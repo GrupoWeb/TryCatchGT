@@ -141,6 +141,11 @@ export class TypeOrmUserRepository implements UserRepository {
     return (result.affected ?? 0) > 0;
   }
 
+  public async setEmailVerified(id: number, at: Date | null): Promise<boolean> {
+    const result = await this.repo.update({ id }, { emailVerifiedAt: at });
+    return (result.affected ?? 0) > 0;
+  }
+
   public async countAdmins(): Promise<number> {
     return this.repo.countBy({ role: 'admin' });
   }

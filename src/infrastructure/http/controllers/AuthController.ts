@@ -5,7 +5,12 @@ import { PasswordHasher } from '../../../application/ports/output/PasswordHasher
 import { User } from '../../../domain/entities/User.js';
 import { createMfaChallenge, verifyMfaChallenge, setSessionCookie, clearSessionCookie } from '../auth/session.js';
 import { verifyMfaToken, normalizeBackupCode } from '../../security/MfaService.js';
+import { TokenService } from '../../security/TokenService.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
+
+function resultPage(message: string, ok: boolean): string {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Verificación de correo</title><style>body{font-family:system-ui,sans-serif;background:#0a0a0c;color:#e7e7ea;display:grid;place-items:center;min-height:100vh;margin:0}.card{max-width:420px;padding:32px;border-radius:16px;background:#15151a;border:1px solid #26262e;text-align:center}.i{font-size:40px}</style></head><body><div class="card"><div class="i">${ok ? '✅' : '⚠️'}</div><h1>${ok ? 'Correo verificado' : 'No se pudo verificar'}</h1><p>${message}</p></div></body></html>`;
+}
 
 // Bloqueo por intentos fallidos (complementa el rate-limit por IP).
 const MAX_FAILED_ATTEMPTS = 5;
@@ -20,7 +25,20 @@ export class AuthController {
     private readonly authenticate: AuthenticateUserUseCase,
     private readonly users: UserRepository,
     private readonly hasher: PasswordHasher,
+    private readonly tokens: TokenService,
   ) {}
+
+  // Verificación de correo desde el enlace del email (GET público). Devuelve HTML.
+  public verifyEmail = async (req: Request, res: Response): Promise<void> => {
+    const token = String(req.query.token ?? '');
+    const userId = await this.tokens.consume('email_verify', token);
+    if (!userId) {
+      res.status(400).type('html').send(resultPage('El enlace es inválido o ya venció. Solicita uno nuevo desde el panel.', false));
+      return;
+    }
+    await this.users.setEmailVerified(userId, new Date());
+    res.status(200).type('html').send(resultPage('Tu correo quedó verificado. Ya puedes cerrar esta pestaña.', true));
+  };
 
   private startSession(res: Response, user: User): void {
     setSessionCookie(res, user.id!, user.sessionVersion);
