@@ -2,8 +2,7 @@ import { Request, Response } from 'express';
 import { AuthenticateUserUseCase } from '../../../application/ports/input/AuthenticateUserUseCase.js';
 import { UserRepository } from '../../../application/ports/output/UserRepository.js';
 import { User } from '../../../domain/entities/User.js';
-import { env } from '../../../config/env.js';
-import { createSessionToken, createMfaChallenge, verifyMfaChallenge } from '../auth/session.js';
+import { createMfaChallenge, verifyMfaChallenge, setSessionCookie, clearSessionCookie } from '../auth/session.js';
 import { verifyMfaToken } from '../../security/MfaService.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 
@@ -14,13 +13,7 @@ export class AuthController {
   ) {}
 
   private startSession(res: Response, user: User): void {
-    res.cookie(env.session.cookieName, createSessionToken(user.id!), {
-      httpOnly: true,
-      sameSite: 'strict',
-      secure: env.isProduction,
-      maxAge: env.session.maxAgeMs,
-      path: '/',
-    });
+    setSessionCookie(res, user.id!, user.sessionVersion);
   }
 
   public login = async (req: Request, res: Response): Promise<void> => {
@@ -67,7 +60,7 @@ export class AuthController {
   };
 
   public logout = (_req: Request, res: Response): void => {
-    res.clearCookie(env.session.cookieName, { path: '/' });
+    clearSessionCookie(res);
     res.status(200).json({ success: true });
   };
 

@@ -116,6 +116,26 @@ export class MySQLUserRepository implements UserRepository {
     }
   }
 
+  public async bumpSessionVersion(id: number): Promise<number | null> {
+    try {
+      await pool.execute<ResultSetHeader>(
+        'UPDATE users SET session_version = session_version + 1 WHERE id = ?',
+        [id],
+      );
+      const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT session_version FROM users WHERE id = ? LIMIT 1',
+        [id],
+      );
+      return rows.length > 0 ? Number(rows[0].session_version) : null;
+    } catch {
+      const idx = this.memoryStore.findIndex((u) => u.id === id);
+      if (idx === -1) return null;
+      const next = (this.memoryStore[idx].sessionVersion ?? 0) + 1;
+      this.memoryStore[idx] = new User({ ...this.memoryStore[idx], sessionVersion: next });
+      return next;
+    }
+  }
+
   public async countAdmins(): Promise<number> {
     try {
       const [rows] = await pool.query<RowDataPacket[]>("SELECT COUNT(*) AS total FROM users WHERE role = 'admin'");
@@ -144,6 +164,7 @@ export class MySQLUserRepository implements UserRepository {
       avatar: row.avatar ?? null,
       mfaEnabled: Boolean(row.mfa_enabled),
       mfaSecret: row.mfa_secret ?? null,
+      sessionVersion: Number(row.session_version ?? 0),
       createdAt: row.created_at,
     });
   }

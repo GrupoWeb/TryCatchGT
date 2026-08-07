@@ -3,6 +3,7 @@ import { UserRepository } from '../../../application/ports/output/UserRepository
 import { PasswordHasher } from '../../../application/ports/output/PasswordHasher.js';
 import { User } from '../../../domain/entities/User.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
+import { setSessionCookie } from '../auth/session.js';
 import { generateMfaSecret, mfaKeyUri, mfaQrDataUrl, verifyMfaToken } from '../../security/MfaService.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -69,6 +70,20 @@ export class AccountAdminController {
       return;
     }
     await this.users.updatePassword(user.id, await this.hasher.hash(String(newPassword)));
+    // Al cambiar la contraseña, invalida cualquier otra sesión abierta y renueva
+    // la cookie de la sesión actual con la versión nueva (rotación).
+    const version = await this.users.bumpSessionVersion(user.id);
+    setSessionCookie(res, user.id, version ?? undefined);
+    res.status(200).json({ success: true });
+  };
+
+  // "Cerrar todas las demás sesiones": sube la versión (invalida las existentes)
+  // y renueva la cookie de la sesión actual para no autoexpulsarse.
+  public revokeOtherSessions = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const user = await this.currentUser(req);
+    if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    const version = await this.users.bumpSessionVersion(user.id);
+    setSessionCookie(res, user.id, version ?? undefined);
     res.status(200).json({ success: true });
   };
 
