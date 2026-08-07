@@ -183,7 +183,7 @@ export class AccountAdminController {
   };
 
   public createUser = async (req: AuthedRequest, res: Response): Promise<void> => {
-    const { username, password, role, fullName, lastName, displayName } = req.body ?? {};
+    const { username, password, role, fullName, lastName, displayName, mustChangePassword } = req.body ?? {};
     const uname = String(username ?? '').trim().toLowerCase();
     if (uname.length < 3) { res.status(400).json({ success: false, error: 'El usuario debe tener al menos 3 caracteres.' }); return; }
     if (!password || String(password).length < 6) { res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' }); return; }
@@ -196,10 +196,30 @@ export class AccountAdminController {
         fullName: fullName ? String(fullName).trim() : null,
         lastName: lastName ? String(lastName).trim() : null,
         displayName: displayName ? String(displayName).trim() : null,
+        mustChangePassword: !!mustChangePassword,
         createdBy: req.userId ?? null,
       }),
     );
     res.status(201).json({ success: true, data: { id: created.id, username: created.username, role: created.role } });
+  };
+
+  // Admin: fija una contraseña temporal a otro usuario y le obliga a cambiarla,
+  // cortando sus sesiones para forzar el reingreso.
+  public resetUserPassword = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!id) { res.status(400).json({ success: false, error: 'Id inválido.' }); return; }
+    if (id === req.userId) { res.status(400).json({ success: false, error: 'Cambia tu propia contraseña desde tu perfil.' }); return; }
+    const target = await this.users.findById(id);
+    if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    const { newPassword } = req.body ?? {};
+    if (!newPassword || String(newPassword).length < 6) {
+      res.status(400).json({ success: false, error: 'La contraseña temporal debe tener al menos 6 caracteres.' });
+      return;
+    }
+    await this.users.updatePassword(id, await this.hasher.hash(String(newPassword)));
+    await this.users.setMustChangePassword(id, true);
+    await this.users.bumpSessionVersion(id);
+    res.status(200).json({ success: true });
   };
 
   public getUser = async (req: AuthedRequest, res: Response): Promise<void> => {

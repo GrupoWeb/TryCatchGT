@@ -34,6 +34,8 @@ export interface UserRepository {
   registerFailedLogin(id: number, attempts: number, lockedUntil: Date | null): Promise<void>;
   // Actualiza estado de cuenta / soft-delete de un usuario.
   updateAccountState(id: number, fields: UserAccountStateUpdate): Promise<boolean>;
+  // Marca (o quita) la obligación de cambiar contraseña en el próximo acceso.
+  setMustChangePassword(id: number, value: boolean): Promise<boolean>;
   countAdmins(): Promise<number>;
   // Admins que pueden operar (activos y no eliminados); para no quedarse sin admin.
   countActiveAdmins(): Promise<number>;

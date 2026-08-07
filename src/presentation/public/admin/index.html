@@ -47,6 +47,25 @@
     </form>
   </section>
 
+  <!-- CAMBIO DE CONTRASEÑA OBLIGATORIO -->
+  <section class="admin-login" id="force-pass-view" hidden>
+    <form class="admin-login__card" id="force-pass-form">
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Debes actualizar tu contraseña para continuar</p>
+      <div class="admin-field">
+        <label for="fp-current">Contraseña actual</label>
+        <input type="password" id="fp-current" autocomplete="current-password" />
+      </div>
+      <div class="admin-field">
+        <label for="fp-new">Nueva contraseña <span class="admin-hint">(mín. 6)</span></label>
+        <input type="password" id="fp-new" autocomplete="new-password" />
+      </div>
+      <p class="admin-error" id="fp-error"></p>
+      <button type="submit" class="btn-primary" id="fp-save">Guardar y continuar</button>
+      <button type="button" class="btn-ghost" id="fp-logout" style="width:100%;margin-top:8px">Cerrar sesión</button>
+    </form>
+  </section>
+
   <!-- DASHBOARD -->
   <section class="admin" id="dashboard-view" hidden>
     <header class="admin__topbar">
@@ -353,6 +372,7 @@
               <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
             </div>
             <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 6)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
+            <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
             <p class="admin-error" id="user-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
           </form>

@@ -2,17 +2,23 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { env } from '../../../config/env.js';
 import { parseCookies, verifySessionToken } from '../auth/session.js';
 import { UserRepository } from '../../../application/ports/output/UserRepository.js';
+import { User } from '../../../domain/entities/User.js';
 
-// Extiende Request para exponer el id de usuario autenticado.
+// Extiende Request para exponer el usuario autenticado.
 export interface AuthedRequest extends Request {
   userId?: number;
+  authUser?: User;
 }
 
+const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// Único endpoint permitido mientras el usuario deba cambiar su contraseña.
+const CHANGE_PASSWORD_PATH = '/admin/account/password';
+
 /**
- * Middleware de autenticación. Verifica la firma y expiración del token y, además,
- * que la versión de sesión del token siga coincidiendo con la del usuario. Esto
- * permite revocar sesiones (p. ej. "cerrar las demás sesiones" o al cambiar la
- * contraseña) subiendo `session_version`: los tokens emitidos antes dejan de valer.
+ * Middleware de autenticación. Verifica firma/expiración del token y que la versión
+ * de sesión siga coincidiendo (permite revocar sesiones). Además, si el usuario tiene
+ * `must_change_password`, bloquea cualquier acción mutante salvo el propio cambio de
+ * contraseña, forzando el flujo.
  */
 export function createRequireAuth(users: UserRepository): RequestHandler {
   return async (req: AuthedRequest, res: Response, next: NextFunction): Promise<void> => {
@@ -31,6 +37,13 @@ export function createRequireAuth(users: UserRepository): RequestHandler {
     }
 
     req.userId = session.uid;
+    req.authUser = user;
+
+    if (user.mustChangePassword && MUTATING.has(req.method) && req.path !== CHANGE_PASSWORD_PATH) {
+      res.status(403).json({ success: false, error: 'Debes cambiar tu contraseña antes de continuar.', code: 'PASSWORD_CHANGE_REQUIRED' });
+      return;
+    }
+
     next();
   };
 }
