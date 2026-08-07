@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import express, { Response, NextFunction, Request } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -7,6 +8,7 @@ import { env, assertSecureSecrets } from '../../config/env.js';
 import { apiRouter, ensureAdminUser } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { testConnection } from '../database/mysql/connection.js';
+import { AppDataSource } from '../database/typeorm/data-source.js';
 
 // Los assets del frontend (HTML/CSS/JS) no los compila tsc, así que se sirven
 // directamente desde el árbol de fuentes usando la raíz del proyecto.
@@ -112,6 +114,12 @@ async function bootstrap(): Promise<void> {
   // servidor; si MySQL falla, los repositorios degradan a memoria.
   const dbUp = await testConnection();
   if (dbUp) {
+    try {
+      await AppDataSource.initialize();
+      console.log('  🗃️  TypeORM inicializado');
+    } catch (error) {
+      console.warn('⚠️  No se pudo inicializar TypeORM:', (error as Error).message);
+    }
     try {
       await ensureAdminUser.execute();
     } catch (error) {

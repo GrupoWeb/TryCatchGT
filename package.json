@@ -7,7 +7,11 @@
     "build": "tsc",
     "start": "node dist/infrastructure/http/server.js",
     "dev": "tsx watch src/infrastructure/http/server.ts",
-    "set-admin-password": "tsx scripts/setAdminPassword.ts"
+    "set-admin-password": "tsx scripts/setAdminPassword.ts",
+    "typeorm": "tsx ./node_modules/typeorm/cli.js -d src/infrastructure/database/typeorm/data-source.ts",
+    "migration:run": "npm run typeorm -- migration:run",
+    "migration:revert": "npm run typeorm -- migration:revert",
+    "migration:generate": "tsx ./node_modules/typeorm/cli.js migration:generate -d src/infrastructure/database/typeorm/data-source.ts"
   },
   "keywords": [
     "nodejs",
@@ -29,7 +33,9 @@
     "mysql2": "^3.9.7",
     "otplib": "^12.0.1",
     "qrcode": "^1.5.4",
-    "sanitize-html": "^2.17.6"
+    "reflect-metadata": "^0.2.2",
+    "sanitize-html": "^2.17.6",
+    "typeorm": "^0.3.31"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
