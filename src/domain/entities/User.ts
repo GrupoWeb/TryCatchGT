@@ -8,6 +8,7 @@ export interface UserProps {
   mfaEnabled?: boolean;
   mfaSecret?: string | null;
   mfaBackupCodes?: string[] | null;
+  sessionVersion?: number;
   createdAt?: Date;
 }
 
@@ -21,6 +22,7 @@ export class User {
   public readonly mfaEnabled: boolean;
   public readonly mfaSecret: string | null;
   public readonly mfaBackupCodes: string[] | null;
+  public readonly sessionVersion: number;
   public readonly createdAt: Date;
 
   constructor(props: UserProps) {
@@ -33,6 +35,7 @@ export class User {
     this.mfaEnabled = props.mfaEnabled ?? false;
     this.mfaSecret = props.mfaSecret || null;
     this.mfaBackupCodes = props.mfaBackupCodes ?? null;
+    this.sessionVersion = props.sessionVersion ?? 0;
     this.createdAt = props.createdAt || new Date();
   }
 }

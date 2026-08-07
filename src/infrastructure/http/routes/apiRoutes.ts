@@ -14,7 +14,7 @@ import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
-import { requireAuth } from '../middleware/requireAuth.js';
+import { createRequireAuth } from '../middleware/requireAuth.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
@@ -47,6 +47,9 @@ const blogRepository = new MySQLBlogPostRepository();
 const userRepository = new MySQLUserRepository();
 const siteConfigRepository = new MySQLSiteConfigRepository();
 const passwordHasher = new BcryptPasswordHasher();
+
+// Autenticación con validación de versión de sesión (permite revocar sesiones).
+const requireAuth = createRequireAuth(userRepository);
 
 // Público
 const serviceController = new ServiceController(new GetServices(serviceRepository));
@@ -160,6 +163,7 @@ apiRouter.put('/admin/config', requireAuth, siteConfigController.adminUpdate);
 apiRouter.get('/admin/account', requireAuth, accountAdminController.me);
 apiRouter.put('/admin/account', requireAuth, accountAdminController.updateProfile);
 apiRouter.post('/admin/account/password', requireAuth, accountAdminController.changePassword);
+apiRouter.post('/admin/account/sessions/revoke-all', requireAuth, accountAdminController.revokeOtherSessions);
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);

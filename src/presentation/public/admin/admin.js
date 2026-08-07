@@ -624,6 +624,13 @@
     if (r.ok) { $('a-current').value = ''; $('a-new').value = ''; toast('Contraseña actualizada'); }
     else { const m = (r.body && r.body.error) || 'No se pudo cambiar.'; $('pass-error').textContent = m; toast(m, 'error'); }
   });
+  $('sessions-revoke-btn').addEventListener('click', async () => {
+    const ok = await confirmDialog({ title: 'Cerrar las demás sesiones', message: 'Se cerrará la sesión en todos los demás dispositivos. Esta sesión se mantiene abierta.', confirmText: 'Cerrar las demás', danger: true });
+    if (!ok) return;
+    const r = await api('/api/admin/account/sessions/revoke-all', { method: 'POST' });
+    if (r.ok) toast('Se cerraron las demás sesiones');
+    else toast((r.body && r.body.error) || 'No se pudo completar.', 'error');
+  });
   $('user-save').addEventListener('click', async () => {
     $('user-error').textContent = '';
     const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value }) });
