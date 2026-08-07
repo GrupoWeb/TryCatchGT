@@ -14,6 +14,7 @@ export interface UserRepository {
   updatePassword(id: number, passwordHash: string): Promise<boolean>;
   updateProfile(id: number, fields: UserProfileUpdate): Promise<boolean>;
   setMfa(id: number, secret: string | null, enabled: boolean): Promise<boolean>;
+  setBackupCodes(id: number, hashes: string[] | null): Promise<boolean>;
   countAdmins(): Promise<number>;
   count(): Promise<number>;
 }

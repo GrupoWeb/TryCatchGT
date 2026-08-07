@@ -3,12 +3,15 @@ import { UserRepository } from '../../../application/ports/output/UserRepository
 import { PasswordHasher } from '../../../application/ports/output/PasswordHasher.js';
 import { User } from '../../../domain/entities/User.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
-import { generateMfaSecret, mfaKeyUri, mfaQrDataUrl, verifyMfaToken } from '../../security/MfaService.js';
+import { generateMfaSecret, mfaKeyUri, mfaQrDataUrl, verifyMfaToken, generateBackupCodes, normalizeBackupCode } from '../../security/MfaService.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function profileView(u: User) {
-  return { id: u.id, username: u.username, email: u.email, avatar: u.avatar, role: u.role, mfaEnabled: u.mfaEnabled };
+  return {
+    id: u.id, username: u.username, email: u.email, avatar: u.avatar, role: u.role,
+    mfaEnabled: u.mfaEnabled, backupCodesRemaining: u.mfaBackupCodes?.length ?? 0,
+  };
 }
 
 export class AccountAdminController {
@@ -92,8 +95,33 @@ export class AccountAdminController {
       return;
     }
     await this.users.setMfa(user.id, String(secret), true);
-    res.status(200).json({ success: true });
+    const backupCodes = await this.replaceBackupCodes(user.id);
+    res.status(200).json({ success: true, data: { backupCodes } });
   };
+
+  // Regenera los códigos de respaldo. Exige un código TOTP válido para evitar que
+  // una sesión secuestrada obtenga códigos nuevos sin el segundo factor.
+  public regenerateBackupCodes = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const { code } = req.body ?? {};
+    const user = await this.currentUser(req);
+    if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    if (!user.mfaEnabled || !user.mfaSecret) { res.status(400).json({ success: false, error: 'El 2FA no está activo.' }); return; }
+    if (!verifyMfaToken(String(code ?? ''), user.mfaSecret)) {
+      res.status(400).json({ success: false, error: 'Código incorrecto.' });
+      return;
+    }
+    const backupCodes = await this.replaceBackupCodes(user.id);
+    res.status(200).json({ success: true, data: { backupCodes } });
+  };
+
+  // Genera un juego nuevo de códigos, guarda solo sus hashes y devuelve el texto
+  // plano (única vez que el usuario podrá verlos).
+  private async replaceBackupCodes(userId: number): Promise<string[]> {
+    const codes = generateBackupCodes();
+    const hashes = await Promise.all(codes.map((c) => this.hasher.hash(normalizeBackupCode(c))));
+    await this.users.setBackupCodes(userId, hashes);
+    return codes;
+  }
 
   public mfaDisable = async (req: AuthedRequest, res: Response): Promise<void> => {
     const { code } = req.body ?? {};
@@ -105,6 +133,7 @@ export class AccountAdminController {
       return;
     }
     await this.users.setMfa(user.id, null, false);
+    await this.users.setBackupCodes(user.id, null);
     res.status(200).json({ success: true });
   };
 

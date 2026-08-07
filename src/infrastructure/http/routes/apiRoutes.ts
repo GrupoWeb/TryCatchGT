@@ -56,7 +56,7 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher);
 
 // Admin
 const adminBlogController = new AdminBlogController(
@@ -146,5 +146,6 @@ apiRouter.post('/admin/account/password', requireAuth, accountAdminController.ch
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);
+apiRouter.post('/admin/account/mfa/backup-codes', requireAuth, accountAdminController.regenerateBackupCodes);
 apiRouter.get('/admin/users', requireAuth, accountAdminController.listUsers);
 apiRouter.post('/admin/users', requireAuth, accountAdminController.createUser);

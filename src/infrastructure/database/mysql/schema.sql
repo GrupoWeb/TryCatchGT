@@ -14,8 +14,12 @@ CREATE TABLE IF NOT EXISTS users (
     avatar VARCHAR(500) NULL,
     mfa_secret VARCHAR(64) NULL,
     mfa_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    mfa_backup_codes JSON NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Para bases de datos ya existentes (MySQL no soporta ADD COLUMN IF NOT EXISTS):
+-- ALTER TABLE users ADD COLUMN mfa_backup_codes JSON NULL AFTER mfa_enabled;
 
 -- Table for Site Config (contacto/WhatsApp editables desde el panel)
 CREATE TABLE IF NOT EXISTS site_config (
