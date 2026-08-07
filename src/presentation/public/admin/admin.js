@@ -126,11 +126,41 @@
   $('fp-logout').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); showLogin(); });
 
   let mfaChallenge = null;
+  let resetToken = null;
   function showLoginStep(step) {
     $('login-form').hidden = step !== 'password';
     $('mfa-login-card').hidden = step !== 'mfa';
+    $('forgot-card').hidden = step !== 'forgot';
+    $('reset-card').hidden = step !== 'reset';
     if (step === 'mfa') setTimeout(() => $('mfa-login-code').focus(), 50);
   }
+  function showResetView(token) {
+    resetToken = token;
+    loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true;
+    showLoginStep('reset');
+  }
+
+  // ¿Olvidaste tu contraseña?
+  $('forgot-link').addEventListener('click', () => { $('forgot-msg').textContent = ''; showLoginStep('forgot'); });
+  $('forgot-back').addEventListener('click', () => showLoginStep('password'));
+  $('forgot-card').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: $('forgot-email').value.trim() }) });
+    // Respuesta uniforme (no revela si el correo existe).
+    if (r.ok) { toast('Si el correo está registrado, te enviamos un enlace.'); $('forgot-email').value = ''; showLoginStep('password'); }
+    else toast((r.body && r.body.error) || 'No se pudo procesar.', 'error');
+  });
+  $('reset-card').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('reset-msg').textContent = '';
+    const r = await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetToken, newPassword: $('reset-pass').value }) });
+    if (r.ok) {
+      toast('Contraseña actualizada. Inicia sesión con la nueva.');
+      resetToken = null;
+      history.replaceState(null, '', '/admin');
+      showLogin();
+    } else { const m = (r.body && r.body.error) || 'No se pudo.'; $('reset-msg').textContent = m; toast(m, 'error'); }
+  });
 
   // Carga Cloudflare Turnstile en el login si está activado en el panel.
   (async function initLoginTurnstile() {
@@ -819,5 +849,11 @@
     else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
   });
 
-  checkSession();
+  // Enlace de recuperación de contraseña: /admin/reset-password?token=...
+  const bootToken = new URLSearchParams(location.search).get('token');
+  if (location.pathname.endsWith('/reset-password') && bootToken) {
+    showResetView(bootToken);
+  } else {
+    checkSession();
+  }
 })();

@@ -45,6 +45,14 @@ export class TypeOrmUserRepository implements UserRepository {
     return row ? toDomain(row) : null;
   }
 
+  public async findByEmail(email: string): Promise<User | null> {
+    const clean = email.trim();
+    if (!clean) return null;
+    // La colación utf8mb4_unicode_ci hace la comparación insensible a mayúsculas.
+    const row = await this.repo.findOne({ where: { email: clean } });
+    return row ? toDomain(row) : null;
+  }
+
   public async findById(id: number): Promise<User | null> {
     const row = await this.repo.findOne({ where: { id } });
     return row ? toDomain(row) : null;

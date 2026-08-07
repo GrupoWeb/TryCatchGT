@@ -17,6 +17,7 @@ export interface UserProfileUpdate {
 
 export interface UserRepository {
   findByUsername(username: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
   findById(id: number): Promise<User | null>;
   findAll(): Promise<User[]>;
   create(user: User): Promise<User>;

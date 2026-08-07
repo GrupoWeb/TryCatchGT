@@ -31,6 +31,30 @@
       <div class="cf-turnstile" id="login-turnstile" style="margin-bottom:12px"></div>
       <p class="admin-error" id="login-error"></p>
       <button type="submit" class="btn-primary" id="login-btn">Ingresar</button>
+      <button type="button" class="btn-ghost" id="forgot-link" style="width:100%;margin-top:8px">¿Olvidaste tu contraseña?</button>
+    </form>
+
+    <form class="admin-login__card" id="forgot-card" hidden>
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Recuperar contraseña</p>
+      <div class="admin-field">
+        <label for="forgot-email">Tu correo</label>
+        <input type="email" id="forgot-email" autocomplete="email" />
+      </div>
+      <p class="admin-error" id="forgot-msg"></p>
+      <button type="submit" class="btn-primary">Enviar enlace</button>
+      <button type="button" class="btn-ghost" id="forgot-back" style="width:100%;margin-top:8px">Volver</button>
+    </form>
+
+    <form class="admin-login__card" id="reset-card" hidden>
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Define tu nueva contraseña</p>
+      <div class="admin-field">
+        <label for="reset-pass">Nueva contraseña <span class="admin-hint">(mín. 6)</span></label>
+        <input type="password" id="reset-pass" autocomplete="new-password" />
+      </div>
+      <p class="admin-error" id="reset-msg"></p>
+      <button type="submit" class="btn-primary">Guardar contraseña</button>
     </form>
 
     <form class="admin-login__card" id="mfa-login-card" hidden>

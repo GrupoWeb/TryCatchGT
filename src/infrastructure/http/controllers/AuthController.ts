@@ -6,6 +6,8 @@ import { User } from '../../../domain/entities/User.js';
 import { createMfaChallenge, verifyMfaChallenge, setSessionCookie, clearSessionCookie } from '../auth/session.js';
 import { verifyMfaToken, normalizeBackupCode } from '../../security/MfaService.js';
 import { TokenService } from '../../security/TokenService.js';
+import { EmailService } from '../../email/EmailService.js';
+import { env } from '../../../config/env.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 
 function resultPage(message: string, ok: boolean): string {
@@ -26,7 +28,44 @@ export class AuthController {
     private readonly users: UserRepository,
     private readonly hasher: PasswordHasher,
     private readonly tokens: TokenService,
+    private readonly email: EmailService,
   ) {}
+
+  // Solicita el restablecimiento: envía un enlace si el correo existe. Responde
+  // siempre igual para no revelar qué correos están registrados.
+  public forgotPassword = async (req: Request, res: Response): Promise<void> => {
+    const email = String(req.body?.email ?? '').trim();
+    const generic = () => res.status(200).json({ success: true });
+    if (!email) { generic(); return; }
+    const user = await this.users.findByEmail(email);
+    if (!user || user.id === undefined || !user.canLogin || !user.email) { generic(); return; }
+    const token = await this.tokens.issue(user.id, 'password_reset', 60);
+    const link = `${env.appUrl}/admin/reset-password?token=${token}`;
+    await this.email.send({
+      to: user.email,
+      subject: 'Restablece tu contraseña — TryCatch GT',
+      html: `<p>Hola ${user.label},</p><p>Recibimos una solicitud para restablecer tu contraseña:</p><p><a href="${link}">Restablecer contraseña</a></p><p>El enlace vence en 60 minutos. Si no lo pediste, ignora este correo.</p>`,
+      text: `Restablece tu contraseña: ${link}`,
+    });
+    generic();
+  };
+
+  // Consume el token y fija la nueva contraseña, cortando las sesiones abiertas.
+  public resetPassword = async (req: Request, res: Response): Promise<void> => {
+    const { token, newPassword } = req.body ?? {};
+    if (!newPassword || String(newPassword).length < 6) {
+      res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+    const userId = await this.tokens.consume('password_reset', String(token ?? ''));
+    if (!userId) {
+      res.status(400).json({ success: false, error: 'El enlace es inválido o venció. Solicita uno nuevo.' });
+      return;
+    }
+    await this.users.updatePassword(userId, await this.hasher.hash(String(newPassword)));
+    await this.users.bumpSessionVersion(userId);
+    res.status(200).json({ success: true });
+  };
 
   // Verificación de correo desde el enlace del email (GET público). Devuelve HTML.
   public verifyEmail = async (req: Request, res: Response): Promise<void> => {
