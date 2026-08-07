@@ -116,6 +116,22 @@ export class MySQLUserRepository implements UserRepository {
     }
   }
 
+  public async setBackupCodes(id: number, hashes: string[] | null): Promise<boolean> {
+    const json = hashes && hashes.length ? JSON.stringify(hashes) : null;
+    try {
+      const [result] = await pool.execute<ResultSetHeader>(
+        'UPDATE users SET mfa_backup_codes = ? WHERE id = ?',
+        [json, id],
+      );
+      return result.affectedRows > 0;
+    } catch {
+      const idx = this.memoryStore.findIndex((u) => u.id === id);
+      if (idx === -1) return false;
+      this.memoryStore[idx] = new User({ ...this.memoryStore[idx], mfaBackupCodes: hashes });
+      return true;
+    }
+  }
+
   public async bumpSessionVersion(id: number): Promise<number | null> {
     try {
       await pool.execute<ResultSetHeader>(
@@ -164,8 +180,21 @@ export class MySQLUserRepository implements UserRepository {
       avatar: row.avatar ?? null,
       mfaEnabled: Boolean(row.mfa_enabled),
       mfaSecret: row.mfa_secret ?? null,
+      mfaBackupCodes: parseBackupCodes(row.mfa_backup_codes),
       sessionVersion: Number(row.session_version ?? 0),
       createdAt: row.created_at,
     });
+  }
+}
+
+// La columna JSON puede llegar ya parseada (array) o como string según el driver.
+function parseBackupCodes(value: unknown): string[] | null {
+  if (!value) return null;
+  if (Array.isArray(value)) return value as string[];
+  try {
+    const parsed = JSON.parse(String(value));
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
   }
 }

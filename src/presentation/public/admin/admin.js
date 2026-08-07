@@ -8,11 +8,17 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Lee la cookie CSRF (double-submit) para reenviarla como header en mutaciones.
+  function csrfHeader() {
+    const match = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+    return match ? { 'X-CSRF-Token': decodeURIComponent(match.slice('XSRF-TOKEN='.length)) } : {};
+  }
+
   async function api(path, options = {}) {
     const res = await fetch(path, {
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
     });
     let body = null;
     try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
@@ -522,6 +528,19 @@
     $('mfa-off').hidden = u.mfaEnabled;
     $('mfa-on').hidden = !u.mfaEnabled;
     $('mfa-setup').hidden = true;
+    $('mfa-backup-view').hidden = true;
+    $('mfa-backup-remaining').textContent = u.backupCodesRemaining ?? 0;
+  }
+
+  // Muestra (una única vez) los códigos de respaldo recién generados.
+  let lastBackupCodes = [];
+  function showBackupCodes(codes) {
+    lastBackupCodes = codes || [];
+    $('mfa-backup-list').innerHTML = lastBackupCodes.map((c) => `<li><code>${esc(c)}</code></li>`).join('');
+    $('mfa-off').hidden = true;
+    $('mfa-on').hidden = true;
+    $('mfa-setup').hidden = true;
+    $('mfa-backup-view').hidden = false;
   }
 
   async function loadUsers() {
@@ -537,7 +556,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', body: fd });
+    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
     let ub = null; try { ub = await up.json(); } catch (_) {}
     if (!up.ok || !ub || !ub.success) { toast((ub && ub.error) || 'No se pudo subir la foto.', 'error'); return; }
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ avatar: ub.data.url }) });
@@ -568,9 +587,30 @@
   $('mfa-enable-btn').addEventListener('click', async () => {
     $('mfa-error').textContent = '';
     const r = await api('/api/admin/account/mfa/enable', { method: 'POST', body: JSON.stringify({ secret: mfaPendingSecret, code: $('mfa-code').value }) });
-    if (r.ok) { mfaPendingSecret = null; loadProfile(); toast('2FA activado'); }
+    if (r.ok) { mfaPendingSecret = null; toast('2FA activado'); showBackupCodes(r.body && r.body.data && r.body.data.backupCodes); }
     else { const m = (r.body && r.body.error) || 'Código incorrecto.'; $('mfa-error').textContent = m; toast(m, 'error'); }
   });
+  // Regenerar códigos de respaldo (exige un código TOTP actual).
+  $('mfa-regen-btn').addEventListener('click', async () => {
+    $('mfa-regen-error').textContent = '';
+    const r = await api('/api/admin/account/mfa/backup-codes', { method: 'POST', body: JSON.stringify({ code: $('mfa-regen-code').value }) });
+    if (r.ok) { $('mfa-regen-code').value = ''; toast('Códigos regenerados'); showBackupCodes(r.body && r.body.data && r.body.data.backupCodes); }
+    else { const m = (r.body && r.body.error) || 'No se pudo regenerar.'; $('mfa-regen-error').textContent = m; toast(m, 'error'); }
+  });
+  // Acciones de la vista de códigos de respaldo.
+  $('mfa-backup-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(lastBackupCodes.join('\n')); toast('Códigos copiados'); }
+    catch { toast('No se pudo copiar', 'error'); }
+  });
+  $('mfa-backup-download').addEventListener('click', () => {
+    const blob = new Blob([`Códigos de respaldo — TryCatch GT\n\n${lastBackupCodes.join('\n')}\n`], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'codigos-respaldo-trycatch.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('mfa-backup-done').addEventListener('click', () => { lastBackupCodes = []; loadProfile(); });
   $('mfa-disable-btn').addEventListener('click', async () => {
     $('mfa-off-error').textContent = '';
     const r = await api('/api/admin/account/mfa/disable', { method: 'POST', body: JSON.stringify({ code: $('mfa-off-code').value }) });

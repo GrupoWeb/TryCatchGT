@@ -15,8 +15,9 @@ import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
 import { createRequireAuth } from '../middleware/requireAuth.js';
-import { uploadImage } from '../upload.js';
+import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
+import { issueCsrfToken, requireCsrf } from '../csrf.js';
 
 // Use cases
 import { GetServices } from '../../../application/use-cases/GetServices.js';
@@ -59,7 +60,7 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher);
 
 // Admin
 const adminBlogController = new AdminBlogController(
@@ -82,6 +83,17 @@ export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHashe
 
 // ── Rutas ───────────────────────────────────────────────────────────────────
 export const apiRouter = Router();
+
+// Emite el token CSRF en los GET; el SPA lo reenvía como header en las mutaciones.
+apiRouter.use(issueCsrfToken);
+
+// Exige token CSRF en toda petición mutante. Excepción: el formulario público de
+// cotización (POST /projects), que es anónimo y ya está acotado por formLimiter.
+apiRouter.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') { next(); return; }
+  if (req.path === '/projects') { next(); return; }
+  requireCsrf(req, res, next);
+});
 
 apiRouter.get('/health', (_req, res) => {
   res.status(200).json({ success: true, status: 'ok', service: 'trycatch-gt-api' });
@@ -109,7 +121,12 @@ apiRouter.post('/admin/uploads', requireAuth, (req, res) => {
   uploadImage.single('image')(req, res, (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }
-    res.status(201).json({ success: true, data: { url: `/uploads/${req.file.filename}` } });
+    try {
+      const filename = saveValidatedImage(req.file);
+      res.status(201).json({ success: true, data: { url: `/uploads/${filename}` } });
+    } catch (e) {
+      res.status(400).json({ success: false, error: (e as Error).message });
+    }
   });
 });
 
@@ -150,5 +167,6 @@ apiRouter.post('/admin/account/sessions/revoke-all', requireAuth, accountAdminCo
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);
+apiRouter.post('/admin/account/mfa/backup-codes', requireAuth, accountAdminController.regenerateBackupCodes);
 apiRouter.get('/admin/users', requireAuth, accountAdminController.listUsers);
 apiRouter.post('/admin/users', requireAuth, accountAdminController.createUser);
