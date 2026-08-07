@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+.claude/
 src/presentation/public/uploads/
 *.log
 npm-debug.log*

@@ -8,11 +8,17 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Lee la cookie CSRF (double-submit) para reenviarla como header en mutaciones.
+  function csrfHeader() {
+    const match = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+    return match ? { 'X-CSRF-Token': decodeURIComponent(match.slice('XSRF-TOKEN='.length)) } : {};
+  }
+
   async function api(path, options = {}) {
     const res = await fetch(path, {
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
     });
     let body = null;
     try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
@@ -537,7 +543,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', body: fd });
+    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
     let ub = null; try { ub = await up.json(); } catch (_) {}
     if (!up.ok || !ub || !ub.success) { toast((ub && ub.error) || 'No se pudo subir la foto.', 'error'); return; }
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ avatar: ub.data.url }) });
