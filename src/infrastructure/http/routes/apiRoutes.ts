@@ -15,7 +15,7 @@ import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
-import { uploadImage } from '../upload.js';
+import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
 
@@ -118,7 +118,12 @@ apiRouter.post('/admin/uploads', requireAuth, (req, res) => {
   uploadImage.single('image')(req, res, (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }
-    res.status(201).json({ success: true, data: { url: `/uploads/${req.file.filename}` } });
+    try {
+      const filename = saveValidatedImage(req.file);
+      res.status(201).json({ success: true, data: { url: `/uploads/${filename}` } });
+    } catch (e) {
+      res.status(400).json({ success: false, error: (e as Error).message });
+    }
   });
 });
 
