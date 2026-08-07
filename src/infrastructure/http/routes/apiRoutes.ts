@@ -33,7 +33,7 @@ import { AuthenticateUser } from '../../../application/use-cases/AuthenticateUse
 import { EnsureAdminUser } from '../../../application/use-cases/EnsureAdminUser.js';
 
 // Adapters (output)
-import { MySQLServiceRepository } from '../../database/mysql/MySQLServiceRepository.js';
+import { TypeOrmServiceRepository } from '../../database/typeorm/TypeOrmServiceRepository.js';
 import { MySQLPlanRepository } from '../../database/mysql/MySQLPlanRepository.js';
 import { MySQLProjectRequestRepository } from '../../database/mysql/MySQLProjectRequestRepository.js';
 import { MySQLBlogPostRepository } from '../../database/mysql/MySQLBlogPostRepository.js';
@@ -43,7 +43,7 @@ import { MySQLAuditLogRepository } from '../../database/mysql/MySQLAuditLogRepos
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
-const serviceRepository = new MySQLServiceRepository();
+const serviceRepository = new TypeOrmServiceRepository();
 const planRepository = new MySQLPlanRepository();
 const projectRequestRepository = new MySQLProjectRequestRepository();
 const blogRepository = new MySQLBlogPostRepository();
