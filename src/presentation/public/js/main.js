@@ -175,6 +175,23 @@
   const submitBtn = document.getElementById('submit-btn');
   const description = document.getElementById('description');
 
+  // Carga Cloudflare Turnstile en el formulario si está activado en el panel.
+  // El widget inyecta un input oculto `cf-turnstile-response` que FormData recoge.
+  (async function initTurnstile() {
+    try {
+      const res = await fetch('/api/config');
+      const cfg = (await res.json()).data || {};
+      const el = document.getElementById('quote-turnstile');
+      if (!cfg.turnstileEnabled || !cfg.turnstileSiteKey || !el) return;
+      el.setAttribute('data-sitekey', cfg.turnstileSiteKey);
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    } catch (_) { /* si falla, el formulario sigue funcionando */ }
+  })();
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     setStatus('', '');
@@ -203,6 +220,7 @@
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Enviar solicitud →';
+      if (window.turnstile) window.turnstile.reset();
     }
   });
 

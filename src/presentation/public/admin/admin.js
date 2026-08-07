@@ -118,10 +118,32 @@
     if (step === 'mfa') setTimeout(() => $('mfa-login-code').focus(), 50);
   }
 
+  // Carga Cloudflare Turnstile en el login si está activado en el panel.
+  (async function initLoginTurnstile() {
+    try {
+      const res = await fetch('/api/config');
+      const cfg = (await res.json()).data || {};
+      const el = $('login-turnstile');
+      if (!cfg.turnstileEnabled || !cfg.turnstileSiteKey || !el) return;
+      el.setAttribute('data-sitekey', cfg.turnstileSiteKey);
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    } catch (_) { /* sin bloquear el login si falla */ }
+  })();
+
+  function loginTurnstileToken() {
+    const input = document.querySelector('#login-form [name="cf-turnstile-response"]');
+    return input ? input.value : '';
+  }
+
   $('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('login-error').textContent = '';
-    const { ok, body } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('login-user').value, password: $('login-pass').value }) });
+    const { ok, body } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('login-user').value, password: $('login-pass').value, 'cf-turnstile-response': loginTurnstileToken() }) });
+    if (window.turnstile) window.turnstile.reset();
     if (ok && body && body.mfaRequired) {
       mfaChallenge = body.challenge;
       $('login-pass').value = '';
@@ -519,14 +541,23 @@
   async function loadContact() {
     const r = await api('/api/admin/config');
     if (!guard(r) || !r.ok) return;
-    $('c-email').value = r.body.data.contactEmail || '';
-    $('c-wa').value = r.body.data.whatsappNumber || '';
-    $('c-msg').value = r.body.data.whatsappMessage || '';
+    const d = r.body.data;
+    $('c-email').value = d.contactEmail || '';
+    $('c-wa').value = d.whatsappNumber || '';
+    $('c-msg').value = d.whatsappMessage || '';
+    $('ts-enabled').checked = !!d.turnstileEnabled;
+    $('ts-site').value = d.turnstileSiteKey || '';
+    $('ts-secret').value = d.turnstileSecretKey || '';
   }
   $('contact-save').addEventListener('click', async () => {
     $('contact-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ contactEmail: $('c-email').value, whatsappNumber: $('c-wa').value, whatsappMessage: $('c-msg').value }) });
     if (r.ok) toast('Contacto actualizado'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('contact-error').textContent = m; toast(m, 'error'); }
+  });
+  $('turnstile-save').addEventListener('click', async () => {
+    $('turnstile-error').textContent = '';
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ turnstileEnabled: $('ts-enabled').checked, turnstileSiteKey: $('ts-site').value.trim(), turnstileSecretKey: $('ts-secret').value.trim() }) });
+    if (r.ok) toast('Protección actualizada'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('turnstile-error').textContent = m; toast(m, 'error'); }
   });
 
   // ── PERFIL ────────────────────────────────────────────────
