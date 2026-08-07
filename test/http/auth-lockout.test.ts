@@ -20,8 +20,9 @@ function fakeRepo(initial: Record<string, unknown> = {}) {
 }
 
 const mockRes = (): any => { const r: any = { statusCode: 200, body: null, cookies: {} }; r.status = (c: number) => { r.statusCode = c; return r; }; r.json = (b: any) => { r.body = b; return r; }; r.cookie = (n: string) => { r.cookies[n] = 1; return r; }; return r; };
-const ctrlFor = (repo: any) => new AuthController(new AuthenticateUser(repo, hasher), repo, hasher);
-const req = (password: string) => ({ body: { username: 'admin', password }, ip: '1.2.3.4' } as any);
+const sessions: any = { create: async () => {}, findActiveBySid: async () => null, revokeBySid: async () => {}, revokeAllExcept: async () => {}, listActiveByUser: async () => [] };
+const ctrlFor = (repo: any) => new AuthController(new AuthenticateUser(repo, hasher), repo, hasher, {} as any, {} as any, sessions);
+const req = (password: string) => ({ body: { username: 'admin', password }, ip: '1.2.3.4', headers: {} } as any);
 
 describe('AuthController login', () => {
   it('login correcto abre sesión y registra el acceso', async () => {

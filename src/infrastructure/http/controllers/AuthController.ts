@@ -1,9 +1,11 @@
+import crypto from 'node:crypto';
 import { Request, Response } from 'express';
 import { AuthenticateUserUseCase } from '../../../application/ports/input/AuthenticateUserUseCase.js';
 import { UserRepository } from '../../../application/ports/output/UserRepository.js';
+import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { PasswordHasher } from '../../../application/ports/output/PasswordHasher.js';
 import { User } from '../../../domain/entities/User.js';
-import { createMfaChallenge, verifyMfaChallenge, setSessionCookie, clearSessionCookie } from '../auth/session.js';
+import { createMfaChallenge, verifyMfaChallenge, setSessionCookie, clearSessionCookie, parseCookies, verifySessionToken } from '../auth/session.js';
 import { verifyMfaToken, normalizeBackupCode } from '../../security/MfaService.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
@@ -29,6 +31,7 @@ export class AuthController {
     private readonly hasher: PasswordHasher,
     private readonly tokens: TokenService,
     private readonly email: EmailService,
+    private readonly sessions: UserSessionRepository,
   ) {}
 
   // Solicita el restablecimiento: envía un enlace si el correo existe. Responde
@@ -79,8 +82,17 @@ export class AuthController {
     res.status(200).type('html').send(resultPage('Tu correo quedó verificado. Ya puedes cerrar esta pestaña.', true));
   };
 
-  private startSession(res: Response, user: User): void {
-    setSessionCookie(res, user.id!, user.sessionVersion);
+  // Abre una sesión por dispositivo: registra la sesión (sid) y emite la cookie.
+  private async startSession(req: Request, res: Response, user: User): Promise<void> {
+    const sid = crypto.randomBytes(24).toString('base64url');
+    await this.sessions.create({
+      userId: user.id!,
+      sid,
+      userAgent: (req.headers['user-agent'] ?? null) as string | null,
+      ip: clientIp(req),
+      expiresAt: new Date(Date.now() + env.session.maxAgeMs),
+    });
+    setSessionCookie(res, user.id!, user.sessionVersion, sid);
   }
 
   public login = async (req: Request, res: Response): Promise<void> => {
@@ -116,7 +128,7 @@ export class AuthController {
     }
 
     await this.users.recordLogin(user.id, clientIp(req));
-    this.startSession(res, user);
+    await this.startSession(req, res, user);
     res.status(200).json({ success: true, user: { username: user.username, role: user.role }, mustChangePassword: user.mustChangePassword });
   };
 
@@ -154,7 +166,7 @@ export class AuthController {
       return;
     }
     await this.users.recordLogin(user.id, clientIp(req));
-    this.startSession(res, user);
+    await this.startSession(req, res, user);
     res.status(200).json({ success: true, user: { username: user.username, role: user.role }, mustChangePassword: user.mustChangePassword });
   };
 
@@ -173,7 +185,9 @@ export class AuthController {
     return false;
   }
 
-  public logout = (_req: Request, res: Response): void => {
+  public logout = async (req: Request, res: Response): Promise<void> => {
+    const payload = verifySessionToken(parseCookies(req.headers.cookie)[env.session.cookieName]);
+    if (payload?.sid) await this.sessions.revokeBySid(payload.sid);
     clearSessionCookie(res);
     res.status(200).json({ success: true });
   };

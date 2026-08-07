@@ -42,6 +42,7 @@ import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserReposit
 import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
 import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLogRepository.js';
 import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
+import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
@@ -55,12 +56,13 @@ const userRepository = new TypeOrmUserRepository();
 const siteConfigRepository = new TypeOrmSiteConfigRepository();
 const auditRepository = new TypeOrmAuditLogRepository();
 const userTokenRepository = new TypeOrmUserTokenRepository();
+const userSessionRepository = new TypeOrmUserSessionRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const tokenService = new TokenService(userTokenRepository);
 const emailService = new EmailService(siteConfigRepository);
 
-// Autenticación con validación de versión de sesión (permite revocar sesiones).
-const requireAuth = createRequireAuth(userRepository);
+// Autenticación con validación de versión + sesión por dispositivo.
+const requireAuth = createRequireAuth(userRepository, userSessionRepository);
 // Bitácora de accesos y acciones sensibles del admin.
 const auditLog = createAuditLog(auditRepository);
 // Protección anti-bots (Cloudflare Turnstile) para formularios; se configura en el panel.
@@ -75,7 +77,7 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService, emailService);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 
 // Admin
 const adminBlogController = new AdminBlogController(
@@ -87,7 +89,7 @@ const adminBlogController = new AdminBlogController(
 const leadAdminController = new LeadAdminController(projectRequestRepository);
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
-const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService);
+const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
 const auditController = new AuditController(auditRepository, userRepository);
 
@@ -188,6 +190,8 @@ apiRouter.put('/admin/account', requireAuth, accountAdminController.updateProfil
 apiRouter.post('/admin/account/password', requireAuth, accountAdminController.changePassword);
 apiRouter.post('/admin/account/email/verify/send', requireAuth, accountAdminController.sendEmailVerification);
 apiRouter.post('/admin/account/sessions/revoke-all', requireAuth, accountAdminController.revokeOtherSessions);
+apiRouter.get('/admin/account/sessions', requireAuth, accountAdminController.listSessions);
+apiRouter.delete('/admin/account/sessions/:id', requireAuth, accountAdminController.revokeSession);
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);
