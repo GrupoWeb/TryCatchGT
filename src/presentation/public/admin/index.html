@@ -37,7 +37,8 @@
       <p class="admin-login__subtitle">Verificación en dos pasos</p>
       <div class="admin-field">
         <label for="mfa-login-code">Código de tu app de autenticación</label>
-        <input type="text" id="mfa-login-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" />
+        <input type="text" id="mfa-login-code" maxlength="11" placeholder="000000 o código de respaldo" autocomplete="one-time-code" />
+        <p class="admin-hint">¿Perdiste tu app? Ingresa uno de tus códigos de respaldo.</p>
       </div>
       <p class="admin-error" id="mfa-login-error"></p>
       <button type="submit" class="btn-primary">Verificar</button>
@@ -298,9 +299,23 @@
             </div>
             <div id="mfa-on" hidden>
               <p class="mfa-status">🔒 El 2FA está <strong>activo</strong>. Se te pedirá un código al iniciar sesión.</p>
-              <div class="admin-field"><label for="mfa-off-code">Para desactivarlo, ingresa un código actual</label><input type="text" id="mfa-off-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-muted">Códigos de respaldo disponibles: <strong id="mfa-backup-remaining">—</strong>. Úsalos para entrar si pierdes tu app de autenticación.</p>
+              <div class="admin-field"><label for="mfa-regen-code">Ingresa un código actual para regenerar los de respaldo</label><input type="text" id="mfa-regen-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-error" id="mfa-regen-error"></p>
+              <div class="admin__editor-actions"><button type="button" class="btn-ghost" id="mfa-regen-btn">Regenerar códigos de respaldo</button></div>
+              <hr class="admin-sep" />
+              <div class="admin-field"><label for="mfa-off-code">Para desactivar el 2FA, ingresa un código actual</label><input type="text" id="mfa-off-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
               <p class="admin-error" id="mfa-off-error"></p>
               <div class="admin__editor-actions"><button type="button" class="btn-danger" id="mfa-disable-btn">Desactivar 2FA</button></div>
+            </div>
+            <div id="mfa-backup-view" hidden>
+              <p class="admin-hint">⚠️ Guarda estos códigos de respaldo en un lugar seguro. Cada uno sirve <strong>una sola vez</strong> y <strong>no se volverán a mostrar</strong>.</p>
+              <ul class="mfa-backup-list" id="mfa-backup-list"></ul>
+              <div class="admin__editor-actions">
+                <button type="button" class="btn-ghost" id="mfa-backup-copy">Copiar</button>
+                <button type="button" class="btn-ghost" id="mfa-backup-download">Descargar .txt</button>
+                <button type="button" class="btn-primary" id="mfa-backup-done">Ya los guardé</button>
+              </div>
             </div>
           </div>
 
