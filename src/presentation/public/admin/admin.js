@@ -154,7 +154,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount };
+  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -187,6 +187,28 @@
         <div class="stat-card__label">${esc(c.label)}</div>
       </div>`).join('');
   }
+
+  // ── AUDITORÍA ─────────────────────────────────────────────
+  async function loadAudit() {
+    const r = await api('/api/admin/audit');
+    if (!guard(r) || !r.ok) return;
+    const rows = r.body.data || [];
+    const body = $('audit-body');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="admin-muted">Sin eventos.</td></tr>'; return; }
+    body.innerHTML = rows.map((e) => {
+      const okStatus = e.status && e.status < 400;
+      const when = e.createdAt ? new Date(e.createdAt).toLocaleString('es-GT') : '—';
+      const who = e.actor || (e.actorId ? `#${e.actorId}` : '—');
+      return `<tr>
+        <td>${esc(when)}</td>
+        <td><code>${esc(e.action)}</code></td>
+        <td>${esc(who)}</td>
+        <td><span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(e.status ?? '—')}</span></td>
+        <td>${esc(e.ip || '—')}</td>
+      </tr>`;
+    }).join('');
+  }
+  $('audit-refresh').addEventListener('click', loadAudit);
 
   // ── COTIZACIONES / LEADS ──────────────────────────────────
   const STATUS = { pending: 'Pendiente', reviewed: 'Revisado', contacted: 'Contactado' };

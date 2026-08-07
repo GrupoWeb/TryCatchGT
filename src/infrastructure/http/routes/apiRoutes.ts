@@ -14,7 +14,9 @@ import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
+import { AuditController } from '../controllers/AuditController.js';
 import { createRequireAuth } from '../middleware/requireAuth.js';
+import { createAuditLog } from '../middleware/auditLog.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
@@ -37,6 +39,7 @@ import { MySQLProjectRequestRepository } from '../../database/mysql/MySQLProject
 import { MySQLBlogPostRepository } from '../../database/mysql/MySQLBlogPostRepository.js';
 import { MySQLUserRepository } from '../../database/mysql/MySQLUserRepository.js';
 import { MySQLSiteConfigRepository } from '../../database/mysql/MySQLSiteConfigRepository.js';
+import { MySQLAuditLogRepository } from '../../database/mysql/MySQLAuditLogRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
@@ -46,10 +49,13 @@ const projectRequestRepository = new MySQLProjectRequestRepository();
 const blogRepository = new MySQLBlogPostRepository();
 const userRepository = new MySQLUserRepository();
 const siteConfigRepository = new MySQLSiteConfigRepository();
+const auditRepository = new MySQLAuditLogRepository();
 const passwordHasher = new BcryptPasswordHasher();
 
 // Autenticación con validación de versión de sesión (permite revocar sesiones).
 const requireAuth = createRequireAuth(userRepository);
+// Bitácora de accesos y acciones sensibles del admin.
+const auditLog = createAuditLog(auditRepository);
 
 // Público
 const serviceController = new ServiceController(new GetServices(serviceRepository));
@@ -74,6 +80,7 @@ const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
+const auditController = new AuditController(auditRepository);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
 export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHasher, {
@@ -95,6 +102,9 @@ apiRouter.use((req, res, next) => {
   requireCsrf(req, res, next);
 });
 
+// Registra en la bitácora las mutaciones de autenticación y del panel admin.
+apiRouter.use(auditLog);
+
 apiRouter.get('/health', (_req, res) => {
   res.status(200).json({ success: true, status: 'ok', service: 'trycatch-gt-api' });
 });
@@ -115,6 +125,7 @@ apiRouter.get('/auth/me', requireAuth, authController.me);
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
+apiRouter.get('/admin/audit', requireAuth, auditController.list);
 
 // Subida de imágenes (portadas del blog, etc.)
 apiRouter.post('/admin/uploads', requireAuth, (req, res) => {

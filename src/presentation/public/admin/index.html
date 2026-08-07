@@ -65,6 +65,7 @@
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
         <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
         <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
+        <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
       </aside>
 
       <main class="admin__main">
@@ -336,6 +337,23 @@
             <p class="admin-error" id="user-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
           </form>
+        </section>
+
+        <!-- AUDITORÍA -->
+        <section class="admin-sec" id="sec-audit" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Auditoría</h2>
+            <button class="btn-ghost" id="audit-refresh">↻ Actualizar</button>
+          </div>
+          <p class="admin-muted">Registro de accesos y acciones sensibles del panel (últimos 100 eventos).</p>
+          <div class="audit-table-wrap">
+            <table class="audit-table">
+              <thead>
+                <tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Estado</th><th>IP</th></tr>
+              </thead>
+              <tbody id="audit-body"><tr><td colspan="5" class="admin-muted">Cargando…</td></tr></tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

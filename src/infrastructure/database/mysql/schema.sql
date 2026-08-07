@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS users (
 -- ALTER TABLE users ADD COLUMN mfa_backup_codes JSON NULL AFTER mfa_enabled;
 -- ALTER TABLE users ADD COLUMN session_version INT NOT NULL DEFAULT 0 AFTER mfa_enabled;
 
+-- Table for Audit Logs (bitácora de accesos y acciones sensibles del admin)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    action VARCHAR(80) NOT NULL,
+    actor_id INT NULL,
+    actor VARCHAR(150) NULL,
+    ip VARCHAR(64) NULL,
+    method VARCHAR(10) NULL,
+    path VARCHAR(255) NULL,
+    status INT NULL,
+    detail VARCHAR(255) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_audit_created (created_at),
+    INDEX idx_audit_action (action)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Table for Site Config (contacto/WhatsApp editables desde el panel)
 CREATE TABLE IF NOT EXISTS site_config (
     config_key VARCHAR(80) PRIMARY KEY,
