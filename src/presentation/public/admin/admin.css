@@ -596,3 +596,14 @@ body { min-height: 100vh; }
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay, .modal, .toast { transition: none; }
 }
+
+/* Auditoría */
+.audit-table-wrap { overflow-x: auto; margin-top: 12px; }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.audit-table th, .audit-table td {
+  text-align: left; padding: 10px 12px; white-space: nowrap;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.audit-table th { color: var(--text-dim); font-weight: 600; }
+.audit-table td code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+.audit-table tbody tr:hover { background: rgba(139, 92, 246, 0.06); }
