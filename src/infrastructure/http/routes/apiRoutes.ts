@@ -17,6 +17,7 @@ import { OverviewController } from '../controllers/OverviewController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { createRequireAuth } from '../middleware/requireAuth.js';
 import { createAuditLog } from '../middleware/auditLog.js';
+import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
@@ -56,6 +57,8 @@ const passwordHasher = new BcryptPasswordHasher();
 const requireAuth = createRequireAuth(userRepository);
 // Bitácora de accesos y acciones sensibles del admin.
 const auditLog = createAuditLog(auditRepository);
+// Protección anti-bots (Cloudflare Turnstile) para formularios; se configura en el panel.
+const turnstileGuard = createTurnstileGuard(siteConfigRepository);
 
 // Público
 const serviceController = new ServiceController(new GetServices(serviceRepository));
@@ -113,12 +116,12 @@ apiRouter.get('/health', (_req, res) => {
 apiRouter.get('/config', siteConfigController.publicConfig);
 apiRouter.get('/services', serviceController.list);
 apiRouter.get('/plans', planController.list);
-apiRouter.post('/projects', formLimiter, projectRequestController.create);
+apiRouter.post('/projects', formLimiter, turnstileGuard, projectRequestController.create);
 apiRouter.get('/blog', blogController.list);
 apiRouter.get('/blog/:slug', blogController.detail);
 
 // Autenticación
-apiRouter.post('/auth/login', authLimiter, authController.login);
+apiRouter.post('/auth/login', authLimiter, turnstileGuard, authController.login);
 apiRouter.post('/auth/mfa', authLimiter, authController.mfaVerify);
 apiRouter.post('/auth/logout', authController.logout);
 apiRouter.get('/auth/me', requireAuth, authController.me);

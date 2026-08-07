@@ -30,9 +30,13 @@ app.use(
         baseUri: ["'self'"],
         fontSrc: ["'self'", 'https://fonts.gstatic.com'],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        scriptSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
+        // Cloudflare Turnstile carga su script y renderiza en un iframe desde challenges.cloudflare.com.
+        scriptSrc: env.isProduction
+          ? ["'self'", 'https://challenges.cloudflare.com']
+          : ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com'],
         imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
+        frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         formAction: ["'self'"],
