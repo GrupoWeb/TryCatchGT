@@ -75,7 +75,7 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService, emailService);
 
 // Admin
 const adminBlogController = new AdminBlogController(
@@ -132,6 +132,8 @@ apiRouter.post('/auth/mfa', authLimiter, authController.mfaVerify);
 apiRouter.post('/auth/logout', authController.logout);
 apiRouter.get('/auth/me', requireAuth, authController.me);
 apiRouter.get('/auth/verify-email', authController.verifyEmail);
+apiRouter.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
+apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword);
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
