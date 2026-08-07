@@ -10,15 +10,16 @@ import { UserEntity } from './entities/UserEntity.js';
 import { SiteConfigEntity } from './entities/SiteConfigEntity.js';
 import { AuditLogEntity } from './entities/AuditLogEntity.js';
 
-// Las migraciones solo las carga el CLI (npm run migration:*), que se ejecuta con
-// tsx desde la raíz del proyecto; por eso la ruta se resuelve contra el árbol de
-// fuentes. En tiempo de app no se auto-ejecutan (migrationsRun no está activo).
-const migrationsGlob = path.join(process.cwd(), 'src', 'infrastructure', 'database', 'typeorm', 'migrations', '*.{ts,js}');
+// Ruta a las migraciones relativa a ESTE archivo, para que funcione tanto en
+// desarrollo/CLI con tsx (resuelve a src/…/*.ts) como en producción con node
+// (resuelve a dist/…/*.js). __dirname existe porque el proyecto compila a CommonJS.
+const migrationsGlob = path.join(__dirname, 'migrations', '*.{ts,js}');
 
 /**
- * Fuente de datos de TypeORM (prueba de concepto del ORM). Convive con el pool
- * mysql2 legado mientras se migran los demás repositorios. `synchronize: false`:
- * el esquema se gestiona SOLO con migraciones versionadas.
+ * Fuente de datos de TypeORM. `synchronize: false`: el esquema se gestiona SOLO
+ * con migraciones versionadas. `migrationsRun: true`: las migraciones pendientes
+ * se aplican automáticamente al inicializar la conexión (en cada arranque/deploy),
+ * así producción (Hostinger) no requiere un paso manual de migración.
  */
 export const AppDataSource = new DataSource({
   type: 'mysql',
@@ -30,5 +31,9 @@ export const AppDataSource = new DataSource({
   entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity],
   migrations: [migrationsGlob],
   synchronize: false,
+  migrationsRun: true,
+  // En MySQL el DDL hace commit implícito, lo que rompe la transacción única que
+  // TypeORM usa por defecto para las migraciones. 'none' evita ese conflicto.
+  migrationsTransactionMode: 'none',
   logging: false,
 });
