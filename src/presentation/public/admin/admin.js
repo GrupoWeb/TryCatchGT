@@ -618,7 +618,29 @@
   // ── PERFIL ────────────────────────────────────────────────
   let mfaPendingSecret = null;
 
-  async function loadAccount() { await Promise.all([loadProfile(), loadUsers()]); }
+  async function loadAccount() { await Promise.all([loadProfile(), loadUsers(), loadSessions()]); }
+
+  async function loadSessions() {
+    const r = await api('/api/admin/account/sessions');
+    if (!guard(r) || !r.ok) return;
+    const rows = r.body.data || [];
+    $('sessions-list').innerHTML = rows.map((s) => {
+      const dev = esc((s.userAgent || 'Dispositivo desconocido').slice(0, 60));
+      const when = s.lastSeenAt || s.createdAt;
+      const meta = `${esc(s.ip || '—')} · ${when ? new Date(when).toLocaleString('es-GT') : ''}`;
+      const action = s.current
+        ? '<span class="badge-status published">Esta sesión</span>'
+        : `<button class="btn-ghost btn-sm" data-session="${s.id}">Cerrar</button>`;
+      return `<div class="user-row"><span>${dev} <span class="admin-hint">${meta}</span></span><span class="user-row__actions">${action}</span></div>`;
+    }).join('') || '<p class="admin-muted">No hay sesiones activas.</p>';
+  }
+  $('sessions-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-session]');
+    if (!btn) return;
+    const r = await api(`/api/admin/account/sessions/${btn.getAttribute('data-session')}`, { method: 'DELETE' });
+    if (r.ok) { toast('Sesión cerrada'); loadSessions(); }
+    else toast((r.body && r.body.error) || 'No se pudo cerrar.', 'error');
+  });
 
   async function loadProfile() {
     const r = await api('/api/admin/account');
@@ -839,7 +861,7 @@
     const ok = await confirmDialog({ title: 'Cerrar las demás sesiones', message: 'Se cerrará la sesión en todos los demás dispositivos. Esta sesión se mantiene abierta.', confirmText: 'Cerrar las demás', danger: true });
     if (!ok) return;
     const r = await api('/api/admin/account/sessions/revoke-all', { method: 'POST' });
-    if (r.ok) toast('Se cerraron las demás sesiones');
+    if (r.ok) { toast('Se cerraron las demás sesiones'); loadSessions(); }
     else toast((r.body && r.body.error) || 'No se pudo completar.', 'error');
   });
   $('user-save').addEventListener('click', async () => {

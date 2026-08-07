@@ -2,12 +2,14 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { env } from '../../../config/env.js';
 import { parseCookies, verifySessionToken } from '../auth/session.js';
 import { UserRepository } from '../../../application/ports/output/UserRepository.js';
+import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { User } from '../../../domain/entities/User.js';
 
-// Extiende Request para exponer el usuario autenticado.
+// Extiende Request para exponer el usuario autenticado y su sesión.
 export interface AuthedRequest extends Request {
   userId?: number;
   authUser?: User;
+  sessionSid?: string;
 }
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -15,12 +17,12 @@ const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const CHANGE_PASSWORD_PATH = '/admin/account/password';
 
 /**
- * Middleware de autenticación. Verifica firma/expiración del token y que la versión
- * de sesión siga coincidiendo (permite revocar sesiones). Además, si el usuario tiene
- * `must_change_password`, bloquea cualquier acción mutante salvo el propio cambio de
- * contraseña, forzando el flujo.
+ * Middleware de autenticación. Verifica firma/expiración del token, que la versión
+ * de sesión coincida (revocación global) y, si el token trae `sid`, que la sesión
+ * por dispositivo siga activa (revocación individual). Además, si el usuario tiene
+ * `must_change_password`, bloquea las acciones mutantes salvo el cambio de contraseña.
  */
-export function createRequireAuth(users: UserRepository): RequestHandler {
+export function createRequireAuth(users: UserRepository, sessions: UserSessionRepository): RequestHandler {
   return async (req: AuthedRequest, res: Response, next: NextFunction): Promise<void> => {
     const cookies = parseCookies(req.headers.cookie);
     const session = verifySessionToken(cookies[env.session.cookieName]);
@@ -34,6 +36,16 @@ export function createRequireAuth(users: UserRepository): RequestHandler {
     if (!user || (session.sv ?? 0) !== (user.sessionVersion ?? 0)) {
       res.status(401).json({ success: false, error: 'Tu sesión ya no es válida. Inicia sesión de nuevo.' });
       return;
+    }
+
+    // Revocación por dispositivo: si el token trae sid, la sesión debe seguir activa.
+    if (session.sid) {
+      const active = await sessions.findActiveBySid(session.sid);
+      if (!active || active.userId !== session.uid) {
+        res.status(401).json({ success: false, error: 'Esta sesión fue cerrada. Inicia sesión de nuevo.' });
+        return;
+      }
+      req.sessionSid = session.sid;
     }
 
     req.userId = session.uid;

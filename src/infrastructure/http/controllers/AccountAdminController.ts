@@ -7,6 +7,7 @@ import { setSessionCookie } from '../auth/session.js';
 import { generateMfaSecret, mfaKeyUri, mfaQrDataUrl, verifyMfaToken, generateBackupCodes, normalizeBackupCode } from '../../security/MfaService.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
+import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { env } from '../../../config/env.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,7 +39,29 @@ export class AccountAdminController {
     private readonly hasher: PasswordHasher,
     private readonly tokens: TokenService,
     private readonly email: EmailService,
+    private readonly sessions: UserSessionRepository,
   ) {}
+
+  // Lista las sesiones activas del usuario, marcando la actual.
+  public listSessions = async (req: AuthedRequest, res: Response): Promise<void> => {
+    if (!req.userId) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    const rows = await this.sessions.listActiveByUser(req.userId);
+    res.status(200).json({
+      success: true,
+      data: rows.map((s) => ({
+        id: s.id, userAgent: s.userAgent, ip: s.ip, lastSeenAt: s.lastSeenAt, createdAt: s.createdAt,
+        current: !!req.sessionSid && s.sid === req.sessionSid,
+      })),
+    });
+  };
+
+  // Revoca una sesión concreta del usuario (cierra ese dispositivo).
+  public revokeSession = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!id || !req.userId) { res.status(400).json({ success: false, error: 'Id inválido.' }); return; }
+    const ok = await this.sessions.revokeById(id, req.userId);
+    res.status(ok ? 200 : 404).json({ success: ok, ...(ok ? {} : { error: 'Sesión no encontrada.' }) });
+  };
 
   // Envía al correo del usuario actual un enlace de verificación (token 60 min).
   public sendEmailVerification = async (req: AuthedRequest, res: Response): Promise<void> => {
@@ -113,19 +136,21 @@ export class AccountAdminController {
     }
     await this.users.updatePassword(user.id, await this.hasher.hash(String(newPassword)));
     // Al cambiar la contraseña, invalida cualquier otra sesión abierta y renueva
-    // la cookie de la sesión actual con la versión nueva (rotación).
+    // la cookie de la sesión actual (misma sesión de dispositivo) con la versión nueva.
     const version = await this.users.bumpSessionVersion(user.id);
-    setSessionCookie(res, user.id, version ?? undefined);
+    if (req.sessionSid) await this.sessions.revokeAllExcept(user.id, req.sessionSid);
+    setSessionCookie(res, user.id, version ?? undefined, req.sessionSid);
     res.status(200).json({ success: true });
   };
 
-  // "Cerrar todas las demás sesiones": sube la versión (invalida las existentes)
+  // "Cerrar todas las demás sesiones": invalida las existentes (versión + registros)
   // y renueva la cookie de la sesión actual para no autoexpulsarse.
   public revokeOtherSessions = async (req: AuthedRequest, res: Response): Promise<void> => {
     const user = await this.currentUser(req);
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
     const version = await this.users.bumpSessionVersion(user.id);
-    setSessionCookie(res, user.id, version ?? undefined);
+    if (req.sessionSid) await this.sessions.revokeAllExcept(user.id, req.sessionSid);
+    setSessionCookie(res, user.id, version ?? undefined, req.sessionSid);
     res.status(200).json({ success: true });
   };
 

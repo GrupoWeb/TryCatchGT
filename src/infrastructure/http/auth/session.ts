@@ -17,6 +17,7 @@ interface TokenPayload {
   exp: number;
   kind: TokenKind;
   sv?: number; // versión de sesión (solo en tokens de sesión)
+  sid?: string; // id de sesión por dispositivo (solo en tokens de sesión)
 }
 
 const MFA_CHALLENGE_TTL_MS = 5 * 60 * 1000; // 5 minutos para completar el 2FA
@@ -25,9 +26,10 @@ function sign(payload: string): string {
   return crypto.createHmac('sha256', env.session.secret).update(payload).digest('base64url');
 }
 
-function make(userId: number, ttlMs: number, kind: TokenKind, sv?: number): string {
+function make(userId: number, ttlMs: number, kind: TokenKind, sv?: number, sid?: string): string {
   const data: TokenPayload = { uid: userId, exp: Date.now() + ttlMs, kind };
   if (sv !== undefined) data.sv = sv;
+  if (sid !== undefined) data.sid = sid;
   const payload = Buffer.from(JSON.stringify(data)).toString('base64url');
   return `${payload}.${sign(payload)}`;
 }
@@ -53,16 +55,16 @@ function verify(token: string | undefined, expectedKind: TokenKind): TokenPayloa
   }
 }
 
-export function createSessionToken(userId: number, sessionVersion = 0): string {
-  return make(userId, env.session.maxAgeMs, 'session', sessionVersion);
+export function createSessionToken(userId: number, sessionVersion = 0, sid?: string): string {
+  return make(userId, env.session.maxAgeMs, 'session', sessionVersion, sid);
 }
 export function verifySessionToken(token: string | undefined): TokenPayload | null {
   return verify(token, 'session');
 }
 
 // Emite/renueva la cookie de sesión con el token del usuario (rotación).
-export function setSessionCookie(res: Response, userId: number, sessionVersion = 0): void {
-  res.cookie(env.session.cookieName, createSessionToken(userId, sessionVersion), {
+export function setSessionCookie(res: Response, userId: number, sessionVersion = 0, sid?: string): void {
+  res.cookie(env.session.cookieName, createSessionToken(userId, sessionVersion, sid), {
     httpOnly: true,
     sameSite: 'strict',
     secure: env.isProduction,

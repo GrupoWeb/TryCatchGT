@@ -10,6 +10,7 @@ import { UserEntity } from './entities/UserEntity.js';
 import { SiteConfigEntity } from './entities/SiteConfigEntity.js';
 import { AuditLogEntity } from './entities/AuditLogEntity.js';
 import { UserTokenEntity } from './entities/UserTokenEntity.js';
+import { UserSessionEntity } from './entities/UserSessionEntity.js';
 
 // Ruta a las migraciones relativa a ESTE archivo, para que funcione tanto en
 // desarrollo/CLI con tsx (resuelve a src/…/*.ts) como en producción con node
@@ -29,7 +30,7 @@ export const AppDataSource = new DataSource({
   username: env.db.user,
   password: env.db.password,
   database: env.db.name,
-  entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity, UserTokenEntity],
+  entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity, UserTokenEntity, UserSessionEntity],
   migrations: [migrationsGlob],
   synchronize: false,
   migrationsRun: true,
