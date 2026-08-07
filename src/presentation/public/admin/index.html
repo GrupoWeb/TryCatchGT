@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Panel · TryCatch GT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/framer-theme.css" />
+  <link rel="stylesheet" href="/admin/admin.css" />
+</head>
+<body>
+  <div class="aura aura--violet"></div>
+  <div class="aura aura--blue"></div>
+
+  <!-- LOGIN -->
+  <section class="admin-login" id="login-view" hidden>
+    <form class="admin-login__card" id="login-form">
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Panel de administración</p>
+      <div class="admin-field">
+        <label for="login-user">Usuario</label>
+        <input type="text" id="login-user" autocomplete="username" required />
+      </div>
+      <div class="admin-field">
+        <label for="login-pass">Contraseña</label>
+        <input type="password" id="login-pass" autocomplete="current-password" required />
+      </div>
+      <p class="admin-error" id="login-error"></p>
+      <button type="submit" class="btn-primary" id="login-btn">Ingresar</button>
+    </form>
+
+    <form class="admin-login__card" id="mfa-login-card" hidden>
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Verificación en dos pasos</p>
+      <div class="admin-field">
+        <label for="mfa-login-code">Código de tu app de autenticación</label>
+        <input type="text" id="mfa-login-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" />
+      </div>
+      <p class="admin-error" id="mfa-login-error"></p>
+      <button type="submit" class="btn-primary">Verificar</button>
+      <button type="button" class="btn-ghost" id="mfa-login-back" style="width:100%;margin-top:8px">Volver</button>
+    </form>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="admin" id="dashboard-view" hidden>
+    <header class="admin__topbar">
+      <div class="admin__logo">TryCatch<span>GT</span> · Panel</div>
+      <div class="admin__actions">
+        <a href="/" target="_blank" class="btn-ghost">Ver sitio ↗</a>
+        <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <div class="admin__shell">
+      <aside class="admin__nav" id="admin-nav">
+        <button class="admin__nav-btn is-active" data-section="home">🏠 Inicio</button>
+        <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
+        <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
+        <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
+        <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
+        <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
+        <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
+      </aside>
+
+      <main class="admin__main">
+        <!-- INICIO -->
+        <section class="admin-sec" id="sec-home">
+          <h2 class="admin-sec__title">Inicio</h2>
+          <div class="stat-grid" id="stat-grid"></div>
+        </section>
+
+        <!-- COTIZACIONES -->
+        <section class="admin-sec" id="sec-leads" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Cotizaciones</h2>
+            <button class="btn-ghost" id="leads-export">⬇ Exportar CSV</button>
+          </div>
+          <div class="leads-toolbar">
+            <input type="text" id="leads-search" class="leads-search" placeholder="Buscar por nombre, correo, empresa…" autocomplete="off" />
+            <div class="leads-filter" id="leads-filter">
+              <button class="chip is-active" data-status="all">Todas</button>
+              <button class="chip" data-status="pending">Pendiente</button>
+              <button class="chip" data-status="reviewed">Revisado</button>
+              <button class="chip" data-status="contacted">Contactado</button>
+            </div>
+          </div>
+          <p class="admin-muted" id="leads-count"></p>
+          <div class="leads-list" id="leads-list"><p class="admin-muted">Cargando…</p></div>
+          <div class="leads-more" id="leads-more" hidden><button class="btn-ghost" id="leads-more-btn">Ver más</button></div>
+        </section>
+
+        <!-- BLOG -->
+        <section class="admin-sec" id="sec-blog" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Blog</h2>
+            <button class="btn-ghost" id="new-btn">+ Nuevo artículo</button>
+          </div>
+          <div class="admin-split">
+            <aside class="admin__list" id="admin-list"></aside>
+            <div>
+              <form class="admin__editor" id="editor" hidden>
+                <input type="hidden" id="f-id" />
+                <div class="admin-field"><label for="f-title">Título *</label><input type="text" id="f-title" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="f-category">Categoría</label><input type="text" id="f-category" placeholder="Technology" /></div>
+                  <div class="admin-field"><label for="f-author">Autor</label><input type="text" id="f-author" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="f-slug">Slug (opcional)</label><input type="text" id="f-slug" placeholder="se-genera-del-titulo" /></div>
+                  <div class="admin-field"><label for="f-status">Estado</label><select id="f-status"><option value="draft">Borrador</option><option value="published">Publicado</option></select></div>
+                </div>
+                <div class="admin-field">
+                  <label>Imagen de portada</label>
+                  <div class="cover">
+                    <div class="cover__preview" id="cover-preview">
+                      <span class="cover__ph">Sin imagen</span>
+                      <span class="cover__handle" id="cover-handle" aria-hidden="true"></span>
+                    </div>
+                    <div class="cover__side">
+                      <input type="file" id="cover-file" accept="image/*" hidden />
+                      <button type="button" class="btn-ghost" id="cover-btn">⬆ Subir imagen</button>
+                      <button type="button" class="btn-danger" id="cover-clear" hidden>Quitar</button>
+                      <input type="text" id="f-cover" class="cover__url" placeholder="…o pega una URL" />
+                      <span class="admin-hint">JPG, PNG, WEBP · máx. 4&nbsp;MB</span>
+                      <span class="admin-hint">Arrastra sobre la imagen para reposicionarla</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="admin-field"><label for="f-excerpt">Extracto <span class="admin-hint">(opcional, se genera del contenido)</span></label><textarea id="f-excerpt" rows="2"></textarea></div>
+                <div class="admin-field">
+                  <label>Contenido *</label>
+                  <div class="rt">
+                    <div class="rt__toolbar" id="rt-toolbar">
+                      <button type="button" class="rt__btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+                      <button type="button" class="rt__btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+                      <button type="button" class="rt__btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h2" title="Título">H2</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h3" title="Subtítulo">H3</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="p" title="Párrafo">¶</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="blockquote" title="Cita">❝</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+                      <button type="button" class="rt__btn" data-cmd="removeFormat" title="Limpiar formato">✕</button>
+                    </div>
+                    <div class="rt__area" id="rt-area" contenteditable="true" data-placeholder="Escribe el contenido del artículo…"></div>
+                  </div>
+                </div>
+                <p class="admin-error" id="editor-error"></p>
+                <div class="admin__editor-actions">
+                  <button type="button" class="btn-primary" id="save-btn">Guardar</button>
+                  <button type="button" class="btn-ghost" id="cancel-btn">Cancelar</button>
+                  <button type="button" class="btn-danger" id="delete-btn" hidden>Eliminar</button>
+                </div>
+              </form>
+              <div class="admin__empty" id="editor-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">📝</div><p>Selecciona un artículo o crea uno nuevo.</p></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SERVICIOS -->
+        <section class="admin-sec" id="sec-services" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Servicios</h2>
+            <button class="btn-ghost" id="svc-new">+ Nuevo servicio</button>
+          </div>
+          <div class="admin-split">
+            <aside class="admin__list" id="svc-list"></aside>
+            <div>
+              <form class="admin__editor" id="svc-editor" hidden>
+                <input type="hidden" id="sv-id" />
+                <div class="admin-field"><label for="sv-title">Título *</label><input type="text" id="sv-title" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="sv-icon">Ícono (emoji)</label><input type="text" id="sv-icon" placeholder="🌐" /></div>
+                  <div class="admin-field"><label for="sv-accent">Color de acento</label><input type="text" id="sv-accent" placeholder="#0066FF" /></div>
+                </div>
+                <div class="admin-field"><label for="sv-slug">Slug (opcional)</label><input type="text" id="sv-slug" /></div>
+                <div class="admin-field"><label for="sv-desc">Descripción</label><textarea id="sv-desc" rows="3"></textarea></div>
+                <div class="admin-field"><label for="sv-tags">Tags <span class="admin-hint">(separados por coma)</span></label><input type="text" id="sv-tags" placeholder="React, Node.js, TypeScript" /></div>
+                <label class="admin-check"><input type="checkbox" id="sv-featured" /> Destacado</label>
+                <p class="admin-error" id="svc-error"></p>
+                <div class="admin__editor-actions">
+                  <button type="button" class="btn-primary" id="svc-save">Guardar</button>
+                  <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
+                  <button type="button" class="btn-danger" id="svc-delete" hidden>Eliminar</button>
+                </div>
+              </form>
+              <div class="admin__empty" id="svc-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">⚙️</div><p>Selecciona un servicio o crea uno nuevo.</p></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PLANES -->
+        <section class="admin-sec" id="sec-plans" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Planes</h2>
+            <button class="btn-ghost" id="plan-new">+ Nuevo plan</button>
+          </div>
+          <div class="admin-split">
+            <aside class="admin__list" id="plan-list"></aside>
+            <div>
+              <form class="admin__editor" id="plan-editor" hidden>
+                <input type="hidden" id="pl-id" />
+                <div class="admin-field"><label for="pl-name">Nombre *</label><input type="text" id="pl-name" /></div>
+                <div class="admin-field"><label for="pl-tagline">Descripción corta</label><input type="text" id="pl-tagline" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="pl-usd">Precio USD / mes</label><input type="number" id="pl-usd" min="0" /></div>
+                  <div class="admin-field"><label for="pl-gtq">Precio GTQ / mes</label><input type="number" id="pl-gtq" min="0" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="pl-accent">Color de acento</label><input type="text" id="pl-accent" placeholder="#8B5CF6" /></div>
+                  <div class="admin-field"><label for="pl-cta">Texto del botón</label><input type="text" id="pl-cta" placeholder="Elegir plan" /></div>
+                </div>
+                <div class="admin-field"><label for="pl-features">Características <span class="admin-hint">(una por línea)</span></label><textarea id="pl-features" rows="5"></textarea></div>
+                <div class="admin-field"><label for="pl-services">Cubre <span class="admin-hint">(una por línea: Web, Móvil…)</span></label><textarea id="pl-services" rows="3"></textarea></div>
+                <label class="admin-check"><input type="checkbox" id="pl-popular" /> Marcar como "Más popular"</label>
+                <p class="admin-error" id="plan-error"></p>
+                <div class="admin__editor-actions">
+                  <button type="button" class="btn-primary" id="plan-save">Guardar</button>
+                  <button type="button" class="btn-ghost" id="plan-cancel">Cancelar</button>
+                  <button type="button" class="btn-danger" id="plan-delete" hidden>Eliminar</button>
+                </div>
+              </form>
+              <div class="admin__empty" id="plan-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">💳</div><p>Selecciona un plan o crea uno nuevo.</p></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CONTACTO -->
+        <section class="admin-sec" id="sec-contact" hidden>
+          <h2 class="admin-sec__title">Contacto del sitio</h2>
+          <p class="admin-muted">Estos datos aparecen en el footer y el botón de WhatsApp de todo el sitio.</p>
+          <form class="admin__editor admin__editor--narrow" id="contact-form">
+            <div class="admin-field"><label for="c-email">Correo de contacto</label><input type="email" id="c-email" /></div>
+            <div class="admin-field"><label for="c-wa">WhatsApp <span class="admin-hint">(solo dígitos, con código de país)</span></label><input type="text" id="c-wa" placeholder="50255555555" /></div>
+            <div class="admin-field"><label for="c-msg">Mensaje predefinido de WhatsApp</label><textarea id="c-msg" rows="2"></textarea></div>
+            <p class="admin-error" id="contact-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
+          </form>
+        </section>
+
+        <!-- PERFIL -->
+        <section class="admin-sec" id="sec-account" hidden>
+          <h2 class="admin-sec__title">Mi perfil</h2>
+
+          <div class="profile-head">
+            <div class="profile-avatar" id="profile-avatar">
+              <span id="profile-initials">?</span>
+              <button type="button" class="profile-avatar__btn" id="avatar-btn" title="Cambiar foto">📷</button>
+            </div>
+            <input type="file" id="avatar-file" accept="image/*" hidden />
+            <div class="profile-head__meta">
+              <div class="profile-head__name" id="profile-username">—</div>
+              <span class="badge-status published" id="profile-role">—</span>
+            </div>
+          </div>
+
+          <form class="admin__editor admin__editor--narrow" id="profile-form">
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+              <div class="admin-field"><label for="p-role">Rol</label><select id="p-role"><option value="admin">Admin</option><option value="editor">Editor</option></select></div>
+            </div>
+            <p class="admin-error" id="profile-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
+          </form>
+
+          <h3 class="admin-sec__subtitle">Contraseña</h3>
+          <form class="admin__editor admin__editor--narrow" id="pass-form">
+            <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
+            <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 6)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
+            <p class="admin-error" id="pass-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
+          </form>
+
+          <h3 class="admin-sec__subtitle">Autenticación en dos pasos (2FA)</h3>
+          <div class="admin__editor admin__editor--narrow" id="mfa-panel">
+            <div id="mfa-off" hidden>
+              <p class="admin-muted">Añade una capa extra de seguridad. Necesitarás una app como Google Authenticator, Authy o 1Password.</p>
+              <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mfa-setup-btn">Activar 2FA</button></div>
+            </div>
+            <div id="mfa-setup" hidden>
+              <p class="admin-muted">1. Escanea este código con tu app de autenticación:</p>
+              <div class="mfa-qr"><img id="mfa-qr" alt="Código QR para 2FA" /></div>
+              <p class="admin-hint">¿No puedes escanear? Ingresa esta clave manualmente:<br /><code class="mfa-secret" id="mfa-secret"></code></p>
+              <div class="admin-field"><label for="mfa-code">2. Ingresa el código de 6 dígitos</label><input type="text" id="mfa-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-error" id="mfa-error"></p>
+              <div class="admin__editor-actions">
+                <button type="button" class="btn-primary" id="mfa-enable-btn">Verificar y activar</button>
+                <button type="button" class="btn-ghost" id="mfa-cancel-btn">Cancelar</button>
+              </div>
+            </div>
+            <div id="mfa-on" hidden>
+              <p class="mfa-status">🔒 El 2FA está <strong>activo</strong>. Se te pedirá un código al iniciar sesión.</p>
+              <div class="admin-field"><label for="mfa-off-code">Para desactivarlo, ingresa un código actual</label><input type="text" id="mfa-off-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-error" id="mfa-off-error"></p>
+              <div class="admin__editor-actions"><button type="button" class="btn-danger" id="mfa-disable-btn">Desactivar 2FA</button></div>
+            </div>
+          </div>
+
+          <h3 class="admin-sec__subtitle">Usuarios</h3>
+          <div class="users-list" id="users-list"></div>
+          <form class="admin__editor admin__editor--narrow" id="user-form">
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
+              <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
+            </div>
+            <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 6)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
+            <p class="admin-error" id="user-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
+          </form>
+        </section>
+      </main>
+    </div>
+  </section>
+
+  <script src="/admin/admin.js"></script>
+</body>
+</html>

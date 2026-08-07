@@ -1,0 +1,45 @@
+{
+  "name": "trycatch-dev",
+  "version": "1.0.0",
+  "description": "TryCatch GT Software Studio - Node.js + MySQL Hexagonal Architecture Web App",
+  "main": "dist/infrastructure/http/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/infrastructure/http/server.js",
+    "dev": "tsx watch src/infrastructure/http/server.ts",
+    "set-admin-password": "tsx scripts/setAdminPassword.ts"
+  },
+  "keywords": [
+    "nodejs",
+    "typescript",
+    "hexagonal-architecture",
+    "mysql",
+    "framer-design"
+  ],
+  "author": "TryCatch GT",
+  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "multer": "^2.2.0",
+    "mysql2": "^3.9.7",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.5.4",
+    "sanitize-html": "^2.17.6"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^20.12.12",
+    "@types/qrcode": "^1.5.6",
+    "@types/sanitize-html": "^2.16.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.4.5"
+  }
+}

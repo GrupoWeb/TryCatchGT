@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TryCatch GT · Ingeniería de Software a Medida</title>
+  <meta name="description" content="TryCatch GT — Desarrollamos aplicaciones web, móviles y cloud a la velocidad de la idea." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/framer-theme.css" />
+</head>
+<body>
+  <!-- Auras ambientales -->
+  <div class="aura aura--violet"></div>
+  <div class="aura aura--blue"></div>
+  <div class="aura aura--cyan"></div>
+  <div class="aura aura--magenta"></div>
+
+  <!-- Canvas de nodos de arquitectura conectada -->
+  <canvas id="nodes-canvas"></canvas>
+
+  <!-- Floating Pill Navbar -->
+  <nav class="navbar">
+    <div class="navbar__brand">TryCatch<span>GT</span></div>
+    <div class="navbar__links">
+      <a href="#services">Servicios</a>
+      <a href="#pricing">Planes</a>
+      <a href="/blog">Blog</a>
+      <a href="#quote">Cotizar</a>
+    </div>
+    <a href="#quote" class="navbar__cta">Iniciar proyecto</a>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero">
+    <span class="badge"><span class="badge__dot"></span> Estudio de Ingeniería de Software · Guatemala</span>
+    <h1>Desarrollamos aplicaciones web, móviles y cloud a la velocidad de la idea.</h1>
+    <p>Diseñamos y construimos software a medida con arquitecturas limpias, escalables y listas para crecer con tu negocio.</p>
+    <div class="hero__actions">
+      <a href="#quote" class="btn btn--primary">Solicitar cotización →</a>
+      <a href="#services" class="btn btn--ghost">Ver servicios</a>
+    </div>
+  </header>
+
+  <!-- Servicios -->
+  <section class="services" id="services">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Qué construimos</p>
+        <h2>Ingeniería de punta a punta</h2>
+        <p>Del prototipo al despliegue en producción, cubrimos todo el ciclo de vida del producto.</p>
+      </div>
+      <div class="services__grid" id="services-grid">
+        <!-- Se inyectan vía /api/services -->
+        <div class="card card--skeleton"></div>
+        <div class="card card--skeleton"></div>
+        <div class="card card--skeleton"></div>
+        <div class="card card--skeleton"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Planes mensuales -->
+  <section class="pricing" id="pricing">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Trabajemos juntos</p>
+        <h2>Planes mensuales</h2>
+        <p>Contrata ingeniería de software por suscripción, sin costos de reclutamiento ni contratos rígidos. Cancela cuando quieras.</p>
+        <div class="currency-toggle" id="currency-toggle" role="group" aria-label="Moneda">
+          <button type="button" class="currency-toggle__btn" data-currency="GTQ">Q GTQ</button>
+          <button type="button" class="currency-toggle__btn" data-currency="USD">$ USD</button>
+        </div>
+      </div>
+      <div class="pricing__grid" id="pricing-grid">
+        <!-- Se inyectan vía /api/plans -->
+        <div class="plan plan--skeleton"></div>
+        <div class="plan plan--skeleton"></div>
+        <div class="plan plan--skeleton"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario de cotización -->
+  <section class="quote" id="quote">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Cuéntanos tu idea</p>
+        <h2>Solicita tu cotización</h2>
+        <p>Respondemos en menos de 24 horas hábiles con una propuesta inicial.</p>
+      </div>
+
+      <div class="quote__panel">
+        <form id="quote-form" novalidate>
+          <div class="form-grid">
+            <div class="field">
+              <label for="clientName">Nombre completo *</label>
+              <input type="text" id="clientName" name="clientName" placeholder="Ada Lovelace" required />
+            </div>
+            <div class="field">
+              <label for="clientEmail">Correo electrónico *</label>
+              <input type="email" id="clientEmail" name="clientEmail" placeholder="ada@empresa.com" required />
+            </div>
+            <div class="field">
+              <label for="companyName">Empresa</label>
+              <input type="text" id="companyName" name="companyName" placeholder="Opcional" />
+            </div>
+            <div class="field">
+              <label for="projectType">Tipo de proyecto *</label>
+              <select id="projectType" name="projectType" required>
+                <option value="Web App">Aplicación Web</option>
+                <option value="Mobile App">Aplicación Móvil</option>
+                <option value="API / Backend">API / Backend</option>
+                <option value="Cloud / DevOps">Cloud / DevOps</option>
+                <option value="Custom Software">Software a medida</option>
+              </select>
+            </div>
+            <div class="field field--full">
+              <label for="budgetRange">Presupuesto estimado</label>
+              <select id="budgetRange" name="budgetRange">
+                <option value="Por definir">Por definir</option>
+                <option value="< $5,000">Menos de $5,000</option>
+                <option value="$5,000 - $15,000">$5,000 - $15,000</option>
+                <option value="$15,000 - $50,000">$15,000 - $50,000</option>
+                <option value="> $50,000">Más de $50,000</option>
+              </select>
+            </div>
+            <div class="field field--full">
+              <label for="description">Descripción del proyecto *</label>
+              <textarea id="description" name="description" placeholder="Cuéntanos qué necesitas construir, objetivos y plazos ideales..." required></textarea>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <span class="form-status" id="form-status" role="status" aria-live="polite"></span>
+            <button type="submit" class="btn btn--submit" id="submit-btn">Enviar solicitud →</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer" id="site-footer"></footer>
+
+  <script src="/js/main.js"></script>
+  <script src="/js/site.js"></script>
+</body>
+</html>
