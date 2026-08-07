@@ -136,6 +136,11 @@ export class TypeOrmUserRepository implements UserRepository {
     return (result.affected ?? 0) > 0;
   }
 
+  public async setMustChangePassword(id: number, value: boolean): Promise<boolean> {
+    const result = await this.repo.update({ id }, { mustChangePassword: value });
+    return (result.affected ?? 0) > 0;
+  }
+
   public async countAdmins(): Promise<number> {
     return this.repo.countBy({ role: 'admin' });
   }

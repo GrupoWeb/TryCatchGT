@@ -102,14 +102,28 @@
   // ── Vistas de sesión ──────────────────────────────────────
   const loginView = $('login-view');
   const dashboardView = $('dashboard-view');
+  const forceView = $('force-pass-view');
 
-  function showLogin() { loginView.hidden = false; dashboardView.hidden = true; showLoginStep('password'); }
-  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; showSection('home'); loadOverview(); }
+  function showLogin() { loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true; showLoginStep('password'); }
+  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; showSection('home'); loadOverview(); }
+  function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
   async function checkSession() {
     const { ok, body } = await api('/api/auth/me');
-    if (ok) { currentUserId = body && body.userId; showDashboard(); } else showLogin();
+    if (!ok) { showLogin(); return; }
+    currentUserId = body && body.userId;
+    if (body && body.mustChangePassword) showForce(); else showDashboard();
   }
+
+  // Cambio de contraseña obligatorio.
+  $('force-pass-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('fp-error').textContent = '';
+    const r = await api('/api/admin/account/password', { method: 'POST', body: JSON.stringify({ currentPassword: $('fp-current').value, newPassword: $('fp-new').value }) });
+    if (r.ok) { $('fp-current').value = ''; $('fp-new').value = ''; toast('Contraseña actualizada'); showDashboard(); }
+    else { const m = (r.body && r.body.error) || 'No se pudo cambiar.'; $('fp-error').textContent = m; toast(m, 'error'); }
+  });
+  $('fp-logout').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); showLogin(); });
 
   let mfaChallenge = null;
   function showLoginStep(step) {
@@ -152,7 +166,7 @@
       showLoginStep('mfa');
     } else if (ok) {
       $('login-pass').value = '';
-      showDashboard();
+      if (body && body.mustChangePassword) showForce(); else showDashboard();
     } else {
       $('login-error').textContent = (body && body.error) || 'No se pudo iniciar sesión.';
     }
@@ -162,7 +176,7 @@
     e.preventDefault();
     $('mfa-login-error').textContent = '';
     const { ok, body } = await api('/api/auth/mfa', { method: 'POST', body: JSON.stringify({ challenge: mfaChallenge, code: $('mfa-login-code').value }) });
-    if (ok) { mfaChallenge = null; showDashboard(); }
+    if (ok) { mfaChallenge = null; if (body && body.mustChangePassword) showForce(); else showDashboard(); }
     else $('mfa-login-error').textContent = (body && body.error) || 'Código incorrecto.';
   });
   $('mfa-login-back').addEventListener('click', () => { mfaChallenge = null; showLoginStep('password'); });
@@ -614,6 +628,7 @@
         : u.deleted
           ? `<button class="btn-ghost btn-sm" data-act="restore" data-id="${u.id}">Restaurar</button>`
           : `<button class="btn-ghost btn-sm" data-act="edit" data-id="${u.id}">Editar</button>
+             <button class="btn-ghost btn-sm" data-act="reset" data-id="${u.id}">Resetear clave</button>
              <button class="btn-ghost btn-sm" data-act="toggle" data-id="${u.id}" data-active="${u.isActive && u.status === 'active' ? '1' : '0'}">${u.isActive && u.status === 'active' ? 'Desactivar' : 'Activar'}</button>
              <button class="btn-danger btn-sm" data-act="delete" data-id="${u.id}">Eliminar</button>`;
       return `<div class="user-row">
@@ -685,6 +700,12 @@
       const res = await api(`/api/admin/users/${id}/restore`, { method: 'POST' });
       if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
       else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
+    } else if (act === 'reset') {
+      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 6). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
+      if (!temp) return;
+      const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
+      if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
+      else toast((res.body && res.body.error) || 'No se pudo resetear.', 'error');
     }
   });
 
@@ -772,7 +793,7 @@
   });
   $('user-save').addEventListener('click', async () => {
     $('user-error').textContent = '';
-    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value }) });
+    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value, mustChangePassword: $('u-mustchange').checked }) });
     if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadAccount(); }
     else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
   });

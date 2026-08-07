@@ -60,7 +60,7 @@ export class AuthController {
 
     await this.users.recordLogin(user.id, clientIp(req));
     this.startSession(res, user);
-    res.status(200).json({ success: true, user: { username: user.username, role: user.role } });
+    res.status(200).json({ success: true, user: { username: user.username, role: user.role }, mustChangePassword: user.mustChangePassword });
   };
 
   // Incrementa el contador de intentos fallidos y bloquea al superar el máximo.
@@ -98,7 +98,7 @@ export class AuthController {
     }
     await this.users.recordLogin(user.id, clientIp(req));
     this.startSession(res, user);
-    res.status(200).json({ success: true, user: { username: user.username, role: user.role } });
+    res.status(200).json({ success: true, user: { username: user.username, role: user.role }, mustChangePassword: user.mustChangePassword });
   };
 
   // Si el código coincide con un código de respaldo, lo elimina y devuelve true.
@@ -122,6 +122,6 @@ export class AuthController {
   };
 
   public me = (req: AuthedRequest, res: Response): void => {
-    res.status(200).json({ success: true, authenticated: true, userId: req.userId });
+    res.status(200).json({ success: true, authenticated: true, userId: req.userId, mustChangePassword: req.authUser?.mustChangePassword ?? false });
   };
 }
