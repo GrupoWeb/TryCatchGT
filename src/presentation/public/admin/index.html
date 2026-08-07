@@ -277,8 +277,16 @@
 
           <form class="admin__editor admin__editor--narrow" id="profile-form">
             <div class="admin-grid-2">
+              <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
+              <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
+            </div>
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
               <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+            </div>
+            <div class="admin-grid-2">
               <div class="admin-field"><label for="p-role">Rol</label><select id="p-role"><option value="admin">Admin</option><option value="editor">Editor</option></select></div>
+              <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
             </div>
             <p class="admin-error" id="profile-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>

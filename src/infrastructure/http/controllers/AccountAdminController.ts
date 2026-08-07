@@ -12,6 +12,10 @@ function profileView(u: User) {
   return {
     id: u.id, username: u.username, email: u.email, avatar: u.avatar, role: u.role,
     mfaEnabled: u.mfaEnabled, backupCodesRemaining: u.mfaBackupCodes?.length ?? 0,
+    fullName: u.fullName, lastName: u.lastName, displayName: u.displayName,
+    status: u.status, isActive: u.isActive, mustChangePassword: u.mustChangePassword,
+    emailVerified: u.emailVerifiedAt !== null,
+    lastLoginAt: u.lastLoginAt, lastLoginIp: u.lastLoginIp,
   };
 }
 
@@ -37,7 +41,7 @@ export class AccountAdminController {
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
 
     const b = req.body ?? {};
-    const fields: { email?: string | null; avatar?: string | null; role?: 'admin' | 'editor' } = {};
+    const fields: { email?: string | null; avatar?: string | null; role?: 'admin' | 'editor'; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
 
     if (b.email !== undefined) {
       const email = String(b.email).trim();
@@ -45,6 +49,9 @@ export class AccountAdminController {
       fields.email = email || null;
     }
     if (b.avatar !== undefined) fields.avatar = String(b.avatar).trim() || null;
+    if (b.fullName !== undefined) fields.fullName = String(b.fullName).trim() || null;
+    if (b.lastName !== undefined) fields.lastName = String(b.lastName).trim() || null;
+    if (b.displayName !== undefined) fields.displayName = String(b.displayName).trim() || null;
     if (b.role !== undefined) {
       const role = b.role === 'admin' ? 'admin' : 'editor';
       // Evita que el único admin se quite el rol y quede el sistema sin administradores.
@@ -157,18 +164,29 @@ export class AccountAdminController {
     const users = await this.users.findAll();
     res.status(200).json({
       success: true,
-      data: users.map((u) => ({ id: u.id, username: u.username, email: u.email, role: u.role, mfaEnabled: u.mfaEnabled })),
+      data: users.map((u) => ({
+        id: u.id, username: u.username, email: u.email, role: u.role, mfaEnabled: u.mfaEnabled,
+        displayName: u.displayName, status: u.status, isActive: u.isActive, lastLoginAt: u.lastLoginAt,
+      })),
     });
   };
 
   public createUser = async (req: AuthedRequest, res: Response): Promise<void> => {
-    const { username, password, role } = req.body ?? {};
+    const { username, password, role, fullName, lastName, displayName } = req.body ?? {};
     const uname = String(username ?? '').trim().toLowerCase();
     if (uname.length < 3) { res.status(400).json({ success: false, error: 'El usuario debe tener al menos 3 caracteres.' }); return; }
     if (!password || String(password).length < 6) { res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' }); return; }
     if (await this.users.findByUsername(uname)) { res.status(409).json({ success: false, error: 'Ese usuario ya existe.' }); return; }
     const created = await this.users.create(
-      new User({ username: uname, passwordHash: await this.hasher.hash(String(password)), role: role === 'admin' ? 'admin' : 'editor' }),
+      new User({
+        username: uname,
+        passwordHash: await this.hasher.hash(String(password)),
+        role: role === 'admin' ? 'admin' : 'editor',
+        fullName: fullName ? String(fullName).trim() : null,
+        lastName: lastName ? String(lastName).trim() : null,
+        displayName: displayName ? String(displayName).trim() : null,
+        createdBy: req.userId ?? null,
+      }),
     );
     res.status(201).json({ success: true, data: { id: created.id, username: created.username, role: created.role } });
   };
