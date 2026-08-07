@@ -5,6 +5,9 @@ import { User } from '../../../domain/entities/User.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 import { setSessionCookie } from '../auth/session.js';
 import { generateMfaSecret, mfaKeyUri, mfaQrDataUrl, verifyMfaToken, generateBackupCodes, normalizeBackupCode } from '../../security/MfaService.js';
+import { TokenService } from '../../security/TokenService.js';
+import { EmailService } from '../../email/EmailService.js';
+import { env } from '../../../config/env.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,7 +36,26 @@ export class AccountAdminController {
   constructor(
     private readonly users: UserRepository,
     private readonly hasher: PasswordHasher,
+    private readonly tokens: TokenService,
+    private readonly email: EmailService,
   ) {}
+
+  // Envía al correo del usuario actual un enlace de verificación (token 60 min).
+  public sendEmailVerification = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const user = await this.currentUser(req);
+    if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    if (!user.email) { res.status(400).json({ success: false, error: 'Agrega un correo a tu perfil primero.' }); return; }
+    if (user.emailVerifiedAt) { res.status(400).json({ success: false, error: 'Tu correo ya está verificado.' }); return; }
+    const token = await this.tokens.issue(user.id, 'email_verify', 60);
+    const link = `${env.appUrl}/api/auth/verify-email?token=${token}`;
+    const { sent } = await this.email.send({
+      to: user.email,
+      subject: 'Verifica tu correo — TryCatch GT',
+      html: `<p>Hola ${user.label},</p><p>Confirma tu correo:</p><p><a href="${link}">Verificar correo</a></p><p>El enlace vence en 60 minutos.</p>`,
+      text: `Verifica tu correo: ${link}`,
+    });
+    res.status(200).json({ success: true, sent });
+  };
 
   private async currentUser(req: AuthedRequest): Promise<User | null> {
     return req.userId ? this.users.findById(req.userId) : null;

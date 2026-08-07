@@ -562,7 +562,18 @@
     $('ts-enabled').checked = !!d.turnstileEnabled;
     $('ts-site').value = d.turnstileSiteKey || '';
     $('ts-secret').value = d.turnstileSecretKey || '';
+    $('smtp-host').value = d.smtpHost || '';
+    $('smtp-port').value = d.smtpPort || '587';
+    $('smtp-user').value = d.smtpUser || '';
+    $('smtp-pass').value = d.smtpPass || '';
+    $('smtp-from').value = d.smtpFrom || '';
+    $('smtp-secure').checked = !!d.smtpSecure;
   }
+  $('smtp-save').addEventListener('click', async () => {
+    $('smtp-error').textContent = '';
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ smtpHost: $('smtp-host').value.trim(), smtpPort: $('smtp-port').value.trim(), smtpUser: $('smtp-user').value.trim(), smtpPass: $('smtp-pass').value, smtpFrom: $('smtp-from').value.trim(), smtpSecure: $('smtp-secure').checked }) });
+    if (r.ok) toast('SMTP actualizado'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('smtp-error').textContent = m; toast(m, 'error'); }
+  });
   $('contact-save').addEventListener('click', async () => {
     $('contact-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ contactEmail: $('c-email').value, whatsappNumber: $('c-wa').value, whatsappMessage: $('c-msg').value }) });
@@ -591,6 +602,10 @@
     $('p-email').value = u.email || '';
     $('p-role').value = u.role;
     $('p-lastlogin').value = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('es-GT') : 'Nunca';
+    // Estado de verificación de correo
+    if (!u.email) { $('p-email-status').textContent = 'Sin correo'; $('email-verify-btn').hidden = true; }
+    else if (u.emailVerified) { $('p-email-status').textContent = '✅ Verificado'; $('email-verify-btn').hidden = true; }
+    else { $('p-email-status').textContent = '⚠️ Sin verificar'; $('email-verify-btn').hidden = false; }
     // Avatar
     const av = $('profile-avatar');
     if (u.avatar) { av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`; av.classList.add('has-img'); }
@@ -729,6 +744,12 @@
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, role: $('p-role').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
+  });
+  $('email-verify-btn').addEventListener('click', async () => {
+    const r = await api('/api/admin/account/email/verify/send', { method: 'POST' });
+    if (!r.ok) { toast((r.body && r.body.error) || 'No se pudo enviar.', 'error'); return; }
+    if (r.body.sent) toast('Te enviamos un enlace de verificación a tu correo.');
+    else toast('SMTP no configurado: el enlace quedó en el log del servidor (modo dev).', 'success', 5000);
   });
 
   // MFA: activar

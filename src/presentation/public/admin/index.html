@@ -276,6 +276,21 @@
             <p class="admin-error" id="turnstile-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
           </form>
+
+          <h3 class="admin-sec__subtitle">Correo saliente (SMTP)</h3>
+          <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
+          <form class="admin__editor admin__editor--narrow" id="smtp-form">
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
+              <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+            </div>
+            <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
+            <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
+            <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
+            <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
+            <p class="admin-error" id="smtp-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
+          </form>
         </section>
 
         <!-- PERFIL -->
@@ -307,6 +322,7 @@
               <div class="admin-field"><label for="p-role">Rol</label><select id="p-role"><option value="admin">Admin</option><option value="editor">Editor</option></select></div>
               <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
             </div>
+            <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
             <p class="admin-error" id="profile-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
           </form>

@@ -9,6 +9,12 @@ interface ResolvedConfig {
   turnstileEnabled: boolean;
   turnstileSiteKey: string;
   turnstileSecretKey: string;
+  smtpHost: string;
+  smtpPort: string;
+  smtpUser: string;
+  smtpPass: string;
+  smtpFrom: string;
+  smtpSecure: boolean;
 }
 
 export class SiteConfigController {
@@ -24,6 +30,12 @@ export class SiteConfigController {
       turnstileEnabled: stored.turnstileEnabled === 'true',
       turnstileSiteKey: stored.turnstileSiteKey || '',
       turnstileSecretKey: stored.turnstileSecretKey || '',
+      smtpHost: stored.smtpHost || '',
+      smtpPort: stored.smtpPort || '587',
+      smtpUser: stored.smtpUser || '',
+      smtpPass: stored.smtpPass || '',
+      smtpFrom: stored.smtpFrom || '',
+      smtpSecure: stored.smtpSecure === 'true',
     };
   }
 
@@ -58,6 +70,12 @@ export class SiteConfigController {
     if (b.turnstileEnabled !== undefined) values.turnstileEnabled = b.turnstileEnabled ? 'true' : 'false';
     if (b.turnstileSiteKey !== undefined) values.turnstileSiteKey = String(b.turnstileSiteKey).trim();
     if (b.turnstileSecretKey !== undefined) values.turnstileSecretKey = String(b.turnstileSecretKey).trim();
+    if (b.smtpHost !== undefined) values.smtpHost = String(b.smtpHost).trim();
+    if (b.smtpPort !== undefined) values.smtpPort = String(b.smtpPort).replace(/\D/g, '') || '587';
+    if (b.smtpUser !== undefined) values.smtpUser = String(b.smtpUser).trim();
+    if (b.smtpPass !== undefined) values.smtpPass = String(b.smtpPass);
+    if (b.smtpFrom !== undefined) values.smtpFrom = String(b.smtpFrom).trim();
+    if (b.smtpSecure !== undefined) values.smtpSecure = b.smtpSecure ? 'true' : 'false';
     await this.repo.setMany(values);
     res.status(200).json({ success: true, data: await this.resolved() });
   };

@@ -1,0 +1,41 @@
+import nodemailer from 'nodemailer';
+import { SiteConfigRepository } from '../../application/ports/output/SiteConfigRepository.js';
+
+export interface EmailMessage {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
+/**
+ * Envío de correo por SMTP (nodemailer). La configuración se lee del panel
+ * (site_config). Si no hay SMTP configurado, degrada a "modo dev": registra el
+ * correo en el log del servidor en vez de enviarlo, para no bloquear los flujos.
+ */
+export class EmailService {
+  constructor(private readonly config: SiteConfigRepository) {}
+
+  public async send(msg: EmailMessage): Promise<{ sent: boolean }> {
+    const c = await this.config.getAll();
+    const host = c.smtpHost;
+    const user = c.smtpUser;
+    const pass = c.smtpPass;
+    const from = c.smtpFrom || user;
+    const port = Number(c.smtpPort) || 587;
+
+    if (!host || !user || !pass) {
+      console.log(`✉️  [DEV email] Para: ${msg.to}\n   Asunto: ${msg.subject}\n   ${msg.text || msg.html}`);
+      return { sent: false };
+    }
+
+    const transport = nodemailer.createTransport({
+      host,
+      port,
+      secure: c.smtpSecure === 'true' || port === 465,
+      auth: { user, pass },
+    });
+    await transport.sendMail({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
+    return { sent: true };
+  }
+}

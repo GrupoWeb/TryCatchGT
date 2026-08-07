@@ -14,6 +14,8 @@ export const env = {
   port: Number(process.env.PORT) || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   isProduction: (process.env.NODE_ENV || 'development') === 'production',
+  // URL base pública, para construir enlaces en correos (verificación, reset).
+  appUrl: process.env.APP_URL || `http://localhost:${Number(process.env.PORT) || 3000}`,
   db: {
     host: required('DB_HOST', 'localhost'),
     port: Number(process.env.DB_PORT) || 3306,

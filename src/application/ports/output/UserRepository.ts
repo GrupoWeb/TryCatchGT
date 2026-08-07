@@ -36,6 +36,8 @@ export interface UserRepository {
   updateAccountState(id: number, fields: UserAccountStateUpdate): Promise<boolean>;
   // Marca (o quita) la obligación de cambiar contraseña en el próximo acceso.
   setMustChangePassword(id: number, value: boolean): Promise<boolean>;
+  // Marca el correo como verificado (o lo desmarca con null).
+  setEmailVerified(id: number, at: Date | null): Promise<boolean>;
   countAdmins(): Promise<number>;
   // Admins que pueden operar (activos y no eliminados); para no quedarse sin admin.
   countActiveAdmins(): Promise<number>;

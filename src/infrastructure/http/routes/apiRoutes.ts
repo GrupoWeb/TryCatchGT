@@ -41,7 +41,10 @@ import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPos
 import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
 import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
 import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLogRepository.js';
+import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
+import { TokenService } from '../../security/TokenService.js';
+import { EmailService } from '../../email/EmailService.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
 const serviceRepository = new TypeOrmServiceRepository();
@@ -51,7 +54,10 @@ const blogRepository = new TypeOrmBlogPostRepository();
 const userRepository = new TypeOrmUserRepository();
 const siteConfigRepository = new TypeOrmSiteConfigRepository();
 const auditRepository = new TypeOrmAuditLogRepository();
+const userTokenRepository = new TypeOrmUserTokenRepository();
 const passwordHasher = new BcryptPasswordHasher();
+const tokenService = new TokenService(userTokenRepository);
+const emailService = new EmailService(siteConfigRepository);
 
 // Autenticación con validación de versión de sesión (permite revocar sesiones).
 const requireAuth = createRequireAuth(userRepository);
@@ -69,7 +75,7 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService);
 
 // Admin
 const adminBlogController = new AdminBlogController(
@@ -81,7 +87,7 @@ const adminBlogController = new AdminBlogController(
 const leadAdminController = new LeadAdminController(projectRequestRepository);
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
-const accountAdminController = new AccountAdminController(userRepository, passwordHasher);
+const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
 const auditController = new AuditController(auditRepository, userRepository);
 
@@ -125,6 +131,7 @@ apiRouter.post('/auth/login', authLimiter, turnstileGuard, authController.login)
 apiRouter.post('/auth/mfa', authLimiter, authController.mfaVerify);
 apiRouter.post('/auth/logout', authController.logout);
 apiRouter.get('/auth/me', requireAuth, authController.me);
+apiRouter.get('/auth/verify-email', authController.verifyEmail);
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
@@ -177,6 +184,7 @@ apiRouter.put('/admin/config', requireAuth, siteConfigController.adminUpdate);
 apiRouter.get('/admin/account', requireAuth, accountAdminController.me);
 apiRouter.put('/admin/account', requireAuth, accountAdminController.updateProfile);
 apiRouter.post('/admin/account/password', requireAuth, accountAdminController.changePassword);
+apiRouter.post('/admin/account/email/verify/send', requireAuth, accountAdminController.sendEmailVerification);
 apiRouter.post('/admin/account/sessions/revoke-all', requireAuth, accountAdminController.revokeOtherSessions);
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
