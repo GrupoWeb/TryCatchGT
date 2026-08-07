@@ -17,6 +17,7 @@ import { OverviewController } from '../controllers/OverviewController.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { uploadImage } from '../upload.js';
 import { authLimiter, formLimiter } from '../rateLimit.js';
+import { issueCsrfToken, requireCsrf } from '../csrf.js';
 
 // Use cases
 import { GetServices } from '../../../application/use-cases/GetServices.js';
@@ -79,6 +80,17 @@ export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHashe
 
 // ── Rutas ───────────────────────────────────────────────────────────────────
 export const apiRouter = Router();
+
+// Emite el token CSRF en los GET; el SPA lo reenvía como header en las mutaciones.
+apiRouter.use(issueCsrfToken);
+
+// Exige token CSRF en toda petición mutante. Excepción: el formulario público de
+// cotización (POST /projects), que es anónimo y ya está acotado por formLimiter.
+apiRouter.use((req, res, next) => {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') { next(); return; }
+  if (req.path === '/projects') { next(); return; }
+  requireCsrf(req, res, next);
+});
 
 apiRouter.get('/health', (_req, res) => {
   res.status(200).json({ success: true, status: 'ok', service: 'trycatch-gt-api' });
