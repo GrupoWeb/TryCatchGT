@@ -220,7 +220,7 @@
     body.innerHTML = rows.map((e) => {
       const okStatus = e.status && e.status < 400;
       const when = e.createdAt ? new Date(e.createdAt).toLocaleString('es-GT') : '—';
-      const who = e.actor || (e.actorId ? `#${e.actorId}` : '—');
+      const who = e.actorLabel || e.actor || (e.actorId ? `#${e.actorId}` : '—');
       return `<tr>
         <td>${esc(when)}</td>
         <td><code>${esc(e.action)}</code></td>
@@ -569,10 +569,14 @@
     const r = await api('/api/admin/account');
     if (!guard(r) || !r.ok) return;
     const u = r.body.data;
-    $('profile-username').textContent = u.username;
+    $('profile-username').textContent = u.displayName || u.fullName || u.username;
     $('profile-role').textContent = u.role === 'admin' ? 'Admin' : 'Editor';
+    $('p-fullname').value = u.fullName || '';
+    $('p-lastname').value = u.lastName || '';
+    $('p-displayname').value = u.displayName || '';
     $('p-email').value = u.email || '';
     $('p-role').value = u.role;
+    $('p-lastlogin').value = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('es-GT') : 'Nunca';
     // Avatar
     const av = $('profile-avatar');
     if (u.avatar) { av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`; av.classList.add('has-img'); }
@@ -619,7 +623,7 @@
 
   $('profile-save').addEventListener('click', async () => {
     $('profile-error').textContent = '';
-    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, role: $('p-role').value }) });
+    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, role: $('p-role').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
   });

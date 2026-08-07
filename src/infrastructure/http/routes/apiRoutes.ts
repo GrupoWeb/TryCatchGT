@@ -83,7 +83,7 @@ const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
-const auditController = new AuditController(auditRepository);
+const auditController = new AuditController(auditRepository, userRepository);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
 export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHasher, {
