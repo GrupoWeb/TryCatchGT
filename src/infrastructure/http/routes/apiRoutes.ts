@@ -184,3 +184,7 @@ apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController
 apiRouter.post('/admin/account/mfa/backup-codes', requireAuth, accountAdminController.regenerateBackupCodes);
 apiRouter.get('/admin/users', requireAuth, accountAdminController.listUsers);
 apiRouter.post('/admin/users', requireAuth, accountAdminController.createUser);
+apiRouter.get('/admin/users/:id', requireAuth, accountAdminController.getUser);
+apiRouter.put('/admin/users/:id', requireAuth, accountAdminController.updateUser);
+apiRouter.delete('/admin/users/:id', requireAuth, accountAdminController.deleteUser);
+apiRouter.post('/admin/users/:id/restore', requireAuth, accountAdminController.restoreUser);

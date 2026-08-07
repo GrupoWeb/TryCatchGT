@@ -19,6 +19,16 @@ function profileView(u: User) {
   };
 }
 
+// Vista de un usuario para la gestión de terceros (más completa que profileView).
+function userView(u: User) {
+  return {
+    id: u.id, username: u.username, email: u.email, role: u.role, mfaEnabled: u.mfaEnabled,
+    fullName: u.fullName, lastName: u.lastName, displayName: u.displayName,
+    status: u.status, isActive: u.isActive, deleted: u.deletedAt !== null,
+    lastLoginAt: u.lastLoginAt, createdBy: u.createdBy, createdAt: u.createdAt,
+  };
+}
+
 export class AccountAdminController {
   constructor(
     private readonly users: UserRepository,
@@ -167,6 +177,7 @@ export class AccountAdminController {
       data: users.map((u) => ({
         id: u.id, username: u.username, email: u.email, role: u.role, mfaEnabled: u.mfaEnabled,
         displayName: u.displayName, status: u.status, isActive: u.isActive, lastLoginAt: u.lastLoginAt,
+        deleted: u.deletedAt !== null,
       })),
     });
   };
@@ -189,5 +200,79 @@ export class AccountAdminController {
       }),
     );
     res.status(201).json({ success: true, data: { id: created.id, username: created.username, role: created.role } });
+  };
+
+  public getUser = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    const u = id ? await this.users.findById(id) : null;
+    if (!u) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    res.status(200).json({ success: true, data: userView(u) });
+  };
+
+  public updateUser = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!id) { res.status(400).json({ success: false, error: 'Id inválido.' }); return; }
+    if (id === req.userId) { res.status(400).json({ success: false, error: 'Edita tu propia cuenta desde tu perfil.' }); return; }
+    const target = await this.users.findById(id);
+    if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+
+    const b = req.body ?? {};
+    const profile: { email?: string | null; role?: 'admin' | 'editor'; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
+    if (b.email !== undefined) {
+      const email = String(b.email).trim();
+      if (email && !EMAIL_RE.test(email)) { res.status(400).json({ success: false, error: 'Correo inválido.' }); return; }
+      profile.email = email || null;
+    }
+    if (b.fullName !== undefined) profile.fullName = String(b.fullName).trim() || null;
+    if (b.lastName !== undefined) profile.lastName = String(b.lastName).trim() || null;
+    if (b.displayName !== undefined) profile.displayName = String(b.displayName).trim() || null;
+
+    const state: { status?: 'active' | 'disabled' | 'invited'; isActive?: boolean } = {};
+    let disabling = false;
+    if (b.isActive !== undefined) { state.isActive = !!b.isActive; if (!state.isActive) disabling = true; }
+    if (b.status !== undefined) {
+      const s = b.status === 'disabled' || b.status === 'invited' ? b.status : 'active';
+      state.status = s;
+      if (s !== 'active') disabling = true;
+    }
+    const demoting = b.role !== undefined && b.role !== 'admin' && target.role === 'admin';
+    if (b.role !== undefined) profile.role = b.role === 'admin' ? 'admin' : 'editor';
+
+    // No dejar el sistema sin administradores activos.
+    if ((disabling || demoting) && target.role === 'admin' && (await this.users.countActiveAdmins()) <= 1) {
+      res.status(400).json({ success: false, error: 'No puedes desactivar/degradar al último administrador activo.' });
+      return;
+    }
+
+    if (Object.keys(profile).length) await this.users.updateProfile(id, profile);
+    if (Object.keys(state).length) await this.users.updateAccountState(id, state);
+    if (disabling) await this.users.bumpSessionVersion(id); // corta sus sesiones abiertas
+
+    const updated = await this.users.findById(id);
+    res.status(200).json({ success: true, data: updated ? userView(updated) : userView(target) });
+  };
+
+  public deleteUser = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!id) { res.status(400).json({ success: false, error: 'Id inválido.' }); return; }
+    if (id === req.userId) { res.status(400).json({ success: false, error: 'No puedes eliminar tu propia cuenta.' }); return; }
+    const target = await this.users.findById(id);
+    if (!target || target.id === undefined || target.deletedAt) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    if (target.role === 'admin' && (await this.users.countActiveAdmins()) <= 1) {
+      res.status(400).json({ success: false, error: 'No puedes eliminar al último administrador activo.' });
+      return;
+    }
+    await this.users.updateAccountState(id, { deletedAt: new Date(), isActive: false, status: 'disabled' });
+    await this.users.bumpSessionVersion(id);
+    res.status(200).json({ success: true });
+  };
+
+  public restoreUser = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    const target = id ? await this.users.findById(id) : null;
+    if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    await this.users.updateAccountState(id, { deletedAt: null, isActive: true, status: 'active' });
+    const updated = await this.users.findById(id);
+    res.status(200).json({ success: true, data: updated ? userView(updated) : userView(target) });
   };
 }

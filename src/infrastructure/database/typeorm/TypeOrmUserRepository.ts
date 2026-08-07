@@ -1,4 +1,5 @@
-import { UserRepository, UserProfileUpdate } from '../../../application/ports/output/UserRepository.js';
+import { IsNull } from 'typeorm';
+import { UserRepository, UserProfileUpdate, UserAccountStateUpdate } from '../../../application/ports/output/UserRepository.js';
 import { User } from '../../../domain/entities/User.js';
 import { AppDataSource } from './data-source.js';
 import { UserEntity } from './entities/UserEntity.js';
@@ -125,8 +126,22 @@ export class TypeOrmUserRepository implements UserRepository {
     await this.repo.update({ id }, { failedLoginAttempts: attempts, lockedUntil });
   }
 
+  public async updateAccountState(id: number, fields: UserAccountStateUpdate): Promise<boolean> {
+    const patch: Partial<UserEntity> = {};
+    if (fields.status !== undefined) patch.status = fields.status;
+    if (fields.isActive !== undefined) patch.isActive = fields.isActive;
+    if (fields.deletedAt !== undefined) patch.deletedAt = fields.deletedAt;
+    if (Object.keys(patch).length === 0) return true;
+    const result = await this.repo.update({ id }, patch);
+    return (result.affected ?? 0) > 0;
+  }
+
   public async countAdmins(): Promise<number> {
     return this.repo.countBy({ role: 'admin' });
+  }
+
+  public async countActiveAdmins(): Promise<number> {
+    return this.repo.countBy({ role: 'admin', isActive: true, deletedAt: IsNull() });
   }
 
   public async count(): Promise<number> {

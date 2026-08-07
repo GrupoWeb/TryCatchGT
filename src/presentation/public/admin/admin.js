@@ -107,8 +107,8 @@
   function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; showSection('home'); loadOverview(); }
 
   async function checkSession() {
-    const { ok } = await api('/api/auth/me');
-    if (ok) showDashboard(); else showLogin();
+    const { ok, body } = await api('/api/auth/me');
+    if (ok) { currentUserId = body && body.userId; showDashboard(); } else showLogin();
   }
 
   let mfaChallenge = null;
@@ -600,11 +600,93 @@
     $('mfa-backup-view').hidden = false;
   }
 
+  let currentUserId = null; // id del usuario en sesión (para no auto-gestionarse)
   async function loadUsers() {
     const r = await api('/api/admin/users');
     if (!guard(r) || !r.ok) return;
-    $('users-list').innerHTML = r.body.data.map((u) => `<div class="user-row"><span>${esc(u.username)}${u.mfaEnabled ? ' 🔒' : ''}</span><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></div>`).join('');
+    $('users-list').innerHTML = r.body.data.map((u) => {
+      const self = u.id === currentUserId;
+      const name = esc(u.displayName || u.username);
+      const statusLabel = u.deleted ? 'Eliminado' : (u.isActive && u.status === 'active' ? 'Activo' : 'Inactivo');
+      const statusCls = u.deleted ? 'draft' : (u.isActive && u.status === 'active' ? 'published' : 'draft');
+      const actions = self
+        ? '<span class="admin-hint">(tú)</span>'
+        : u.deleted
+          ? `<button class="btn-ghost btn-sm" data-act="restore" data-id="${u.id}">Restaurar</button>`
+          : `<button class="btn-ghost btn-sm" data-act="edit" data-id="${u.id}">Editar</button>
+             <button class="btn-ghost btn-sm" data-act="toggle" data-id="${u.id}" data-active="${u.isActive && u.status === 'active' ? '1' : '0'}">${u.isActive && u.status === 'active' ? 'Desactivar' : 'Activar'}</button>
+             <button class="btn-danger btn-sm" data-act="delete" data-id="${u.id}">Eliminar</button>`;
+      return `<div class="user-row">
+        <span>${name}${u.mfaEnabled ? ' 🔒' : ''} <span class="admin-hint">@${esc(u.username)}</span></span>
+        <span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span>
+        <span class="badge-status ${statusCls}">${statusLabel}</span>
+        <span class="user-row__actions">${actions}</span>
+      </div>`;
+    }).join('');
   }
+
+  // Modal de edición de un usuario (terceros).
+  function editUserDialog(u) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Editar usuario">
+          <h3 class="modal__title">Editar: ${esc(u.username)}</h3>
+          <div class="admin-field"><label>Nombre para mostrar</label><input class="modal__input" id="eu-display" type="text" value="${esc(u.displayName || '')}" /></div>
+          <div class="admin-field"><label>Nombre(s)</label><input class="modal__input" id="eu-full" type="text" value="${esc(u.fullName || '')}" /></div>
+          <div class="admin-field"><label>Apellidos</label><input class="modal__input" id="eu-last" type="text" value="${esc(u.lastName || '')}" /></div>
+          <div class="admin-field"><label>Correo</label><input class="modal__input" id="eu-email" type="email" value="${esc(u.email || '')}" /></div>
+          <div class="admin-field"><label>Rol</label><select class="modal__input" id="eu-role"><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option></select></div>
+          <div class="modal__actions">
+            <button class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button class="btn-primary" data-act="ok">Guardar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('is-open'));
+      function close(val) { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); resolve(val); }
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) return close(null);
+        const a = e.target.closest('[data-act]');
+        if (!a) return;
+        if (a.getAttribute('data-act') === 'ok') {
+          close({ displayName: overlay.querySelector('#eu-display').value, fullName: overlay.querySelector('#eu-full').value, lastName: overlay.querySelector('#eu-last').value, email: overlay.querySelector('#eu-email').value, role: overlay.querySelector('#eu-role').value });
+        } else close(null);
+      });
+    });
+  }
+
+  $('users-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-id');
+    const act = btn.getAttribute('data-act');
+    if (act === 'edit') {
+      const r = await api(`/api/admin/users/${id}`);
+      if (!guard(r) || !r.ok) return;
+      const fields = await editUserDialog(r.body.data);
+      if (!fields) return;
+      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(fields) });
+      if (res.ok) { toast('Usuario actualizado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo actualizar.', 'error');
+    } else if (act === 'toggle') {
+      const activate = btn.getAttribute('data-active') === '0';
+      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: activate, status: activate ? 'active' : 'disabled' }) });
+      if (res.ok) { toast(activate ? 'Usuario activado' : 'Usuario desactivado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
+    } else if (act === 'delete') {
+      const ok = await confirmDialog({ title: 'Eliminar usuario', message: 'Se marcará como eliminado y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Eliminar', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if (res.ok) { toast('Usuario eliminado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo eliminar.', 'error');
+    } else if (act === 'restore') {
+      const res = await api(`/api/admin/users/${id}/restore`, { method: 'POST' });
+      if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
+    }
+  });
 
   // Avatar
   $('avatar-btn').addEventListener('click', () => $('avatar-file').click());

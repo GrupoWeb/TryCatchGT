@@ -1,4 +1,10 @@
-import { User } from '../../../domain/entities/User.js';
+import { User, UserStatus } from '../../../domain/entities/User.js';
+
+export interface UserAccountStateUpdate {
+  status?: UserStatus;
+  isActive?: boolean;
+  deletedAt?: Date | null;
+}
 
 export interface UserProfileUpdate {
   email?: string | null;
@@ -26,6 +32,10 @@ export interface UserRepository {
   clearLoginFailures(id: number): Promise<void>;
   // Fija el contador de intentos fallidos y, si aplica, la fecha de bloqueo.
   registerFailedLogin(id: number, attempts: number, lockedUntil: Date | null): Promise<void>;
+  // Actualiza estado de cuenta / soft-delete de un usuario.
+  updateAccountState(id: number, fields: UserAccountStateUpdate): Promise<boolean>;
   countAdmins(): Promise<number>;
+  // Admins que pueden operar (activos y no eliminados); para no quedarse sin admin.
+  countActiveAdmins(): Promise<number>;
   count(): Promise<number>;
 }
