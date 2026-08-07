@@ -3,6 +3,12 @@ import { DataSource } from 'typeorm';
 import path from 'node:path';
 import { env } from '../../../config/env.js';
 import { ServiceEntity } from './entities/ServiceEntity.js';
+import { PlanEntity } from './entities/PlanEntity.js';
+import { ProjectRequestEntity } from './entities/ProjectRequestEntity.js';
+import { BlogPostEntity } from './entities/BlogPostEntity.js';
+import { UserEntity } from './entities/UserEntity.js';
+import { SiteConfigEntity } from './entities/SiteConfigEntity.js';
+import { AuditLogEntity } from './entities/AuditLogEntity.js';
 
 // Las migraciones solo las carga el CLI (npm run migration:*), que se ejecuta con
 // tsx desde la raíz del proyecto; por eso la ruta se resuelve contra el árbol de
@@ -21,7 +27,7 @@ export const AppDataSource = new DataSource({
   username: env.db.user,
   password: env.db.password,
   database: env.db.name,
-  entities: [ServiceEntity],
+  entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity],
   migrations: [migrationsGlob],
   synchronize: false,
   logging: false,

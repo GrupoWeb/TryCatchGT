@@ -32,24 +32,24 @@ import { DeleteBlogPost } from '../../../application/use-cases/DeleteBlogPost.js
 import { AuthenticateUser } from '../../../application/use-cases/AuthenticateUser.js';
 import { EnsureAdminUser } from '../../../application/use-cases/EnsureAdminUser.js';
 
-// Adapters (output)
+// Adapters (output) — persistencia con TypeORM
 import { TypeOrmServiceRepository } from '../../database/typeorm/TypeOrmServiceRepository.js';
-import { MySQLPlanRepository } from '../../database/mysql/MySQLPlanRepository.js';
-import { MySQLProjectRequestRepository } from '../../database/mysql/MySQLProjectRequestRepository.js';
-import { MySQLBlogPostRepository } from '../../database/mysql/MySQLBlogPostRepository.js';
-import { MySQLUserRepository } from '../../database/mysql/MySQLUserRepository.js';
-import { MySQLSiteConfigRepository } from '../../database/mysql/MySQLSiteConfigRepository.js';
-import { MySQLAuditLogRepository } from '../../database/mysql/MySQLAuditLogRepository.js';
+import { TypeOrmPlanRepository } from '../../database/typeorm/TypeOrmPlanRepository.js';
+import { TypeOrmProjectRequestRepository } from '../../database/typeorm/TypeOrmProjectRequestRepository.js';
+import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPostRepository.js';
+import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
+import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
+import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLogRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
 const serviceRepository = new TypeOrmServiceRepository();
-const planRepository = new MySQLPlanRepository();
-const projectRequestRepository = new MySQLProjectRequestRepository();
-const blogRepository = new MySQLBlogPostRepository();
-const userRepository = new MySQLUserRepository();
-const siteConfigRepository = new MySQLSiteConfigRepository();
-const auditRepository = new MySQLAuditLogRepository();
+const planRepository = new TypeOrmPlanRepository();
+const projectRequestRepository = new TypeOrmProjectRequestRepository();
+const blogRepository = new TypeOrmBlogPostRepository();
+const userRepository = new TypeOrmUserRepository();
+const siteConfigRepository = new TypeOrmSiteConfigRepository();
+const auditRepository = new TypeOrmAuditLogRepository();
 const passwordHasher = new BcryptPasswordHasher();
 
 // Autenticación con validación de versión de sesión (permite revocar sesiones).
