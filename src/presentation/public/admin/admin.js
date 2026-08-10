@@ -673,10 +673,18 @@
     if (!u.email) { $('p-email-status').textContent = 'Sin correo'; $('email-verify-btn').hidden = true; }
     else if (u.emailVerified) { $('p-email-status').textContent = '✅ Verificado'; $('email-verify-btn').hidden = true; }
     else { $('p-email-status').textContent = '⚠️ Sin verificar'; $('email-verify-btn').hidden = false; }
-    // Avatar
+    // Avatar (con su punto de enfoque reposicionable)
     const av = $('profile-avatar');
-    if (u.avatar) { av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`; av.classList.add('has-img'); }
-    else { av.style.backgroundImage = ''; av.classList.remove('has-img'); $('profile-initials').textContent = (u.username[0] || '?').toUpperCase(); }
+    avatarPos = u.avatarPosition || '50% 50%';
+    if (u.avatar) {
+      av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`;
+      av.style.backgroundPosition = avatarPos;
+      av.classList.add('has-img');
+      applyAvatarHandle();
+    } else {
+      av.style.backgroundImage = ''; av.classList.remove('has-img');
+      $('profile-initials').textContent = (u.username[0] || '?').toUpperCase();
+    }
     // Estado MFA
     $('mfa-off').hidden = u.mfaEnabled;
     $('mfa-on').hidden = !u.mfaEnabled;
@@ -807,9 +815,41 @@
     $('avatar-file').value = '';
   });
 
+  // Reposición del avatar por arrastre (mismo mecanismo que la portada del blog).
+  // Se guarda al pulsar "Guardar perfil".
+  let avatarPos = '50% 50%';
+  const avEl = $('profile-avatar');
+  const avHandle = $('avatar-handle');
+  function applyAvatarHandle() {
+    if (!avHandle) return;
+    const [x, y] = parsePos(avatarPos);
+    avHandle.style.left = x + '%';
+    avHandle.style.top = y + '%';
+  }
+  function setAvatarPos(x, y) {
+    const cx = Math.max(0, Math.min(100, Math.round(x)));
+    const cy = Math.max(0, Math.min(100, Math.round(y)));
+    avatarPos = `${cx}% ${cy}%`;
+    avEl.style.backgroundPosition = avatarPos;
+    applyAvatarHandle();
+  }
+  let avatarDragging = false;
+  function avatarPointer(e) {
+    const r = avEl.getBoundingClientRect();
+    setAvatarPos(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+  }
+  avEl.addEventListener('pointerdown', (e) => {
+    if (!avEl.classList.contains('has-img')) return;
+    if (e.target.closest('.profile-avatar__btn')) return; // pulsar 📷 no arrastra
+    avatarDragging = true; avEl.setPointerCapture(e.pointerId); avatarPointer(e);
+  });
+  avEl.addEventListener('pointermove', (e) => { if (avatarDragging) avatarPointer(e); });
+  avEl.addEventListener('pointerup', () => { avatarDragging = false; });
+  avEl.addEventListener('pointercancel', () => { avatarDragging = false; });
+
   $('profile-save').addEventListener('click', async () => {
     $('profile-error').textContent = '';
-    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
+    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value, avatarPosition: avatarPos }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
   });

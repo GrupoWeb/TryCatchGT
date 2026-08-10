@@ -12,6 +12,7 @@ function toDomain(e: UserEntity): User {
     role: e.role,
     email: e.email ?? null,
     avatar: e.avatar ?? null,
+    avatarPosition: e.avatarPosition ?? null,
     mfaEnabled: e.mfaEnabled,
     mfaSecret: e.mfaSecret ?? null,
     mfaBackupCodes: e.mfaBackupCodes ?? null,
@@ -92,6 +93,7 @@ export class TypeOrmUserRepository implements UserRepository {
     const patch: Partial<UserEntity> = {};
     if (fields.email !== undefined) patch.email = fields.email || null;
     if (fields.avatar !== undefined) patch.avatar = fields.avatar || null;
+    if (fields.avatarPosition !== undefined) patch.avatarPosition = fields.avatarPosition || null;
     if (fields.role !== undefined) patch.role = fields.role;
     if (fields.fullName !== undefined) patch.fullName = fields.fullName || null;
     if (fields.lastName !== undefined) patch.lastName = fields.lastName || null;

@@ -13,10 +13,12 @@ import { validatePassword } from '../../security/passwordPolicy.js';
 import { renderEmail } from '../../email/emailTemplate.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// "x% y%" con enteros 0–100, para el punto de enfoque del avatar (background-position).
+const POSITION_RE = /^(100|[0-9]{1,2})% (100|[0-9]{1,2})%$/;
 
 function profileView(u: User) {
   return {
-    id: u.id, username: u.username, email: u.email, avatar: u.avatar, role: u.role,
+    id: u.id, username: u.username, email: u.email, avatar: u.avatar, avatarPosition: u.avatarPosition, role: u.role,
     mfaEnabled: u.mfaEnabled, backupCodesRemaining: u.mfaBackupCodes?.length ?? 0,
     fullName: u.fullName, lastName: u.lastName, displayName: u.displayName,
     status: u.status, isActive: u.isActive, mustChangePassword: u.mustChangePassword,
@@ -107,7 +109,7 @@ export class AccountAdminController {
     const b = req.body ?? {};
     // El rol NO se edita desde el propio perfil (evita auto-escalada editor→admin).
     // Se cambia solo desde la gestión de usuarios, que exige rol admin (ver updateUser).
-    const fields: { email?: string | null; avatar?: string | null; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
+    const fields: { email?: string | null; avatar?: string | null; avatarPosition?: string | null; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
 
     if (b.email !== undefined) {
       const email = String(b.email).trim();
@@ -115,6 +117,12 @@ export class AccountAdminController {
       fields.email = email || null;
     }
     if (b.avatar !== undefined) fields.avatar = String(b.avatar).trim() || null;
+    if (b.avatarPosition !== undefined) {
+      const pos = String(b.avatarPosition).trim();
+      // Formato "x% y%" con enteros 0–100 (background-position); si no, se ignora.
+      if (pos && !POSITION_RE.test(pos)) { res.status(400).json({ success: false, error: 'Posición de imagen inválida.' }); return; }
+      fields.avatarPosition = pos || null;
+    }
     if (b.fullName !== undefined) fields.fullName = String(b.fullName).trim() || null;
     if (b.lastName !== undefined) fields.lastName = String(b.lastName).trim() || null;
     if (b.displayName !== undefined) fields.displayName = String(b.displayName).trim() || null;
