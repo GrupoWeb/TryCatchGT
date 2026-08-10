@@ -540,7 +540,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const res = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', body: fd });
+    const res = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
     let body = null; try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
     if (res.ok && body && body.success) { $('f-cover').value = body.data.url; updateCoverPreview(); toast('Imagen subida'); }
     else toast((body && body.error) || 'No se pudo subir la imagen.', 'error');
