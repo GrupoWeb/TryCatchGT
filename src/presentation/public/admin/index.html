@@ -109,6 +109,7 @@
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
         <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
         <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
+        <button class="admin__nav-btn" data-section="users">👥 Usuarios</button>
         <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
       </aside>
 
@@ -405,7 +406,12 @@
             </div>
           </div>
 
-          <h3 class="admin-sec__subtitle">Usuarios</h3>
+        </section>
+
+        <!-- USUARIOS (solo admin) -->
+        <section class="admin-sec" id="sec-users" hidden>
+          <h2 class="admin-sec__title">Usuarios</h2>
+          <p class="admin-muted">Gestiona las cuentas del equipo: crea, edita, activa/desactiva, restablece contraseñas y restaura usuarios.</p>
           <div class="users-list" id="users-list"></div>
           <form class="admin__editor admin__editor--narrow" id="user-form">
             <div class="admin-grid-2">
