@@ -120,9 +120,13 @@ export class AuthController {
       return;
     }
 
-    // Si el usuario tiene 2FA, no abrimos sesión todavía: pedimos el código.
+    // Si el usuario tiene 2FA, no abrimos sesión todavía: pedimos el código. NO
+    // se limpian los fallos aquí: hacerlo con la contraseña correcta pero antes
+    // de validar el segundo factor permitiría a quien ya tiene la contraseña
+    // reiniciar el contador del lockout de MFA en cada intento (login → probar
+    // códigos → login…) y nunca alcanzar el bloqueo. El contador solo se limpia
+    // al completar el 2FA (recordLogin en mfaVerify).
     if (user.mfaEnabled) {
-      await this.users.clearLoginFailures(user.id);
       res.status(200).json({ success: true, mfaRequired: true, challenge: createMfaChallenge(user.id) });
       return;
     }

@@ -60,4 +60,17 @@ describe('AuthController login', () => {
     await ctrlFor(repo).login(req('correct'), res);
     expect(res.statusCode).toBe(403);
   });
+
+  it('login con 2FA NO reinicia el contador de fallos antes del segundo factor', async () => {
+    // Con la contraseña correcta y 2FA activo, se pide el código pero el lockout
+    // NO se limpia: si no, quien tenga la contraseña reiniciaría el contador de
+    // fuerza bruta del MFA en cada ronda y nunca se bloquearía.
+    const repo = fakeRepo({ mfaEnabled: true, mfaSecret: 'JBSWY3DPEHPK3PXP', failedLoginAttempts: 3 });
+    const res = mockRes();
+    await ctrlFor(repo).login(req('correct'), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.mfaRequired).toBe(true);
+    expect(repo._rec.cleared).toBeUndefined();  // clearLoginFailures no se llamó
+    expect(repo._rec.recorded).toBeUndefined(); // recordLogin tampoco (aún no hay sesión)
+  });
 });
