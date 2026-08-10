@@ -15,13 +15,18 @@
 
   <nav class="navbar">
     <a class="navbar__brand" href="/" style="text-decoration:none;color:inherit">TryCatch<span>GT</span></a>
-    <div class="navbar__links">
-      <a href="/#services">Servicios</a>
-      <a href="/#pricing">Planes</a>
-      <a href="/blog">Blog</a>
-      <a href="/#quote">Cotizar</a>
+    <button class="navbar__burger" id="nav-burger" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="navbar__menu" id="nav-menu">
+      <div class="navbar__links">
+        <a href="/#services">Servicios</a>
+        <a href="/#pricing">Planes</a>
+        <a href="/blog">Blog</a>
+        <a href="/#quote">Cotizar</a>
+      </div>
+      <a href="/#quote" class="navbar__cta">Iniciar proyecto</a>
     </div>
-    <a href="/#quote" class="navbar__cta">Iniciar proyecto</a>
   </nav>
 
   <article class="article">

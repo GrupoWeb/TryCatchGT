@@ -298,10 +298,17 @@
       ctx.globalAlpha = 1;
     }
 
-    requestAnimationFrame(tick);
+    if (!prefersReducedMotion) requestAnimationFrame(tick);
   }
 
-  window.addEventListener('resize', resize);
+  // Si el usuario prefiere menos movimiento, se dibuja un solo cuadro estático.
+  const prefersReducedMotion =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  window.addEventListener('resize', () => {
+    resize();
+    if (prefersReducedMotion) tick();
+  });
   resize();
   tick();
 
