@@ -5,9 +5,10 @@ import helmet from 'helmet';
 import path from 'node:path';
 import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
-import { apiRouter, ensureAdminUser } from './routes/apiRoutes.js';
+import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { buildCspDirectives } from './csp.js';
+import { buildPostSeo, buildDefaultPostSeo, buildSitemap, buildRobots } from './seo.js';
 import { AppDataSource } from '../database/typeorm/data-source.js';
 
 // Los assets del frontend (HTML/CSS/JS) no los compila tsc, así que se sirven
@@ -47,7 +48,27 @@ if (liveReload) {
   app.get('/dev/livereload', liveReload.sseHandler);
 }
 
-// redirect:false evita que un directorio (p. ej. /admin) haga 301 a "/admin/".
+// ── Panel de administración en ruta configurable (ADMIN_PATH) ───────────────
+// Los assets del panel (admin.js/css) se sirven SOLO bajo env.adminPath. Si la ruta
+// se cambió respecto a /admin, se bloquea el /admin por defecto (y sus archivos)
+// para que no delate la existencia del panel: cae a la landing como cualquier ruta
+// inexistente. La auth sigue siendo el control real; esto es solo ofuscación.
+const adminDir = path.join(publicDir, 'admin');
+const adminHidden = env.adminPath !== '/admin';
+
+app.use(env.adminPath, express.static(adminDir, { index: false, redirect: false }));
+
+if (adminHidden) {
+  app.use((req, res, next) => {
+    if (req.path === '/admin' || req.path.startsWith('/admin/')) {
+      sendHtml(res, 'index.html');
+      return;
+    }
+    next();
+  });
+}
+
+// redirect:false evita que un directorio haga 301 a la variante con "/".
 app.use(express.static(publicDir, { index: false, redirect: false }));
 
 // Sirve una página HTML inyectando el snippet de live reload en desarrollo.
@@ -67,10 +88,56 @@ function sendHtml(res: Response, relativePath: string): void {
   res.type('html').send(html);
 }
 
+// ── SEO: robots.txt y sitemap.xml (dinámicos, con la URL pública real) ──────
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send(buildRobots(env.appUrl));
+});
+app.get('/sitemap.xml', async (_req, res) => {
+  try {
+    const posts = await seoListPosts();
+    res.type('application/xml').send(buildSitemap(env.appUrl, posts));
+  } catch {
+    res.type('application/xml').send(buildSitemap(env.appUrl, []));
+  }
+});
+
+// Sirve el artículo del blog inyectando las meta tags server-side (title,
+// description, canonical, Open Graph, Twitter, JSON-LD Article) en el marcador
+// {{HEAD_SEO}} de post.html, para que buscadores y redes las vean sin ejecutar JS.
+function sendPostHtml(res: Response, seo: string): void {
+  const absPath = path.join(publicDir, 'post.html');
+  const raw = fs.readFileSync(absPath, 'utf8').replace('{{HEAD_SEO}}', seo);
+  res.type('html').send(liveReload ? liveReload.injectInto(raw) : raw);
+}
+
+// Sirve el HTML del panel resolviendo {{ADMIN_BASE}} a la ruta real (env.adminPath),
+// para que los assets y el history.replaceState apunten a la ruta secreta.
+let adminHtmlCache: string | undefined;
+function sendAdminHtml(res: Response): void {
+  const absPath = path.join(publicDir, 'admin', 'index.html');
+  if (liveReload) {
+    const html = fs.readFileSync(absPath, 'utf8').replaceAll('{{ADMIN_BASE}}', env.adminPath);
+    res.type('html').send(liveReload.injectInto(html));
+    return;
+  }
+  if (adminHtmlCache === undefined) {
+    adminHtmlCache = fs.readFileSync(absPath, 'utf8').replaceAll('{{ADMIN_BASE}}', env.adminPath);
+  }
+  res.type('html').send(adminHtmlCache);
+}
+
 // Páginas con URLs "bonitas".
 app.get('/blog', (_req, res) => sendHtml(res, 'blog.html'));
-app.get('/blog/:slug', (_req, res) => sendHtml(res, 'post.html'));
-app.get(['/admin', '/admin/*'], (_req, res) => sendHtml(res, 'admin/index.html'));
+app.get('/blog/:slug', async (req, res) => {
+  try {
+    const post = await seoGetPost(String(req.params.slug));
+    if (!post) { res.status(404); sendPostHtml(res, buildDefaultPostSeo()); return; }
+    sendPostHtml(res, buildPostSeo(post, env.appUrl));
+  } catch {
+    sendPostHtml(res, buildDefaultPostSeo());
+  }
+});
+app.get([env.adminPath, `${env.adminPath}/*`], (_req, res) => sendAdminHtml(res));
 app.get('/privacidad', (_req, res) => sendHtml(res, 'legal/privacidad.html'));
 app.get('/terminos', (_req, res) => sendHtml(res, 'legal/terminos.html'));
 app.get('/cookies', (_req, res) => sendHtml(res, 'legal/cookies.html'));
