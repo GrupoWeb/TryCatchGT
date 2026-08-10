@@ -1,21 +1,6 @@
 import multer from 'multer';
-import path from 'node:path';
-import fs from 'node:fs';
-import crypto from 'node:crypto';
-
-// Las imágenes subidas se guardan bajo public/uploads, servido como estático.
-export const uploadsDir = path.join(process.cwd(), 'src', 'presentation', 'public', 'uploads');
-fs.mkdirSync(uploadsDir, { recursive: true });
 
 const MAX_SIZE = 4 * 1024 * 1024; // 4 MB
-
-const EXT_BY_MIME: Record<string, string> = {
-  'image/jpeg': '.jpg',
-  'image/png': '.png',
-  'image/webp': '.webp',
-  'image/gif': '.gif',
-  'image/avif': '.avif',
-};
 
 /**
  * Detecta el tipo real de la imagen por sus "magic bytes" (firma binaria del
@@ -56,19 +41,3 @@ export const uploadImage = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_SIZE },
 });
-
-/**
- * Valida el contenido real del archivo y, si es una imagen soportada, lo escribe
- * en uploads con un nombre aleatorio y la extensión que corresponde al tipo
- * detectado (no a la que envió el cliente). Devuelve el nombre del archivo.
- * Lanza Error con mensaje apto para el cliente si el contenido no es válido.
- */
-export function saveValidatedImage(file: Express.Multer.File): string {
-  const mime = sniffImageMime(file.buffer);
-  if (!mime) {
-    throw new Error('El archivo no es una imagen válida. Usa JPG, PNG, WEBP, GIF o AVIF.');
-  }
-  const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${EXT_BY_MIME[mime]}`;
-  fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
-  return filename;
-}
