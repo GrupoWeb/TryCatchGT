@@ -7,6 +7,8 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
+  // Ruta base del panel (puede ser secreta vía ADMIN_PATH); la inyecta el server.
+  const ADMIN_BASE = document.querySelector('meta[name="admin-base"]')?.content || '/admin';
 
   // Lee la cookie CSRF (double-submit) para reenviarla como header en mutaciones.
   function csrfHeader() {
@@ -200,7 +202,7 @@
     if (r.ok) {
       toast('Contraseña actualizada. Inicia sesión con la nueva.');
       resetToken = null;
-      history.replaceState(null, '', '/admin');
+      history.replaceState(null, '', ADMIN_BASE);
       showLogin();
     } else { const m = (r.body && r.body.error) || 'No se pudo.'; $('reset-msg').textContent = m; toast(m, 'error'); }
   });

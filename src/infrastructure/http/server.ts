@@ -47,7 +47,27 @@ if (liveReload) {
   app.get('/dev/livereload', liveReload.sseHandler);
 }
 
-// redirect:false evita que un directorio (p. ej. /admin) haga 301 a "/admin/".
+// ── Panel de administración en ruta configurable (ADMIN_PATH) ───────────────
+// Los assets del panel (admin.js/css) se sirven SOLO bajo env.adminPath. Si la ruta
+// se cambió respecto a /admin, se bloquea el /admin por defecto (y sus archivos)
+// para que no delate la existencia del panel: cae a la landing como cualquier ruta
+// inexistente. La auth sigue siendo el control real; esto es solo ofuscación.
+const adminDir = path.join(publicDir, 'admin');
+const adminHidden = env.adminPath !== '/admin';
+
+app.use(env.adminPath, express.static(adminDir, { index: false, redirect: false }));
+
+if (adminHidden) {
+  app.use((req, res, next) => {
+    if (req.path === '/admin' || req.path.startsWith('/admin/')) {
+      sendHtml(res, 'index.html');
+      return;
+    }
+    next();
+  });
+}
+
+// redirect:false evita que un directorio haga 301 a la variante con "/".
 app.use(express.static(publicDir, { index: false, redirect: false }));
 
 // Sirve una página HTML inyectando el snippet de live reload en desarrollo.
@@ -67,10 +87,26 @@ function sendHtml(res: Response, relativePath: string): void {
   res.type('html').send(html);
 }
 
+// Sirve el HTML del panel resolviendo {{ADMIN_BASE}} a la ruta real (env.adminPath),
+// para que los assets y el history.replaceState apunten a la ruta secreta.
+let adminHtmlCache: string | undefined;
+function sendAdminHtml(res: Response): void {
+  const absPath = path.join(publicDir, 'admin', 'index.html');
+  if (liveReload) {
+    const html = fs.readFileSync(absPath, 'utf8').replaceAll('{{ADMIN_BASE}}', env.adminPath);
+    res.type('html').send(liveReload.injectInto(html));
+    return;
+  }
+  if (adminHtmlCache === undefined) {
+    adminHtmlCache = fs.readFileSync(absPath, 'utf8').replaceAll('{{ADMIN_BASE}}', env.adminPath);
+  }
+  res.type('html').send(adminHtmlCache);
+}
+
 // Páginas con URLs "bonitas".
 app.get('/blog', (_req, res) => sendHtml(res, 'blog.html'));
 app.get('/blog/:slug', (_req, res) => sendHtml(res, 'post.html'));
-app.get(['/admin', '/admin/*'], (_req, res) => sendHtml(res, 'admin/index.html'));
+app.get([env.adminPath, `${env.adminPath}/*`], (_req, res) => sendAdminHtml(res));
 app.get('/privacidad', (_req, res) => sendHtml(res, 'legal/privacidad.html'));
 app.get('/terminos', (_req, res) => sendHtml(res, 'legal/terminos.html'));
 app.get('/cookies', (_req, res) => sendHtml(res, 'legal/cookies.html'));
