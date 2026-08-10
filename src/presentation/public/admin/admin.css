@@ -340,13 +340,43 @@ body { min-height: 100vh; }
   background: rgba(139, 92, 246, 0.14);
   border: 1px solid color-mix(in srgb, var(--violet) 40%, transparent);
 }
+
+.admin-sep {
+  border: none;
+  border-top: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  margin: 18px 0;
+}
+
+.mfa-backup-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.mfa-backup-list code {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-align: center;
+  color: var(--text);
+  background: rgba(139, 92, 246, 0.14);
+  border: 1px solid color-mix(in srgb, var(--violet) 40%, transparent);
+}
 .mfa-status { color: var(--text-muted); font-size: 15px; margin-bottom: 16px; }
 .mfa-status strong { color: #4ade80; }
 #mfa-code, #mfa-off-code, #mfa-login-code { letter-spacing: 6px; font-size: 20px; text-align: center; font-family: ui-monospace, Menlo, Consolas, monospace; }
 
 /* Users */
 .users-list { display: flex; flex-direction: column; gap: 8px; max-width: 520px; margin-bottom: 20px; }
-.user-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 14px; }
+.user-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 14px; }
+.user-row > span:first-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-row__actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
 .admin-item {
   padding: 16px;
   border-radius: 14px;
@@ -391,6 +421,25 @@ body { min-height: 100vh; }
   .nav-badge { margin-left: 6px; }
   .admin-split { grid-template-columns: 1fr; }
   .admin-grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .admin__topbar { padding: 14px 18px; }
+  .admin__main { padding: 22px 18px 72px; }
+  .admin__editor, .admin__empty { padding: 20px; }
+  .admin-login__card { padding: 30px 22px; }
+  /* La lista superior de navegación permite scroll horizontal sin romper el layout */
+  .admin__nav { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .admin__nav::-webkit-scrollbar { display: none; }
+  /* 16px evita el zoom automático de iOS Safari al enfocar un campo */
+  .admin-field input,
+  .admin-field select,
+  .admin-field textarea,
+  .leads-search,
+  .modal__input { font-size: 16px; }
+  .lead-card__top { flex-wrap: wrap; }
+  .lead-card__status { width: 100%; }
+  .cover__url { max-width: 100%; }
 }
 
 /* ---------- Modal de confirmación ---------- */
@@ -569,3 +618,14 @@ body { min-height: 100vh; }
 @media (prefers-reduced-motion: reduce) {
   .modal-overlay, .modal, .toast { transition: none; }
 }
+
+/* Auditoría */
+.audit-table-wrap { overflow-x: auto; margin-top: 12px; }
+.audit-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.audit-table th, .audit-table td {
+  text-align: left; padding: 10px 12px; white-space: nowrap;
+  border-bottom: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+}
+.audit-table th { color: var(--text-dim); font-weight: 600; }
+.audit-table td code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
+.audit-table tbody tr:hover { background: rgba(139, 92, 246, 0.06); }

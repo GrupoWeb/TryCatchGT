@@ -14,9 +14,16 @@ import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
-import { requireAuth } from '../middleware/requireAuth.js';
-import { uploadImage } from '../upload.js';
-import { authLimiter, formLimiter } from '../rateLimit.js';
+import { AuditController } from '../controllers/AuditController.js';
+import { createRequireAuth } from '../middleware/requireAuth.js';
+import { requireRole } from '../middleware/requireRole.js';
+import { createAuditLog } from '../middleware/auditLog.js';
+import { createTurnstileGuard } from '../middleware/turnstile.js';
+import { uploadImage, saveValidatedImage } from '../upload.js';
+import { authLimiter, formLimiter, uploadLimiter, healthLimiter } from '../rateLimit.js';
+import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
+import { createHealthCheck } from '../health.js';
+import { AppDataSource } from '../../database/typeorm/data-source.js';
 
 // Use cases
 import { GetServices } from '../../../application/use-cases/GetServices.js';
@@ -29,23 +36,45 @@ import { DeleteBlogPost } from '../../../application/use-cases/DeleteBlogPost.js
 import { AuthenticateUser } from '../../../application/use-cases/AuthenticateUser.js';
 import { EnsureAdminUser } from '../../../application/use-cases/EnsureAdminUser.js';
 
-// Adapters (output)
-import { MySQLServiceRepository } from '../../database/mysql/MySQLServiceRepository.js';
-import { MySQLPlanRepository } from '../../database/mysql/MySQLPlanRepository.js';
-import { MySQLProjectRequestRepository } from '../../database/mysql/MySQLProjectRequestRepository.js';
-import { MySQLBlogPostRepository } from '../../database/mysql/MySQLBlogPostRepository.js';
-import { MySQLUserRepository } from '../../database/mysql/MySQLUserRepository.js';
-import { MySQLSiteConfigRepository } from '../../database/mysql/MySQLSiteConfigRepository.js';
+// Adapters (output) — persistencia con TypeORM
+import { TypeOrmServiceRepository } from '../../database/typeorm/TypeOrmServiceRepository.js';
+import { TypeOrmPlanRepository } from '../../database/typeorm/TypeOrmPlanRepository.js';
+import { TypeOrmProjectRequestRepository } from '../../database/typeorm/TypeOrmProjectRequestRepository.js';
+import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPostRepository.js';
+import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
+import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
+import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLogRepository.js';
+import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
+import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
+import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
+import { TokenService } from '../../security/TokenService.js';
+import { EmailService } from '../../email/EmailService.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
-const serviceRepository = new MySQLServiceRepository();
-const planRepository = new MySQLPlanRepository();
-const projectRequestRepository = new MySQLProjectRequestRepository();
-const blogRepository = new MySQLBlogPostRepository();
-const userRepository = new MySQLUserRepository();
-const siteConfigRepository = new MySQLSiteConfigRepository();
+const serviceRepository = new TypeOrmServiceRepository();
+const planRepository = new TypeOrmPlanRepository();
+const projectRequestRepository = new TypeOrmProjectRequestRepository();
+const blogRepository = new TypeOrmBlogPostRepository();
+const userRepository = new TypeOrmUserRepository();
+const siteConfigRepository = new TypeOrmSiteConfigRepository();
+const auditRepository = new TypeOrmAuditLogRepository();
+const userTokenRepository = new TypeOrmUserTokenRepository();
+const userSessionRepository = new TypeOrmUserSessionRepository();
 const passwordHasher = new BcryptPasswordHasher();
+const htmlSanitizer = new BlogHtmlSanitizer();
+const tokenService = new TokenService(userTokenRepository);
+const emailService = new EmailService(siteConfigRepository);
+
+// Autenticación con validación de versión + sesión por dispositivo.
+const requireAuth = createRequireAuth(userRepository, userSessionRepository);
+// Autorización: competencia exclusiva del administrador (gestión de usuarios,
+// configuración con secretos y bitácora). El editor conserva su trabajo legítimo.
+const requireAdmin = requireRole('admin');
+// Bitácora de accesos y acciones sensibles del admin.
+const auditLog = createAuditLog(auditRepository);
+// Protección anti-bots (Cloudflare Turnstile) para formularios; se configura en el panel.
+const turnstileGuard = createTurnstileGuard(siteConfigRepository);
 
 // Público
 const serviceController = new ServiceController(new GetServices(serviceRepository));
@@ -56,20 +85,21 @@ const projectRequestController = new ProjectRequestController(
 const getBlogPosts = new GetBlogPosts(blogRepository);
 const blogController = new BlogController(getBlogPosts, new GetBlogPostBySlug(blogRepository));
 const siteConfigController = new SiteConfigController(siteConfigRepository);
-const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository);
+const authController = new AuthController(new AuthenticateUser(userRepository, passwordHasher), userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 
 // Admin
 const adminBlogController = new AdminBlogController(
   getBlogPosts,
-  new SaveBlogPost(blogRepository),
+  new SaveBlogPost(blogRepository, htmlSanitizer),
   new DeleteBlogPost(blogRepository),
   blogRepository,
 );
 const leadAdminController = new LeadAdminController(projectRequestRepository);
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
-const accountAdminController = new AccountAdminController(userRepository, passwordHasher);
+const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
+const auditController = new AuditController(auditRepository, userRepository);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
 export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHasher, {
@@ -80,33 +110,53 @@ export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHashe
 // ── Rutas ───────────────────────────────────────────────────────────────────
 export const apiRouter = Router();
 
-apiRouter.get('/health', (_req, res) => {
-  res.status(200).json({ success: true, status: 'ok', service: 'trycatch-gt-api' });
-});
+// Emite el token CSRF en los GET; el SPA lo reenvía como header en las mutaciones.
+apiRouter.use(issueCsrfToken);
+
+// Exige token CSRF en toda petición mutante. La única excepción (documentada en
+// createCsrfGuard) es el formulario público de cotización (POST /projects).
+apiRouter.use(createCsrfGuard(['/projects']));
+
+// Registra en la bitácora las mutaciones de autenticación y del panel admin.
+apiRouter.use(auditLog);
+
+// Refleja el estado real de la BD (503 si no responde) para que el HEALTHCHECK
+// del contenedor detecte una BD caída en vez de dar por sano al server. El
+// sondeo va cacheado y con rate limit para no amplificar carga contra la BD.
+apiRouter.get('/health', healthLimiter, createHealthCheck(AppDataSource));
 
 // Público
 apiRouter.get('/config', siteConfigController.publicConfig);
 apiRouter.get('/services', serviceController.list);
 apiRouter.get('/plans', planController.list);
-apiRouter.post('/projects', formLimiter, projectRequestController.create);
+apiRouter.post('/projects', formLimiter, turnstileGuard, projectRequestController.create);
 apiRouter.get('/blog', blogController.list);
 apiRouter.get('/blog/:slug', blogController.detail);
 
 // Autenticación
-apiRouter.post('/auth/login', authLimiter, authController.login);
+apiRouter.post('/auth/login', authLimiter, turnstileGuard, authController.login);
 apiRouter.post('/auth/mfa', authLimiter, authController.mfaVerify);
 apiRouter.post('/auth/logout', authController.logout);
 apiRouter.get('/auth/me', requireAuth, authController.me);
+apiRouter.get('/auth/verify-email', authController.verifyEmail);
+apiRouter.post('/auth/forgot-password', authLimiter, authController.forgotPassword);
+apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword);
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
+apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
 // Subida de imágenes (portadas del blog, etc.)
-apiRouter.post('/admin/uploads', requireAuth, (req, res) => {
+apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req, res) => {
   uploadImage.single('image')(req, res, (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }
-    res.status(201).json({ success: true, data: { url: `/uploads/${req.file.filename}` } });
+    try {
+      const filename = saveValidatedImage(req.file);
+      res.status(201).json({ success: true, data: { url: `/uploads/${filename}` } });
+    } catch (e) {
+      res.status(400).json({ success: false, error: (e as Error).message });
+    }
   });
 });
 
@@ -135,16 +185,27 @@ apiRouter.post('/admin/plans', requireAuth, planAdminController.create);
 apiRouter.put('/admin/plans/:id', requireAuth, planAdminController.update);
 apiRouter.delete('/admin/plans/:id', requireAuth, planAdminController.remove);
 
-// Configuración del sitio
-apiRouter.get('/admin/config', requireAuth, siteConfigController.adminGet);
-apiRouter.put('/admin/config', requireAuth, siteConfigController.adminUpdate);
+// Configuración del sitio (incluye credenciales SMTP/Turnstile → solo admin)
+apiRouter.get('/admin/config', requireAuth, requireAdmin, siteConfigController.adminGet);
+apiRouter.put('/admin/config', requireAuth, requireAdmin, siteConfigController.adminUpdate);
 
 // Perfil, cuenta y usuarios
 apiRouter.get('/admin/account', requireAuth, accountAdminController.me);
 apiRouter.put('/admin/account', requireAuth, accountAdminController.updateProfile);
 apiRouter.post('/admin/account/password', requireAuth, accountAdminController.changePassword);
+apiRouter.post('/admin/account/email/verify/send', requireAuth, accountAdminController.sendEmailVerification);
+apiRouter.post('/admin/account/sessions/revoke-all', requireAuth, accountAdminController.revokeOtherSessions);
+apiRouter.get('/admin/account/sessions', requireAuth, accountAdminController.listSessions);
+apiRouter.delete('/admin/account/sessions/:id', requireAuth, accountAdminController.revokeSession);
 apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.mfaSetup);
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);
-apiRouter.get('/admin/users', requireAuth, accountAdminController.listUsers);
-apiRouter.post('/admin/users', requireAuth, accountAdminController.createUser);
+apiRouter.post('/admin/account/mfa/backup-codes', requireAuth, accountAdminController.regenerateBackupCodes);
+// Gestión de usuarios: exclusiva de admin (todas las verbos, incluidos los GET).
+apiRouter.get('/admin/users', requireAuth, requireAdmin, accountAdminController.listUsers);
+apiRouter.post('/admin/users', requireAuth, requireAdmin, accountAdminController.createUser);
+apiRouter.get('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.getUser);
+apiRouter.put('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.updateUser);
+apiRouter.delete('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.deleteUser);
+apiRouter.post('/admin/users/:id/restore', requireAuth, requireAdmin, accountAdminController.restoreUser);
+apiRouter.post('/admin/users/:id/reset-password', requireAuth, requireAdmin, accountAdminController.resetUserPassword);

@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import express, { Response, NextFunction, Request } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -6,7 +7,8 @@ import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
 import { apiRouter, ensureAdminUser } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
-import { testConnection } from '../database/mysql/connection.js';
+import { buildCspDirectives } from './csp.js';
+import { AppDataSource } from '../database/typeorm/data-source.js';
 
 // Los assets del frontend (HTML/CSS/JS) no los compila tsc, así que se sirven
 // directamente desde el árbol de fuentes usando la raíz del proyecto.
@@ -24,19 +26,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
       useDefaults: false,
-      directives: {
-        defaultSrc: ["'self'"],
-        baseUri: ["'self'"],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        scriptSrc: env.isProduction ? ["'self'"] : ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'"],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        formAction: ["'self'"],
-        ...(env.isProduction ? { upgradeInsecureRequests: [] } : {}),
-      },
+      directives: buildCspDirectives({ isProduction: env.isProduction, forceHttps: env.forceHttps }),
     },
   }),
 );
@@ -108,15 +98,19 @@ async function bootstrap(): Promise<void> {
     console.log('');
   });
 
-  // Probe de MySQL + siembra del admin inicial. No bloquean el arranque del
-  // servidor; si MySQL falla, los repositorios degradan a memoria.
-  const dbUp = await testConnection();
-  if (dbUp) {
+  // Inicializa el ORM (probe de base de datos) y siembra el admin inicial. No
+  // bloquean el arranque del servidor; si la DB falla, las peticiones que la usen
+  // devolverán error (ya no hay degradación a memoria).
+  try {
+    await AppDataSource.initialize();
+    console.log('  🗃️  TypeORM inicializado');
     try {
       await ensureAdminUser.execute();
     } catch (error) {
       console.warn('⚠️  No se pudo sembrar el admin inicial:', (error as Error).message);
     }
+  } catch (error) {
+    console.warn('⚠️  No se pudo conectar a la base de datos:', (error as Error).message);
   }
 }
 

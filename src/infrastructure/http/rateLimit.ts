@@ -19,3 +19,23 @@ export const formLimiter = rateLimit({
   legacyHeaders: false,
   message: json,
 });
+
+// Health check público: generoso para monitoreo/healthcheck del contenedor
+// (localhost cada 15 s), pero acota un flood externo contra un endpoint sin auth.
+export const healthLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: json,
+});
+
+// Subida de imágenes (panel): evita que un usuario autenticado llene el disco
+// con subidas ilimitadas de hasta 4 MB (M8).
+export const uploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hora
+  limit: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: json,
+});

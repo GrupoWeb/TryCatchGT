@@ -8,11 +8,17 @@
 
   const $ = (id) => document.getElementById(id);
 
+  // Lee la cookie CSRF (double-submit) para reenviarla como header en mutaciones.
+  function csrfHeader() {
+    const match = document.cookie.split('; ').find((c) => c.startsWith('XSRF-TOKEN='));
+    return match ? { 'X-CSRF-Token': decodeURIComponent(match.slice('XSRF-TOKEN='.length)) } : {};
+  }
+
   async function api(path, options = {}) {
     const res = await fetch(path, {
       credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
       ...options,
+      headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
     });
     let body = null;
     try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
@@ -96,26 +102,104 @@
   // ── Vistas de sesión ──────────────────────────────────────
   const loginView = $('login-view');
   const dashboardView = $('dashboard-view');
+  const forceView = $('force-pass-view');
 
-  function showLogin() { loginView.hidden = false; dashboardView.hidden = true; showLoginStep('password'); }
-  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; showSection('home'); loadOverview(); }
+  function showLogin() { loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true; showLoginStep('password'); }
+  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; applyRoleGate(currentUserRole); showSection('home'); loadOverview(); }
+
+  // Oculta a los editores las secciones que en el servidor exigen rol admin
+  // (contacto/config, auditoría y gestión de usuarios). Es solo cosmético: el
+  // control real es requireRole en las rutas.
+  function applyRoleGate(role) {
+    const isAdmin = role === 'admin';
+    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"]').forEach((b) => { b.hidden = !isAdmin; });
+    const usersList = $('users-list');
+    const heading = usersList ? usersList.previousElementSibling : null; // <h3>Usuarios</h3>
+    [usersList, $('user-form'), heading].forEach((el) => { if (el) el.hidden = !isAdmin; });
+  }
+  function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
   async function checkSession() {
-    const { ok } = await api('/api/auth/me');
-    if (ok) showDashboard(); else showLogin();
+    const { ok, body } = await api('/api/auth/me');
+    if (!ok) { showLogin(); return; }
+    currentUserId = body && body.userId;
+    currentUserRole = body && body.role;
+    if (body && body.mustChangePassword) showForce(); else showDashboard();
   }
 
+  // Cambio de contraseña obligatorio.
+  $('force-pass-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('fp-error').textContent = '';
+    const r = await api('/api/admin/account/password', { method: 'POST', body: JSON.stringify({ currentPassword: $('fp-current').value, newPassword: $('fp-new').value }) });
+    if (r.ok) { $('fp-current').value = ''; $('fp-new').value = ''; toast('Contraseña actualizada'); showDashboard(); }
+    else { const m = (r.body && r.body.error) || 'No se pudo cambiar.'; $('fp-error').textContent = m; toast(m, 'error'); }
+  });
+  $('fp-logout').addEventListener('click', async () => { await api('/api/auth/logout', { method: 'POST' }); showLogin(); });
+
   let mfaChallenge = null;
+  let resetToken = null;
   function showLoginStep(step) {
     $('login-form').hidden = step !== 'password';
     $('mfa-login-card').hidden = step !== 'mfa';
+    $('forgot-card').hidden = step !== 'forgot';
+    $('reset-card').hidden = step !== 'reset';
     if (step === 'mfa') setTimeout(() => $('mfa-login-code').focus(), 50);
+  }
+  function showResetView(token) {
+    resetToken = token;
+    loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true;
+    showLoginStep('reset');
+  }
+
+  // ¿Olvidaste tu contraseña?
+  $('forgot-link').addEventListener('click', () => { $('forgot-msg').textContent = ''; showLoginStep('forgot'); });
+  $('forgot-back').addEventListener('click', () => showLoginStep('password'));
+  $('forgot-card').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await api('/api/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email: $('forgot-email').value.trim() }) });
+    // Respuesta uniforme (no revela si el correo existe).
+    if (r.ok) { toast('Si el correo está registrado, te enviamos un enlace.'); $('forgot-email').value = ''; showLoginStep('password'); }
+    else toast((r.body && r.body.error) || 'No se pudo procesar.', 'error');
+  });
+  $('reset-card').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('reset-msg').textContent = '';
+    const r = await api('/api/auth/reset-password', { method: 'POST', body: JSON.stringify({ token: resetToken, newPassword: $('reset-pass').value }) });
+    if (r.ok) {
+      toast('Contraseña actualizada. Inicia sesión con la nueva.');
+      resetToken = null;
+      history.replaceState(null, '', '/admin');
+      showLogin();
+    } else { const m = (r.body && r.body.error) || 'No se pudo.'; $('reset-msg').textContent = m; toast(m, 'error'); }
+  });
+
+  // Carga Cloudflare Turnstile en el login si está activado en el panel.
+  (async function initLoginTurnstile() {
+    try {
+      const res = await fetch('/api/config');
+      const cfg = (await res.json()).data || {};
+      const el = $('login-turnstile');
+      if (!cfg.turnstileEnabled || !cfg.turnstileSiteKey || !el) return;
+      el.setAttribute('data-sitekey', cfg.turnstileSiteKey);
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+      s.async = true;
+      s.defer = true;
+      document.head.appendChild(s);
+    } catch (_) { /* sin bloquear el login si falla */ }
+  })();
+
+  function loginTurnstileToken() {
+    const input = document.querySelector('#login-form [name="cf-turnstile-response"]');
+    return input ? input.value : '';
   }
 
   $('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     $('login-error').textContent = '';
-    const { ok, body } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('login-user').value, password: $('login-pass').value }) });
+    const { ok, body } = await api('/api/auth/login', { method: 'POST', body: JSON.stringify({ username: $('login-user').value, password: $('login-pass').value, 'cf-turnstile-response': loginTurnstileToken() }) });
+    if (window.turnstile) window.turnstile.reset();
     if (ok && body && body.mfaRequired) {
       mfaChallenge = body.challenge;
       $('login-pass').value = '';
@@ -124,7 +208,7 @@
       showLoginStep('mfa');
     } else if (ok) {
       $('login-pass').value = '';
-      showDashboard();
+      await checkSession(); // carga rol + vista correcta (dashboard o cambio forzado)
     } else {
       $('login-error').textContent = (body && body.error) || 'No se pudo iniciar sesión.';
     }
@@ -134,7 +218,7 @@
     e.preventDefault();
     $('mfa-login-error').textContent = '';
     const { ok, body } = await api('/api/auth/mfa', { method: 'POST', body: JSON.stringify({ challenge: mfaChallenge, code: $('mfa-login-code').value }) });
-    if (ok) { mfaChallenge = null; showDashboard(); }
+    if (ok) { mfaChallenge = null; await checkSession(); }
     else $('mfa-login-error').textContent = (body && body.error) || 'Código incorrecto.';
   });
   $('mfa-login-back').addEventListener('click', () => { mfaChallenge = null; showLoginStep('password'); });
@@ -148,7 +232,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount };
+  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -181,6 +265,28 @@
         <div class="stat-card__label">${esc(c.label)}</div>
       </div>`).join('');
   }
+
+  // ── AUDITORÍA ─────────────────────────────────────────────
+  async function loadAudit() {
+    const r = await api('/api/admin/audit');
+    if (!guard(r) || !r.ok) return;
+    const rows = r.body.data || [];
+    const body = $('audit-body');
+    if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="admin-muted">Sin eventos.</td></tr>'; return; }
+    body.innerHTML = rows.map((e) => {
+      const okStatus = e.status && e.status < 400;
+      const when = e.createdAt ? new Date(e.createdAt).toLocaleString('es-GT') : '—';
+      const who = e.actorLabel || e.actor || (e.actorId ? `#${e.actorId}` : '—');
+      return `<tr>
+        <td>${esc(when)}</td>
+        <td><code>${esc(e.action)}</code></td>
+        <td>${esc(who)}</td>
+        <td><span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(e.status ?? '—')}</span></td>
+        <td>${esc(e.ip || '—')}</td>
+      </tr>`;
+    }).join('');
+  }
+  $('audit-refresh').addEventListener('click', loadAudit);
 
   // ── COTIZACIONES / LEADS ──────────────────────────────────
   const STATUS = { pending: 'Pendiente', reviewed: 'Revisado', contacted: 'Contactado' };
@@ -491,29 +597,83 @@
   async function loadContact() {
     const r = await api('/api/admin/config');
     if (!guard(r) || !r.ok) return;
-    $('c-email').value = r.body.data.contactEmail || '';
-    $('c-wa').value = r.body.data.whatsappNumber || '';
-    $('c-msg').value = r.body.data.whatsappMessage || '';
+    const d = r.body.data;
+    $('c-email').value = d.contactEmail || '';
+    $('c-wa').value = d.whatsappNumber || '';
+    $('c-msg').value = d.whatsappMessage || '';
+    $('ts-enabled').checked = !!d.turnstileEnabled;
+    $('ts-site').value = d.turnstileSiteKey || '';
+    // Los secretos no llegan del servidor (enmascarados): se dejan vacíos y solo se
+    // reescriben si el admin teclea uno nuevo. El placeholder indica si ya hay uno.
+    $('ts-secret').value = '';
+    $('ts-secret').placeholder = d.turnstileSecretConfigured ? '•••••••• (ya configurada)' : '0x4AAAAAAA...';
+    $('smtp-host').value = d.smtpHost || '';
+    $('smtp-port').value = d.smtpPort || '587';
+    $('smtp-user').value = d.smtpUser || '';
+    $('smtp-pass').value = '';
+    $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
+    $('smtp-from').value = d.smtpFrom || '';
+    $('smtp-secure').checked = !!d.smtpSecure;
   }
+  $('smtp-save').addEventListener('click', async () => {
+    $('smtp-error').textContent = '';
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ smtpHost: $('smtp-host').value.trim(), smtpPort: $('smtp-port').value.trim(), smtpUser: $('smtp-user').value.trim(), smtpPass: $('smtp-pass').value, smtpFrom: $('smtp-from').value.trim(), smtpSecure: $('smtp-secure').checked }) });
+    if (r.ok) toast('SMTP actualizado'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('smtp-error').textContent = m; toast(m, 'error'); }
+  });
   $('contact-save').addEventListener('click', async () => {
     $('contact-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ contactEmail: $('c-email').value, whatsappNumber: $('c-wa').value, whatsappMessage: $('c-msg').value }) });
     if (r.ok) toast('Contacto actualizado'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('contact-error').textContent = m; toast(m, 'error'); }
   });
+  $('turnstile-save').addEventListener('click', async () => {
+    $('turnstile-error').textContent = '';
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ turnstileEnabled: $('ts-enabled').checked, turnstileSiteKey: $('ts-site').value.trim(), turnstileSecretKey: $('ts-secret').value.trim() }) });
+    if (r.ok) toast('Protección actualizada'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('turnstile-error').textContent = m; toast(m, 'error'); }
+  });
 
   // ── PERFIL ────────────────────────────────────────────────
   let mfaPendingSecret = null;
 
-  async function loadAccount() { await Promise.all([loadProfile(), loadUsers()]); }
+  async function loadAccount() { await Promise.all([loadProfile(), loadUsers(), loadSessions()]); }
+
+  async function loadSessions() {
+    const r = await api('/api/admin/account/sessions');
+    if (!guard(r) || !r.ok) return;
+    const rows = r.body.data || [];
+    $('sessions-list').innerHTML = rows.map((s) => {
+      const dev = esc((s.userAgent || 'Dispositivo desconocido').slice(0, 60));
+      const when = s.lastSeenAt || s.createdAt;
+      const meta = `${esc(s.ip || '—')} · ${when ? new Date(when).toLocaleString('es-GT') : ''}`;
+      const action = s.current
+        ? '<span class="badge-status published">Esta sesión</span>'
+        : `<button class="btn-ghost btn-sm" data-session="${s.id}">Cerrar</button>`;
+      return `<div class="user-row"><span>${dev} <span class="admin-hint">${meta}</span></span><span class="user-row__actions">${action}</span></div>`;
+    }).join('') || '<p class="admin-muted">No hay sesiones activas.</p>';
+  }
+  $('sessions-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-session]');
+    if (!btn) return;
+    const r = await api(`/api/admin/account/sessions/${btn.getAttribute('data-session')}`, { method: 'DELETE' });
+    if (r.ok) { toast('Sesión cerrada'); loadSessions(); }
+    else toast((r.body && r.body.error) || 'No se pudo cerrar.', 'error');
+  });
 
   async function loadProfile() {
     const r = await api('/api/admin/account');
     if (!guard(r) || !r.ok) return;
     const u = r.body.data;
-    $('profile-username').textContent = u.username;
+    $('profile-username').textContent = u.displayName || u.fullName || u.username;
     $('profile-role').textContent = u.role === 'admin' ? 'Admin' : 'Editor';
+    $('p-fullname').value = u.fullName || '';
+    $('p-lastname').value = u.lastName || '';
+    $('p-displayname').value = u.displayName || '';
     $('p-email').value = u.email || '';
-    $('p-role').value = u.role;
+    $('p-role').value = u.role === 'admin' ? 'Admin' : 'Editor';
+    $('p-lastlogin').value = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('es-GT') : 'Nunca';
+    // Estado de verificación de correo
+    if (!u.email) { $('p-email-status').textContent = 'Sin correo'; $('email-verify-btn').hidden = true; }
+    else if (u.emailVerified) { $('p-email-status').textContent = '✅ Verificado'; $('email-verify-btn').hidden = true; }
+    else { $('p-email-status').textContent = '⚠️ Sin verificar'; $('email-verify-btn').hidden = false; }
     // Avatar
     const av = $('profile-avatar');
     if (u.avatar) { av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`; av.classList.add('has-img'); }
@@ -522,13 +682,116 @@
     $('mfa-off').hidden = u.mfaEnabled;
     $('mfa-on').hidden = !u.mfaEnabled;
     $('mfa-setup').hidden = true;
+    $('mfa-backup-view').hidden = true;
+    $('mfa-backup-remaining').textContent = u.backupCodesRemaining ?? 0;
   }
 
+  // Muestra (una única vez) los códigos de respaldo recién generados.
+  let lastBackupCodes = [];
+  function showBackupCodes(codes) {
+    lastBackupCodes = codes || [];
+    $('mfa-backup-list').innerHTML = lastBackupCodes.map((c) => `<li><code>${esc(c)}</code></li>`).join('');
+    $('mfa-off').hidden = true;
+    $('mfa-on').hidden = true;
+    $('mfa-setup').hidden = true;
+    $('mfa-backup-view').hidden = false;
+  }
+
+  let currentUserId = null; // id del usuario en sesión (para no auto-gestionarse)
+  let currentUserRole = null; // rol en sesión (solo para el gate cosmético de la UI)
   async function loadUsers() {
     const r = await api('/api/admin/users');
     if (!guard(r) || !r.ok) return;
-    $('users-list').innerHTML = r.body.data.map((u) => `<div class="user-row"><span>${esc(u.username)}${u.mfaEnabled ? ' 🔒' : ''}</span><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></div>`).join('');
+    $('users-list').innerHTML = r.body.data.map((u) => {
+      const self = u.id === currentUserId;
+      const name = esc(u.displayName || u.username);
+      const statusLabel = u.deleted ? 'Eliminado' : (u.isActive && u.status === 'active' ? 'Activo' : 'Inactivo');
+      const statusCls = u.deleted ? 'draft' : (u.isActive && u.status === 'active' ? 'published' : 'draft');
+      const actions = self
+        ? '<span class="admin-hint">(tú)</span>'
+        : u.deleted
+          ? `<button class="btn-ghost btn-sm" data-act="restore" data-id="${u.id}">Restaurar</button>`
+          : `<button class="btn-ghost btn-sm" data-act="edit" data-id="${u.id}">Editar</button>
+             <button class="btn-ghost btn-sm" data-act="reset" data-id="${u.id}">Resetear clave</button>
+             <button class="btn-ghost btn-sm" data-act="toggle" data-id="${u.id}" data-active="${u.isActive && u.status === 'active' ? '1' : '0'}">${u.isActive && u.status === 'active' ? 'Desactivar' : 'Activar'}</button>
+             <button class="btn-danger btn-sm" data-act="delete" data-id="${u.id}">Eliminar</button>`;
+      return `<div class="user-row">
+        <span>${name}${u.mfaEnabled ? ' 🔒' : ''} <span class="admin-hint">@${esc(u.username)}</span></span>
+        <span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span>
+        <span class="badge-status ${statusCls}">${statusLabel}</span>
+        <span class="user-row__actions">${actions}</span>
+      </div>`;
+    }).join('');
   }
+
+  // Modal de edición de un usuario (terceros).
+  function editUserDialog(u) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal" role="dialog" aria-modal="true" aria-label="Editar usuario">
+          <h3 class="modal__title">Editar: ${esc(u.username)}</h3>
+          <div class="admin-field"><label>Nombre para mostrar</label><input class="modal__input" id="eu-display" type="text" value="${esc(u.displayName || '')}" /></div>
+          <div class="admin-field"><label>Nombre(s)</label><input class="modal__input" id="eu-full" type="text" value="${esc(u.fullName || '')}" /></div>
+          <div class="admin-field"><label>Apellidos</label><input class="modal__input" id="eu-last" type="text" value="${esc(u.lastName || '')}" /></div>
+          <div class="admin-field"><label>Correo</label><input class="modal__input" id="eu-email" type="email" value="${esc(u.email || '')}" /></div>
+          <div class="admin-field"><label>Rol</label><select class="modal__input" id="eu-role"><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option></select></div>
+          <div class="modal__actions">
+            <button class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button class="btn-primary" data-act="ok">Guardar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('is-open'));
+      function close(val) { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); resolve(val); }
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) return close(null);
+        const a = e.target.closest('[data-act]');
+        if (!a) return;
+        if (a.getAttribute('data-act') === 'ok') {
+          close({ displayName: overlay.querySelector('#eu-display').value, fullName: overlay.querySelector('#eu-full').value, lastName: overlay.querySelector('#eu-last').value, email: overlay.querySelector('#eu-email').value, role: overlay.querySelector('#eu-role').value });
+        } else close(null);
+      });
+    });
+  }
+
+  $('users-list').addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-id');
+    const act = btn.getAttribute('data-act');
+    if (act === 'edit') {
+      const r = await api(`/api/admin/users/${id}`);
+      if (!guard(r) || !r.ok) return;
+      const fields = await editUserDialog(r.body.data);
+      if (!fields) return;
+      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(fields) });
+      if (res.ok) { toast('Usuario actualizado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo actualizar.', 'error');
+    } else if (act === 'toggle') {
+      const activate = btn.getAttribute('data-active') === '0';
+      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: activate, status: activate ? 'active' : 'disabled' }) });
+      if (res.ok) { toast(activate ? 'Usuario activado' : 'Usuario desactivado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
+    } else if (act === 'delete') {
+      const ok = await confirmDialog({ title: 'Eliminar usuario', message: 'Se marcará como eliminado y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Eliminar', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+      if (res.ok) { toast('Usuario eliminado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo eliminar.', 'error');
+    } else if (act === 'restore') {
+      const res = await api(`/api/admin/users/${id}/restore`, { method: 'POST' });
+      if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
+    } else if (act === 'reset') {
+      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 12). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
+      if (!temp) return;
+      const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
+      if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
+      else toast((res.body && res.body.error) || 'No se pudo resetear.', 'error');
+    }
+  });
 
   // Avatar
   $('avatar-btn').addEventListener('click', () => $('avatar-file').click());
@@ -537,7 +800,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', body: fd });
+    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
     let ub = null; try { ub = await up.json(); } catch (_) {}
     if (!up.ok || !ub || !ub.success) { toast((ub && ub.error) || 'No se pudo subir la foto.', 'error'); return; }
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ avatar: ub.data.url }) });
@@ -547,9 +810,15 @@
 
   $('profile-save').addEventListener('click', async () => {
     $('profile-error').textContent = '';
-    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, role: $('p-role').value }) });
+    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
+  });
+  $('email-verify-btn').addEventListener('click', async () => {
+    const r = await api('/api/admin/account/email/verify/send', { method: 'POST' });
+    if (!r.ok) { toast((r.body && r.body.error) || 'No se pudo enviar.', 'error'); return; }
+    if (r.body.sent) toast('Te enviamos un enlace de verificación a tu correo.');
+    else toast('SMTP no configurado: el enlace quedó en el log del servidor (modo dev).', 'success', 5000);
   });
 
   // MFA: activar
@@ -568,9 +837,30 @@
   $('mfa-enable-btn').addEventListener('click', async () => {
     $('mfa-error').textContent = '';
     const r = await api('/api/admin/account/mfa/enable', { method: 'POST', body: JSON.stringify({ secret: mfaPendingSecret, code: $('mfa-code').value }) });
-    if (r.ok) { mfaPendingSecret = null; loadProfile(); toast('2FA activado'); }
+    if (r.ok) { mfaPendingSecret = null; toast('2FA activado'); showBackupCodes(r.body && r.body.data && r.body.data.backupCodes); }
     else { const m = (r.body && r.body.error) || 'Código incorrecto.'; $('mfa-error').textContent = m; toast(m, 'error'); }
   });
+  // Regenerar códigos de respaldo (exige un código TOTP actual).
+  $('mfa-regen-btn').addEventListener('click', async () => {
+    $('mfa-regen-error').textContent = '';
+    const r = await api('/api/admin/account/mfa/backup-codes', { method: 'POST', body: JSON.stringify({ code: $('mfa-regen-code').value }) });
+    if (r.ok) { $('mfa-regen-code').value = ''; toast('Códigos regenerados'); showBackupCodes(r.body && r.body.data && r.body.data.backupCodes); }
+    else { const m = (r.body && r.body.error) || 'No se pudo regenerar.'; $('mfa-regen-error').textContent = m; toast(m, 'error'); }
+  });
+  // Acciones de la vista de códigos de respaldo.
+  $('mfa-backup-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(lastBackupCodes.join('\n')); toast('Códigos copiados'); }
+    catch { toast('No se pudo copiar', 'error'); }
+  });
+  $('mfa-backup-download').addEventListener('click', () => {
+    const blob = new Blob([`Códigos de respaldo — TryCatch GT\n\n${lastBackupCodes.join('\n')}\n`], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'codigos-respaldo-trycatch.txt';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+  $('mfa-backup-done').addEventListener('click', () => { lastBackupCodes = []; loadProfile(); });
   $('mfa-disable-btn').addEventListener('click', async () => {
     $('mfa-off-error').textContent = '';
     const r = await api('/api/admin/account/mfa/disable', { method: 'POST', body: JSON.stringify({ code: $('mfa-off-code').value }) });
@@ -584,12 +874,25 @@
     if (r.ok) { $('a-current').value = ''; $('a-new').value = ''; toast('Contraseña actualizada'); }
     else { const m = (r.body && r.body.error) || 'No se pudo cambiar.'; $('pass-error').textContent = m; toast(m, 'error'); }
   });
+  $('sessions-revoke-btn').addEventListener('click', async () => {
+    const ok = await confirmDialog({ title: 'Cerrar las demás sesiones', message: 'Se cerrará la sesión en todos los demás dispositivos. Esta sesión se mantiene abierta.', confirmText: 'Cerrar las demás', danger: true });
+    if (!ok) return;
+    const r = await api('/api/admin/account/sessions/revoke-all', { method: 'POST' });
+    if (r.ok) { toast('Se cerraron las demás sesiones'); loadSessions(); }
+    else toast((r.body && r.body.error) || 'No se pudo completar.', 'error');
+  });
   $('user-save').addEventListener('click', async () => {
     $('user-error').textContent = '';
-    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value }) });
+    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value, mustChangePassword: $('u-mustchange').checked }) });
     if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadAccount(); }
     else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
   });
 
-  checkSession();
+  // Enlace de recuperación de contraseña: /admin/reset-password?token=...
+  const bootToken = new URLSearchParams(location.search).get('token');
+  if (location.pathname.endsWith('/reset-password') && bootToken) {
+    showResetView(bootToken);
+  } else {
+    checkSession();
+  }
 })();

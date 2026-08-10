@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TryCatch GT · Ingeniería de Software a Medida</title>
-  <meta name="description" content="TryCatch GT — Desarrollamos aplicaciones web, móviles y cloud a la velocidad de la idea." />
+  <meta name="description" content="TryCatch GT — Software a medida, construido para escalar. Aplicaciones web, móviles y cloud con arquitecturas limpias, de la idea a producción." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -23,20 +23,25 @@
   <!-- Floating Pill Navbar -->
   <nav class="navbar">
     <div class="navbar__brand">TryCatch<span>GT</span></div>
-    <div class="navbar__links">
-      <a href="#services">Servicios</a>
-      <a href="#pricing">Planes</a>
-      <a href="/blog">Blog</a>
-      <a href="#quote">Cotizar</a>
+    <button class="navbar__burger" id="nav-burger" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav-menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="navbar__menu" id="nav-menu">
+      <div class="navbar__links">
+        <a href="#services">Servicios</a>
+        <a href="#pricing">Planes</a>
+        <a href="/blog">Blog</a>
+        <a href="#quote">Cotizar</a>
+      </div>
+      <a href="#quote" class="navbar__cta">Iniciar proyecto</a>
     </div>
-    <a href="#quote" class="navbar__cta">Iniciar proyecto</a>
   </nav>
 
   <!-- Hero -->
   <header class="hero">
     <span class="badge"><span class="badge__dot"></span> Estudio de Ingeniería de Software · Guatemala</span>
-    <h1>Desarrollamos aplicaciones web, móviles y cloud a la velocidad de la idea.</h1>
-    <p>Diseñamos y construimos software a medida con arquitecturas limpias, escalables y listas para crecer con tu negocio.</p>
+    <h1>Software a medida, construido para escalar.</h1>
+    <p>Aplicaciones web, móviles y cloud con arquitecturas limpias, de la idea a producción.</p>
     <div class="hero__actions">
       <a href="#quote" class="btn btn--primary">Solicitar cotización →</a>
       <a href="#services" class="btn btn--ghost">Ver servicios</a>
@@ -131,6 +136,8 @@
               <textarea id="description" name="description" placeholder="Cuéntanos qué necesitas construir, objetivos y plazos ideales..." required></textarea>
             </div>
           </div>
+
+          <div class="cf-turnstile" id="quote-turnstile"></div>
 
           <div class="form-footer">
             <span class="form-status" id="form-status" role="status" aria-live="polite"></span>

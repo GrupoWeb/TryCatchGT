@@ -28,8 +28,33 @@
         <label for="login-pass">Contraseña</label>
         <input type="password" id="login-pass" autocomplete="current-password" required />
       </div>
+      <div class="cf-turnstile" id="login-turnstile" style="margin-bottom:12px"></div>
       <p class="admin-error" id="login-error"></p>
       <button type="submit" class="btn-primary" id="login-btn">Ingresar</button>
+      <button type="button" class="btn-ghost" id="forgot-link" style="width:100%;margin-top:8px">¿Olvidaste tu contraseña?</button>
+    </form>
+
+    <form class="admin-login__card" id="forgot-card" hidden>
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Recuperar contraseña</p>
+      <div class="admin-field">
+        <label for="forgot-email">Tu correo</label>
+        <input type="email" id="forgot-email" autocomplete="email" />
+      </div>
+      <p class="admin-error" id="forgot-msg"></p>
+      <button type="submit" class="btn-primary">Enviar enlace</button>
+      <button type="button" class="btn-ghost" id="forgot-back" style="width:100%;margin-top:8px">Volver</button>
+    </form>
+
+    <form class="admin-login__card" id="reset-card" hidden>
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Define tu nueva contraseña</p>
+      <div class="admin-field">
+        <label for="reset-pass">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label>
+        <input type="password" id="reset-pass" autocomplete="new-password" />
+      </div>
+      <p class="admin-error" id="reset-msg"></p>
+      <button type="submit" class="btn-primary">Guardar contraseña</button>
     </form>
 
     <form class="admin-login__card" id="mfa-login-card" hidden>
@@ -37,11 +62,31 @@
       <p class="admin-login__subtitle">Verificación en dos pasos</p>
       <div class="admin-field">
         <label for="mfa-login-code">Código de tu app de autenticación</label>
-        <input type="text" id="mfa-login-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" />
+        <input type="text" id="mfa-login-code" maxlength="11" placeholder="000000 o código de respaldo" autocomplete="one-time-code" />
+        <p class="admin-hint">¿Perdiste tu app? Ingresa uno de tus códigos de respaldo.</p>
       </div>
       <p class="admin-error" id="mfa-login-error"></p>
       <button type="submit" class="btn-primary">Verificar</button>
       <button type="button" class="btn-ghost" id="mfa-login-back" style="width:100%;margin-top:8px">Volver</button>
+    </form>
+  </section>
+
+  <!-- CAMBIO DE CONTRASEÑA OBLIGATORIO -->
+  <section class="admin-login" id="force-pass-view" hidden>
+    <form class="admin-login__card" id="force-pass-form">
+      <div class="admin-login__logo">TryCatch<span>GT</span></div>
+      <p class="admin-login__subtitle">Debes actualizar tu contraseña para continuar</p>
+      <div class="admin-field">
+        <label for="fp-current">Contraseña actual</label>
+        <input type="password" id="fp-current" autocomplete="current-password" />
+      </div>
+      <div class="admin-field">
+        <label for="fp-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label>
+        <input type="password" id="fp-new" autocomplete="new-password" />
+      </div>
+      <p class="admin-error" id="fp-error"></p>
+      <button type="submit" class="btn-primary" id="fp-save">Guardar y continuar</button>
+      <button type="button" class="btn-ghost" id="fp-logout" style="width:100%;margin-top:8px">Cerrar sesión</button>
     </form>
   </section>
 
@@ -64,6 +109,7 @@
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
         <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
         <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
+        <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
       </aside>
 
       <main class="admin__main">
@@ -244,6 +290,31 @@
             <p class="admin-error" id="contact-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
           </form>
+
+          <h3 class="admin-sec__subtitle">Protección de formularios (Cloudflare Turnstile)</h3>
+          <p class="admin-muted">Anti-bots para el formulario de cotización y el login. Crea un widget en el panel de Cloudflare Turnstile y pega aquí las llaves.</p>
+          <form class="admin__editor admin__editor--narrow" id="turnstile-form">
+            <label class="admin-check"><input type="checkbox" id="ts-enabled" /> Activar protección Turnstile</label>
+            <div class="admin-field"><label for="ts-site">Site key (pública)</label><input type="text" id="ts-site" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+            <div class="admin-field"><label for="ts-secret">Secret key <span class="admin-hint">(privada, se guarda en el servidor)</span></label><input type="password" id="ts-secret" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+            <p class="admin-error" id="turnstile-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
+          </form>
+
+          <h3 class="admin-sec__subtitle">Correo saliente (SMTP)</h3>
+          <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
+          <form class="admin__editor admin__editor--narrow" id="smtp-form">
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
+              <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+            </div>
+            <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
+            <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
+            <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
+            <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
+            <p class="admin-error" id="smtp-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
+          </form>
         </section>
 
         <!-- PERFIL -->
@@ -264,9 +335,18 @@
 
           <form class="admin__editor admin__editor--narrow" id="profile-form">
             <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
-              <div class="admin-field"><label for="p-role">Rol</label><select id="p-role"><option value="admin">Admin</option><option value="editor">Editor</option></select></div>
+              <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
+              <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
             </div>
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
+              <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+            </div>
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="p-role">Rol <span class="admin-hint">(lo asigna un administrador)</span></label><input type="text" id="p-role" readonly /></div>
+              <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
+            </div>
+            <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
             <p class="admin-error" id="profile-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
           </form>
@@ -274,10 +354,17 @@
           <h3 class="admin-sec__subtitle">Contraseña</h3>
           <form class="admin__editor admin__editor--narrow" id="pass-form">
             <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
-            <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 6)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
+            <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
             <p class="admin-error" id="pass-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
           </form>
+
+          <h3 class="admin-sec__subtitle">Sesiones activas</h3>
+          <div class="admin__editor admin__editor--narrow" id="sessions-panel">
+            <p class="admin-muted">Dispositivos donde tu cuenta tiene sesión abierta.</p>
+            <div class="users-list" id="sessions-list"></div>
+            <div class="admin__editor-actions" style="margin-top:12px"><button type="button" class="btn-ghost" id="sessions-revoke-btn">Cerrar las demás sesiones</button></div>
+          </div>
 
           <h3 class="admin-sec__subtitle">Autenticación en dos pasos (2FA)</h3>
           <div class="admin__editor admin__editor--narrow" id="mfa-panel">
@@ -298,9 +385,23 @@
             </div>
             <div id="mfa-on" hidden>
               <p class="mfa-status">🔒 El 2FA está <strong>activo</strong>. Se te pedirá un código al iniciar sesión.</p>
-              <div class="admin-field"><label for="mfa-off-code">Para desactivarlo, ingresa un código actual</label><input type="text" id="mfa-off-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-muted">Códigos de respaldo disponibles: <strong id="mfa-backup-remaining">—</strong>. Úsalos para entrar si pierdes tu app de autenticación.</p>
+              <div class="admin-field"><label for="mfa-regen-code">Ingresa un código actual para regenerar los de respaldo</label><input type="text" id="mfa-regen-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
+              <p class="admin-error" id="mfa-regen-error"></p>
+              <div class="admin__editor-actions"><button type="button" class="btn-ghost" id="mfa-regen-btn">Regenerar códigos de respaldo</button></div>
+              <hr class="admin-sep" />
+              <div class="admin-field"><label for="mfa-off-code">Para desactivar el 2FA, ingresa un código actual</label><input type="text" id="mfa-off-code" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="one-time-code" /></div>
               <p class="admin-error" id="mfa-off-error"></p>
               <div class="admin__editor-actions"><button type="button" class="btn-danger" id="mfa-disable-btn">Desactivar 2FA</button></div>
+            </div>
+            <div id="mfa-backup-view" hidden>
+              <p class="admin-hint">⚠️ Guarda estos códigos de respaldo en un lugar seguro. Cada uno sirve <strong>una sola vez</strong> y <strong>no se volverán a mostrar</strong>.</p>
+              <ul class="mfa-backup-list" id="mfa-backup-list"></ul>
+              <div class="admin__editor-actions">
+                <button type="button" class="btn-ghost" id="mfa-backup-copy">Copiar</button>
+                <button type="button" class="btn-ghost" id="mfa-backup-download">Descargar .txt</button>
+                <button type="button" class="btn-primary" id="mfa-backup-done">Ya los guardé</button>
+              </div>
             </div>
           </div>
 
@@ -311,10 +412,28 @@
               <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
               <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
             </div>
-            <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 6)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
+            <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
+            <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
             <p class="admin-error" id="user-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
           </form>
+        </section>
+
+        <!-- AUDITORÍA -->
+        <section class="admin-sec" id="sec-audit" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Auditoría</h2>
+            <button class="btn-ghost" id="audit-refresh">↻ Actualizar</button>
+          </div>
+          <p class="admin-muted">Registro de accesos y acciones sensibles del panel (últimos 100 eventos).</p>
+          <div class="audit-table-wrap">
+            <table class="audit-table">
+              <thead>
+                <tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Estado</th><th>IP</th></tr>
+              </thead>
+              <tbody id="audit-body"><tr><td colspan="5" class="admin-muted">Cargando…</td></tr></tbody>
+            </table>
+          </div>
         </section>
       </main>
     </div>

@@ -29,7 +29,8 @@ export class BlogController {
       const posts = await this.getPosts.execute({ onlyPublished: true, category });
       res.status(200).json({ success: true, data: posts.map(toListItem) });
     } catch (error) {
-      res.status(500).json({ success: false, error: 'No se pudieron obtener los artículos.', detail: (error as Error).message });
+      console.error('❌ Error listando artículos:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'No se pudieron obtener los artículos.' });
     }
   };
 
@@ -56,7 +57,8 @@ export class BlogController {
         },
       });
     } catch (error) {
-      res.status(500).json({ success: false, error: 'No se pudo obtener el artículo.', detail: (error as Error).message });
+      console.error('❌ Error obteniendo artículo:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'No se pudo obtener el artículo.' });
     }
   };
 }

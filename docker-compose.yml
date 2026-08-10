@@ -1,0 +1,57 @@
+# Entorno de prueba local (p. ej. en Kali): app Node + MySQL.
+#   1) cp .env.example .env   y completa los secretos (ver DOCKER.md)
+#   2) docker compose up --build
+#   → sitio:  http://localhost:3000
+#   → panel:  http://localhost:3000/admin
+#
+# Los secretos NO viven en este archivo: se cargan desde .env (gitignored).
+
+services:
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      # ':?' aborta con un mensaje claro si la variable no está en .env.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?define MYSQL_ROOT_PASSWORD en .env}
+      MYSQL_DATABASE: trycatch_db
+      # Usuario dedicado de la app (no root), con ALL PRIVILEGES solo sobre
+      # trycatch_db — suficiente para el CRUD y el DDL de las migraciones.
+      MYSQL_USER: ${MYSQL_USER:?define MYSQL_USER en .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?define MYSQL_PASSWORD en .env}
+    # Sin `ports`: MySQL NO se publica en el host. La app le habla por la red
+    # interna de Compose (DB_HOST=db). Para inspeccionar la BD desde el host:
+    #   docker compose exec db mysql -u"$MYSQL_USER" -p trycatch_db
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy   # espera a que MySQL acepte conexiones
+    # Secretos (credenciales de BD, SESSION_SECRET, ENCRYPTION_KEY, admin…) desde
+    # .env — nunca se commitean. Copia .env.example a .env y complétalo.
+    env_file: .env
+    environment:
+      # Solo variables no sensibles / de topología en claro:
+      # production conserva TODO el endurecimiento (CSP estricta, cookies Secure,
+      # validación de secretos, trust proxy). FORCE_HTTPS=false desacopla solo el
+      # upgrade-insecure-requests, porque el stack local se sirve por http://localhost
+      # y forzar https rompería CSS/JS. En Hostinger (con HTTPS) omite FORCE_HTTPS.
+      NODE_ENV: production
+      FORCE_HTTPS: "false"
+      PORT: "3000"
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: trycatch_db
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:

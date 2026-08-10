@@ -73,7 +73,8 @@ export class PlanAdminController {
       const saved = await this.repo.save(plan);
       res.status(id ? 200 : 201).json({ success: true, data: toView(saved) });
     } catch (error) {
-      res.status(500).json({ success: false, error: 'No se pudo guardar el plan.', detail: (error as Error).message });
+      console.error('❌ Error guardando plan:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'No se pudo guardar el plan.' });
     }
   }
 }

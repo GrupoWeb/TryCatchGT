@@ -36,10 +36,10 @@ export class ProjectRequestController {
         res.status(400).json({ success: false, error: error.message });
         return;
       }
+      console.error('❌ Error procesando solicitud de proyecto:', (error as Error).message);
       res.status(500).json({
         success: false,
         error: 'Ocurrió un error al procesar tu solicitud.',
-        detail: (error as Error).message,
       });
     }
   };
