@@ -148,7 +148,7 @@
     const isAdmin = role === 'admin';
     // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
     // navegación a los editores. El control real es requireRole en las rutas.
-    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"]').forEach((b) => { b.hidden = !isAdmin; });
+    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
@@ -265,7 +265,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -483,40 +483,74 @@
   }
 
   // ── Editor de texto enriquecido (contenteditable + execCommand) ──
-  const rtArea = $('rt-area');
-  let savedRange = null;
-  function saveRange() { const s = window.getSelection(); if (s && s.rangeCount && rtArea.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); }
-  function restoreRange() { if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); } }
-  function toggleRtPlaceholder() { rtArea.classList.toggle('is-empty', rtArea.textContent.trim() === '' && !rtArea.querySelector('img, ul, ol, blockquote')); }
-  rtArea.addEventListener('keyup', saveRange);
-  rtArea.addEventListener('mouseup', saveRange);
-  rtArea.addEventListener('input', toggleRtPlaceholder);
+  // Fábrica de editor: cada instancia gestiona su propia área, toolbar y rango.
+  // Se usa en el blog y en las páginas legales.
+  function makeRichEditor(rtArea, rtToolbar) {
+    let savedRange = null;
+    function saveRange() { const s = window.getSelection(); if (s && s.rangeCount && rtArea.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); }
+    function restoreRange() { if (savedRange) { const s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange); } }
+    function togglePlaceholder() { rtArea.classList.toggle('is-empty', rtArea.textContent.trim() === '' && !rtArea.querySelector('img, ul, ol, blockquote')); }
+    rtArea.addEventListener('keyup', saveRange);
+    rtArea.addEventListener('mouseup', saveRange);
+    rtArea.addEventListener('input', togglePlaceholder);
+    rtToolbar.addEventListener('mousedown', async (e) => {
+      const btn = e.target.closest('.rt__btn');
+      if (!btn) return;
+      e.preventDefault(); // conserva la selección del área editable
+      const cmd = btn.getAttribute('data-cmd');
+      rtArea.focus(); restoreRange();
+      if (cmd === 'createLink') {
+        saveRange();
+        const url = await promptDialog({ title: 'Insertar enlace', label: 'URL del enlace', placeholder: 'https://…' });
+        rtArea.focus(); restoreRange();
+        if (url) document.execCommand('createLink', false, url);
+      } else if (cmd === 'formatBlock') {
+        document.execCommand('formatBlock', false, btn.getAttribute('data-value'));
+      } else {
+        document.execCommand(cmd, false, null);
+      }
+      saveRange();
+      togglePlaceholder();
+    });
+    return {
+      set(html) { rtArea.innerHTML = html || ''; togglePlaceholder(); },
+      get() { return rtArea.innerHTML.trim(); },
+    };
+  }
   try { document.execCommand('defaultParagraphSeparator', false, 'p'); } catch (_) { /* navegador antiguo */ }
 
-  $('rt-toolbar').addEventListener('mousedown', async (e) => {
-    const btn = e.target.closest('.rt__btn');
-    if (!btn) return;
-    e.preventDefault(); // conserva la selección del área editable
-    const cmd = btn.getAttribute('data-cmd');
-    rtArea.focus(); restoreRange();
-    if (cmd === 'createLink') {
-      saveRange();
-      const url = await promptDialog({ title: 'Insertar enlace', label: 'URL del enlace', placeholder: 'https://…' });
-      rtArea.focus(); restoreRange();
-      if (url) document.execCommand('createLink', false, url);
-    } else if (cmd === 'formatBlock') {
-      document.execCommand('formatBlock', false, btn.getAttribute('data-value'));
-    } else {
-      document.execCommand(cmd, false, null);
-    }
-    saveRange();
-    toggleRtPlaceholder();
-  });
+  const richEditor = makeRichEditor($('rt-area'), $('rt-toolbar'));
 
-  const richEditor = {
-    set(html) { rtArea.innerHTML = html || ''; toggleRtPlaceholder(); },
-    get() { return rtArea.innerHTML.trim(); },
-  };
+  // ── Páginas legales (Términos/Privacidad/Cookies) — mismo editor enriquecido ──
+  const legalEditor = makeRichEditor($('rt-legal-area'), $('rt-legal-toolbar'));
+  let legalData = null;
+  let legalCurrent = 'terminos';
+  async function loadLegal() {
+    const r = await api('/api/admin/legal');
+    if (!guard(r) || !r.ok) return;
+    legalData = r.body.data;
+    legalCurrent = $('legal-page').value || 'terminos';
+    legalEditor.set(legalData[legalCurrent] || '');
+  }
+  $('legal-page').addEventListener('change', () => {
+    // Conserva en memoria lo editado de la página anterior al cambiar de pestaña.
+    if (legalData) legalData[legalCurrent] = legalEditor.get();
+    legalCurrent = $('legal-page').value;
+    legalEditor.set((legalData && legalData[legalCurrent]) || '');
+  });
+  $('legal-save').addEventListener('click', async () => {
+    $('legal-error').textContent = '';
+    const slug = $('legal-page').value;
+    const r = await api(`/api/admin/legal/${slug}`, { method: 'PUT', body: JSON.stringify({ html: legalEditor.get() }) });
+    if (r.ok) {
+      if (legalData) legalData[slug] = r.body.data.html;
+      legalEditor.set(r.body.data.html);
+      toast('Página legal guardada');
+    } else {
+      const m = (r.body && r.body.error) || 'No se pudo guardar.';
+      $('legal-error').textContent = m; toast(m, 'error');
+    }
+  });
 
   // ── Portada: subida + reposición por arrastre ──
   let coverPos = '50% 50%';
