@@ -9,6 +9,8 @@ import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { env } from '../../../config/env.js';
+import { validatePassword } from '../../security/passwordPolicy.js';
+import { escapeHtml } from '../../security/escapeHtml.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -74,7 +76,7 @@ export class AccountAdminController {
     const { sent } = await this.email.send({
       to: user.email,
       subject: 'Verifica tu correo — TryCatch GT',
-      html: `<p>Hola ${user.label},</p><p>Confirma tu correo:</p><p><a href="${link}">Verificar correo</a></p><p>El enlace vence en 60 minutos.</p>`,
+      html: `<p>Hola ${escapeHtml(user.label)},</p><p>Confirma tu correo:</p><p><a href="${escapeHtml(link)}">Verificar correo</a></p><p>El enlace vence en 60 minutos.</p>`,
       text: `Verifica tu correo: ${link}`,
     });
     res.status(200).json({ success: true, sent });
@@ -96,7 +98,9 @@ export class AccountAdminController {
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
 
     const b = req.body ?? {};
-    const fields: { email?: string | null; avatar?: string | null; role?: 'admin' | 'editor'; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
+    // El rol NO se edita desde el propio perfil (evita auto-escalada editor→admin).
+    // Se cambia solo desde la gestión de usuarios, que exige rol admin (ver updateUser).
+    const fields: { email?: string | null; avatar?: string | null; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
 
     if (b.email !== undefined) {
       const email = String(b.email).trim();
@@ -107,15 +111,6 @@ export class AccountAdminController {
     if (b.fullName !== undefined) fields.fullName = String(b.fullName).trim() || null;
     if (b.lastName !== undefined) fields.lastName = String(b.lastName).trim() || null;
     if (b.displayName !== undefined) fields.displayName = String(b.displayName).trim() || null;
-    if (b.role !== undefined) {
-      const role = b.role === 'admin' ? 'admin' : 'editor';
-      // Evita que el único admin se quite el rol y quede el sistema sin administradores.
-      if (user.role === 'admin' && role !== 'admin' && (await this.users.countAdmins()) <= 1) {
-        res.status(400).json({ success: false, error: 'No puedes quitarte el rol admin: eres el único administrador.' });
-        return;
-      }
-      fields.role = role;
-    }
 
     await this.users.updateProfile(user.id, fields);
     const updated = await this.users.findById(user.id);
@@ -124,12 +119,10 @@ export class AccountAdminController {
 
   public changePassword = async (req: AuthedRequest, res: Response): Promise<void> => {
     const { currentPassword, newPassword } = req.body ?? {};
-    if (!newPassword || String(newPassword).length < 6) {
-      res.status(400).json({ success: false, error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
-      return;
-    }
     const user = await this.currentUser(req);
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    const pErr = validatePassword(String(newPassword ?? ''), user.username);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     if (!(await this.hasher.compare(String(currentPassword ?? ''), user.passwordHash))) {
       res.status(400).json({ success: false, error: 'La contraseña actual es incorrecta.' });
       return;
@@ -233,7 +226,8 @@ export class AccountAdminController {
     const { username, password, role, fullName, lastName, displayName, mustChangePassword } = req.body ?? {};
     const uname = String(username ?? '').trim().toLowerCase();
     if (uname.length < 3) { res.status(400).json({ success: false, error: 'El usuario debe tener al menos 3 caracteres.' }); return; }
-    if (!password || String(password).length < 6) { res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' }); return; }
+    const pErr = validatePassword(String(password ?? ''), uname);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     if (await this.users.findByUsername(uname)) { res.status(409).json({ success: false, error: 'Ese usuario ya existe.' }); return; }
     const created = await this.users.create(
       new User({
@@ -259,10 +253,8 @@ export class AccountAdminController {
     const target = await this.users.findById(id);
     if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
     const { newPassword } = req.body ?? {};
-    if (!newPassword || String(newPassword).length < 6) {
-      res.status(400).json({ success: false, error: 'La contraseña temporal debe tener al menos 6 caracteres.' });
-      return;
-    }
+    const pErr = validatePassword(String(newPassword ?? ''), target.username);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     await this.users.updatePassword(id, await this.hasher.hash(String(newPassword)));
     await this.users.setMustChangePassword(id, true);
     await this.users.bumpSessionVersion(id);

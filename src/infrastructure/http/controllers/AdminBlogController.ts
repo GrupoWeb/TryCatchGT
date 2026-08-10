@@ -84,7 +84,8 @@ export class AdminBlogController {
         res.status(400).json({ success: false, error: error.message });
         return;
       }
-      res.status(500).json({ success: false, error: 'No se pudo guardar el artículo.', detail: (error as Error).message });
+      console.error('❌ Error guardando artículo:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'No se pudo guardar el artículo.' });
     }
   }
 }

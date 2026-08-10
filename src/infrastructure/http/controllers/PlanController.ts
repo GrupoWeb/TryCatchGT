@@ -25,10 +25,10 @@ export class PlanController {
         })),
       });
     } catch (error) {
+      console.error('❌ Error obteniendo planes:', (error as Error).message);
       res.status(500).json({
         success: false,
         error: 'No se pudieron obtener los planes.',
-        detail: (error as Error).message,
       });
     }
   };

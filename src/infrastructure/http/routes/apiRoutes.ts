@@ -16,10 +16,11 @@ import { AccountAdminController } from '../controllers/AccountAdminController.js
 import { OverviewController } from '../controllers/OverviewController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { createRequireAuth } from '../middleware/requireAuth.js';
+import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
-import { authLimiter, formLimiter } from '../rateLimit.js';
+import { authLimiter, formLimiter, uploadLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
 
 // Use cases
@@ -44,6 +45,7 @@ import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLo
 import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
 import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
+import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 
@@ -58,11 +60,15 @@ const auditRepository = new TypeOrmAuditLogRepository();
 const userTokenRepository = new TypeOrmUserTokenRepository();
 const userSessionRepository = new TypeOrmUserSessionRepository();
 const passwordHasher = new BcryptPasswordHasher();
+const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
 const emailService = new EmailService(siteConfigRepository);
 
 // Autenticación con validación de versión + sesión por dispositivo.
 const requireAuth = createRequireAuth(userRepository, userSessionRepository);
+// Autorización: competencia exclusiva del administrador (gestión de usuarios,
+// configuración con secretos y bitácora). El editor conserva su trabajo legítimo.
+const requireAdmin = requireRole('admin');
 // Bitácora de accesos y acciones sensibles del admin.
 const auditLog = createAuditLog(auditRepository);
 // Protección anti-bots (Cloudflare Turnstile) para formularios; se configura en el panel.
@@ -82,7 +88,7 @@ const authController = new AuthController(new AuthenticateUser(userRepository, p
 // Admin
 const adminBlogController = new AdminBlogController(
   getBlogPosts,
-  new SaveBlogPost(blogRepository),
+  new SaveBlogPost(blogRepository, htmlSanitizer),
   new DeleteBlogPost(blogRepository),
   blogRepository,
 );
@@ -139,10 +145,10 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
-apiRouter.get('/admin/audit', requireAuth, auditController.list);
+apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
 // Subida de imágenes (portadas del blog, etc.)
-apiRouter.post('/admin/uploads', requireAuth, (req, res) => {
+apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req, res) => {
   uploadImage.single('image')(req, res, (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }
@@ -180,9 +186,9 @@ apiRouter.post('/admin/plans', requireAuth, planAdminController.create);
 apiRouter.put('/admin/plans/:id', requireAuth, planAdminController.update);
 apiRouter.delete('/admin/plans/:id', requireAuth, planAdminController.remove);
 
-// Configuración del sitio
-apiRouter.get('/admin/config', requireAuth, siteConfigController.adminGet);
-apiRouter.put('/admin/config', requireAuth, siteConfigController.adminUpdate);
+// Configuración del sitio (incluye credenciales SMTP/Turnstile → solo admin)
+apiRouter.get('/admin/config', requireAuth, requireAdmin, siteConfigController.adminGet);
+apiRouter.put('/admin/config', requireAuth, requireAdmin, siteConfigController.adminUpdate);
 
 // Perfil, cuenta y usuarios
 apiRouter.get('/admin/account', requireAuth, accountAdminController.me);
@@ -196,10 +202,11 @@ apiRouter.post('/admin/account/mfa/setup', requireAuth, accountAdminController.m
 apiRouter.post('/admin/account/mfa/enable', requireAuth, accountAdminController.mfaEnable);
 apiRouter.post('/admin/account/mfa/disable', requireAuth, accountAdminController.mfaDisable);
 apiRouter.post('/admin/account/mfa/backup-codes', requireAuth, accountAdminController.regenerateBackupCodes);
-apiRouter.get('/admin/users', requireAuth, accountAdminController.listUsers);
-apiRouter.post('/admin/users', requireAuth, accountAdminController.createUser);
-apiRouter.get('/admin/users/:id', requireAuth, accountAdminController.getUser);
-apiRouter.put('/admin/users/:id', requireAuth, accountAdminController.updateUser);
-apiRouter.delete('/admin/users/:id', requireAuth, accountAdminController.deleteUser);
-apiRouter.post('/admin/users/:id/restore', requireAuth, accountAdminController.restoreUser);
-apiRouter.post('/admin/users/:id/reset-password', requireAuth, accountAdminController.resetUserPassword);
+// Gestión de usuarios: exclusiva de admin (todas las verbos, incluidos los GET).
+apiRouter.get('/admin/users', requireAuth, requireAdmin, accountAdminController.listUsers);
+apiRouter.post('/admin/users', requireAuth, requireAdmin, accountAdminController.createUser);
+apiRouter.get('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.getUser);
+apiRouter.put('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.updateUser);
+apiRouter.delete('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.deleteUser);
+apiRouter.post('/admin/users/:id/restore', requireAuth, requireAdmin, accountAdminController.restoreUser);
+apiRouter.post('/admin/users/:id/reset-password', requireAuth, requireAdmin, accountAdminController.resetUserPassword);

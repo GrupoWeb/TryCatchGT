@@ -1,14 +1,23 @@
 import { SaveBlogPostUseCase, SaveBlogPostDTO } from '../ports/input/SaveBlogPostUseCase.js';
 import { BlogPostRepository } from '../ports/output/BlogPostRepository.js';
+import { HtmlSanitizer } from '../ports/output/HtmlSanitizer.js';
 import { BlogPost, slugify } from '../../domain/entities/BlogPost.js';
 
 export class SaveBlogPost implements SaveBlogPostUseCase {
-  constructor(private readonly blogRepo: BlogPostRepository) {}
+  constructor(
+    private readonly blogRepo: BlogPostRepository,
+    private readonly sanitizer: HtmlSanitizer,
+  ) {}
 
   public async execute(dto: SaveBlogPostDTO): Promise<BlogPost> {
     const existing = dto.id ? await this.blogRepo.findById(dto.id) : null;
     const baseSlug = dto.slug?.trim() ? slugify(dto.slug) : slugify(dto.title);
     const slug = await this.ensureUniqueSlug(baseSlug, dto.id);
+
+    // Única puerta de escritura del blog: se sanea el HTML aquí, ANTES de construir
+    // la entidad, para frenar el XSS almacenado y para que el excerpt que deriva
+    // BlogPost del contenido se calcule sobre HTML ya limpio.
+    const safeContent = this.sanitizer.sanitize(dto.content);
 
     // Al publicar por primera vez se fija la fecha de publicación.
     const nowPublished = dto.status === 'published';
@@ -21,7 +30,7 @@ export class SaveBlogPost implements SaveBlogPostUseCase {
       slug,
       title: dto.title,
       excerpt: dto.excerpt,
-      content: dto.content,
+      content: safeContent,
       category: dto.category,
       author: dto.author,
       coverImage: dto.coverImage,

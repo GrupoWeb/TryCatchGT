@@ -10,6 +10,8 @@ import { verifyMfaToken, normalizeBackupCode } from '../../security/MfaService.j
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 import { env } from '../../../config/env.js';
+import { validatePassword } from '../../security/passwordPolicy.js';
+import { escapeHtml } from '../../security/escapeHtml.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 
 function resultPage(message: string, ok: boolean): string {
@@ -47,7 +49,7 @@ export class AuthController {
     await this.email.send({
       to: user.email,
       subject: 'Restablece tu contraseña — TryCatch GT',
-      html: `<p>Hola ${user.label},</p><p>Recibimos una solicitud para restablecer tu contraseña:</p><p><a href="${link}">Restablecer contraseña</a></p><p>El enlace vence en 60 minutos. Si no lo pediste, ignora este correo.</p>`,
+      html: `<p>Hola ${escapeHtml(user.label)},</p><p>Recibimos una solicitud para restablecer tu contraseña:</p><p><a href="${escapeHtml(link)}">Restablecer contraseña</a></p><p>El enlace vence en 60 minutos. Si no lo pediste, ignora este correo.</p>`,
       text: `Restablece tu contraseña: ${link}`,
     });
     generic();
@@ -56,10 +58,8 @@ export class AuthController {
   // Consume el token y fija la nueva contraseña, cortando las sesiones abiertas.
   public resetPassword = async (req: Request, res: Response): Promise<void> => {
     const { token, newPassword } = req.body ?? {};
-    if (!newPassword || String(newPassword).length < 6) {
-      res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' });
-      return;
-    }
+    const pErr = validatePassword(String(newPassword ?? ''));
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     const userId = await this.tokens.consume('password_reset', String(token ?? ''));
     if (!userId) {
       res.status(400).json({ success: false, error: 'El enlace es inválido o venció. Solicita uno nuevo.' });
@@ -135,10 +135,17 @@ export class AuthController {
   // Incrementa el contador de intentos fallidos y bloquea al superar el máximo.
   private async registerFailure(username: string): Promise<void> {
     const u = await this.users.findByUsername(username);
-    if (!u || u.id === undefined) return;
-    const attempts = (u.failedLoginAttempts ?? 0) + 1;
+    if (u) await this.registerUserFailure(u);
+  }
+
+  // Igual que registerFailure pero a partir del usuario ya resuelto (para el MFA,
+  // donde el fallo no viene de un username sino del segundo factor). Comparte el
+  // mismo contador/bloqueo que el login (M3).
+  private async registerUserFailure(user: User): Promise<void> {
+    if (user.id === undefined) return;
+    const attempts = (user.failedLoginAttempts ?? 0) + 1;
     const lockedUntil = attempts >= MAX_FAILED_ATTEMPTS ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null;
-    await this.users.registerFailedLogin(u.id, attempts, lockedUntil);
+    await this.users.registerFailedLogin(user.id, attempts, lockedUntil);
   }
 
   public mfaVerify = async (req: Request, res: Response): Promise<void> => {
@@ -157,11 +164,18 @@ export class AuthController {
       res.status(403).json({ success: false, error: 'Tu cuenta está deshabilitada. Contacta al administrador.' });
       return;
     }
+    // El bloqueo por fallos aplica también al segundo factor (M3): así el TOTP de
+    // 6 dígitos no queda expuesto a fuerza bruta desde múltiples IPs.
+    if (user.isLocked) {
+      res.status(401).json({ success: false, error: 'Cuenta bloqueada temporalmente por intentos fallidos. Inténtalo más tarde.' });
+      return;
+    }
     const input = String(code ?? '');
     // Acepta el código TOTP de la app o, en su defecto, un código de respaldo
     // de un solo uso (que se consume al usarlo).
     const okTotp = verifyMfaToken(input, user.mfaSecret);
     if (!okTotp && !(await this.consumeBackupCode(user, input))) {
+      await this.registerUserFailure(user);
       res.status(401).json({ success: false, error: 'Código incorrecto.' });
       return;
     }
@@ -193,6 +207,8 @@ export class AuthController {
   };
 
   public me = (req: AuthedRequest, res: Response): void => {
-    res.status(200).json({ success: true, authenticated: true, userId: req.userId, mustChangePassword: req.authUser?.mustChangePassword ?? false });
+    // `role` solo alimenta el ocultamiento cosmético de la UI solo-admin; la
+    // autorización real vive en el servidor (requireRole).
+    res.status(200).json({ success: true, authenticated: true, userId: req.userId, role: req.authUser?.role, mustChangePassword: req.authUser?.mustChangePassword ?? false });
   };
 }

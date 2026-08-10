@@ -21,10 +21,10 @@ export class ServiceController {
         })),
       });
     } catch (error) {
+      console.error('❌ Error obteniendo servicios:', (error as Error).message);
       res.status(500).json({
         success: false,
         error: 'No se pudieron obtener los servicios.',
-        detail: (error as Error).message,
       });
     }
   };

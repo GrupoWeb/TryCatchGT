@@ -105,13 +105,25 @@
   const forceView = $('force-pass-view');
 
   function showLogin() { loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true; showLoginStep('password'); }
-  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; showSection('home'); loadOverview(); }
+  function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; applyRoleGate(currentUserRole); showSection('home'); loadOverview(); }
+
+  // Oculta a los editores las secciones que en el servidor exigen rol admin
+  // (contacto/config, auditoría y gestión de usuarios). Es solo cosmético: el
+  // control real es requireRole en las rutas.
+  function applyRoleGate(role) {
+    const isAdmin = role === 'admin';
+    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"]').forEach((b) => { b.hidden = !isAdmin; });
+    const usersList = $('users-list');
+    const heading = usersList ? usersList.previousElementSibling : null; // <h3>Usuarios</h3>
+    [usersList, $('user-form'), heading].forEach((el) => { if (el) el.hidden = !isAdmin; });
+  }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
   async function checkSession() {
     const { ok, body } = await api('/api/auth/me');
     if (!ok) { showLogin(); return; }
     currentUserId = body && body.userId;
+    currentUserRole = body && body.role;
     if (body && body.mustChangePassword) showForce(); else showDashboard();
   }
 
@@ -196,7 +208,7 @@
       showLoginStep('mfa');
     } else if (ok) {
       $('login-pass').value = '';
-      if (body && body.mustChangePassword) showForce(); else showDashboard();
+      await checkSession(); // carga rol + vista correcta (dashboard o cambio forzado)
     } else {
       $('login-error').textContent = (body && body.error) || 'No se pudo iniciar sesión.';
     }
@@ -206,7 +218,7 @@
     e.preventDefault();
     $('mfa-login-error').textContent = '';
     const { ok, body } = await api('/api/auth/mfa', { method: 'POST', body: JSON.stringify({ challenge: mfaChallenge, code: $('mfa-login-code').value }) });
-    if (ok) { mfaChallenge = null; if (body && body.mustChangePassword) showForce(); else showDashboard(); }
+    if (ok) { mfaChallenge = null; await checkSession(); }
     else $('mfa-login-error').textContent = (body && body.error) || 'Código incorrecto.';
   });
   $('mfa-login-back').addEventListener('click', () => { mfaChallenge = null; showLoginStep('password'); });
@@ -591,11 +603,15 @@
     $('c-msg').value = d.whatsappMessage || '';
     $('ts-enabled').checked = !!d.turnstileEnabled;
     $('ts-site').value = d.turnstileSiteKey || '';
-    $('ts-secret').value = d.turnstileSecretKey || '';
+    // Los secretos no llegan del servidor (enmascarados): se dejan vacíos y solo se
+    // reescriben si el admin teclea uno nuevo. El placeholder indica si ya hay uno.
+    $('ts-secret').value = '';
+    $('ts-secret').placeholder = d.turnstileSecretConfigured ? '•••••••• (ya configurada)' : '0x4AAAAAAA...';
     $('smtp-host').value = d.smtpHost || '';
     $('smtp-port').value = d.smtpPort || '587';
     $('smtp-user').value = d.smtpUser || '';
-    $('smtp-pass').value = d.smtpPass || '';
+    $('smtp-pass').value = '';
+    $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
     $('smtp-from').value = d.smtpFrom || '';
     $('smtp-secure').checked = !!d.smtpSecure;
   }
@@ -652,7 +668,7 @@
     $('p-lastname').value = u.lastName || '';
     $('p-displayname').value = u.displayName || '';
     $('p-email').value = u.email || '';
-    $('p-role').value = u.role;
+    $('p-role').value = u.role === 'admin' ? 'Admin' : 'Editor';
     $('p-lastlogin').value = u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('es-GT') : 'Nunca';
     // Estado de verificación de correo
     if (!u.email) { $('p-email-status').textContent = 'Sin correo'; $('email-verify-btn').hidden = true; }
@@ -682,6 +698,7 @@
   }
 
   let currentUserId = null; // id del usuario en sesión (para no auto-gestionarse)
+  let currentUserRole = null; // rol en sesión (solo para el gate cosmético de la UI)
   async function loadUsers() {
     const r = await api('/api/admin/users');
     if (!guard(r) || !r.ok) return;
@@ -768,7 +785,7 @@
       if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
       else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
     } else if (act === 'reset') {
-      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 6). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
+      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 12). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
       if (!temp) return;
       const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
       if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
@@ -793,7 +810,7 @@
 
   $('profile-save').addEventListener('click', async () => {
     $('profile-error').textContent = '';
-    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, role: $('p-role').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
+    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
   });

@@ -54,14 +54,14 @@ describe('resetPassword', () => {
   it('token inválido → 400', async () => {
     const { ctrl } = build({ consumeId: null });
     const res = mockRes();
-    await ctrl.resetPassword({ body: { token: 'malo', newPassword: 'nueva123' } } as any, res);
+    await ctrl.resetPassword({ body: { token: 'malo', newPassword: 'Nueva-Clave-Segura-2026' } } as any, res);
     expect(res.statusCode).toBe(400);
   });
 
   it('token válido → cambia contraseña y corta sesiones', async () => {
     const { ctrl, calls } = build({ consumeId: 5 });
     const res = mockRes();
-    await ctrl.resetPassword({ body: { token: 'tok', newPassword: 'nueva123' } } as any, res);
+    await ctrl.resetPassword({ body: { token: 'tok', newPassword: 'Nueva-Clave-Segura-2026' } } as any, res);
     expect(res.statusCode).toBe(200);
     expect(calls.updated).toBe(5);
     expect(calls.bumped).toBe(5);

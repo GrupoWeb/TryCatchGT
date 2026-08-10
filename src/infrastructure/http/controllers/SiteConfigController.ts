@@ -55,9 +55,28 @@ export class SiteConfigController {
     });
   };
 
-  // Admin: leer los valores editables (incluye la secret key, detrás de auth).
+  // Vista para el panel: nunca serializa los secretos en claro (smtpPass,
+  // turnstileSecretKey). En su lugar expone banderas de "configurado" (M2).
+  private adminView(c: ResolvedConfig) {
+    return {
+      contactEmail: c.contactEmail,
+      whatsappNumber: c.whatsappNumber,
+      whatsappMessage: c.whatsappMessage,
+      turnstileEnabled: c.turnstileEnabled,
+      turnstileSiteKey: c.turnstileSiteKey,
+      turnstileSecretConfigured: c.turnstileSecretKey.length > 0,
+      smtpHost: c.smtpHost,
+      smtpPort: c.smtpPort,
+      smtpUser: c.smtpUser,
+      smtpConfigured: c.smtpPass.length > 0,
+      smtpFrom: c.smtpFrom,
+      smtpSecure: c.smtpSecure,
+    };
+  }
+
+  // Admin: leer los valores editables. Los secretos van enmascarados (booleanos).
   public adminGet = async (_req: Request, res: Response): Promise<void> => {
-    res.status(200).json({ success: true, data: await this.resolved() });
+    res.status(200).json({ success: true, data: this.adminView(await this.resolved()) });
   };
 
   // Admin: guardar cambios.
@@ -69,14 +88,17 @@ export class SiteConfigController {
     if (b.whatsappMessage !== undefined) values.whatsappMessage = String(b.whatsappMessage).trim();
     if (b.turnstileEnabled !== undefined) values.turnstileEnabled = b.turnstileEnabled ? 'true' : 'false';
     if (b.turnstileSiteKey !== undefined) values.turnstileSiteKey = String(b.turnstileSiteKey).trim();
-    if (b.turnstileSecretKey !== undefined) values.turnstileSecretKey = String(b.turnstileSecretKey).trim();
+    // Secretos: solo se reescriben si llega un valor NO vacío. Un campo vacío
+    // significa "déjalo como está" (el panel no lo pre-rellena), para no borrar
+    // por accidente la clave al guardar el resto de la config (M2).
+    if (b.turnstileSecretKey !== undefined && String(b.turnstileSecretKey).trim() !== '') values.turnstileSecretKey = String(b.turnstileSecretKey).trim();
     if (b.smtpHost !== undefined) values.smtpHost = String(b.smtpHost).trim();
     if (b.smtpPort !== undefined) values.smtpPort = String(b.smtpPort).replace(/\D/g, '') || '587';
     if (b.smtpUser !== undefined) values.smtpUser = String(b.smtpUser).trim();
-    if (b.smtpPass !== undefined) values.smtpPass = String(b.smtpPass);
+    if (b.smtpPass !== undefined && String(b.smtpPass) !== '') values.smtpPass = String(b.smtpPass);
     if (b.smtpFrom !== undefined) values.smtpFrom = String(b.smtpFrom).trim();
     if (b.smtpSecure !== undefined) values.smtpSecure = b.smtpSecure ? 'true' : 'false';
     await this.repo.setMany(values);
-    res.status(200).json({ success: true, data: await this.resolved() });
+    res.status(200).json({ success: true, data: this.adminView(await this.resolved()) });
   };
 }

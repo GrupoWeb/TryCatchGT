@@ -65,7 +65,8 @@ export class ServiceAdminController {
       const saved = await this.repo.save(service);
       res.status(id ? 200 : 201).json({ success: true, data: toView(saved) });
     } catch (error) {
-      res.status(500).json({ success: false, error: 'No se pudo guardar el servicio.', detail: (error as Error).message });
+      console.error('❌ Error guardando servicio:', (error as Error).message);
+      res.status(500).json({ success: false, error: 'No se pudo guardar el servicio.' });
     }
   }
 }
