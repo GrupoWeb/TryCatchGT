@@ -9,6 +9,7 @@ import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { env } from '../../../config/env.js';
+import { validatePassword } from '../../security/passwordPolicy.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -117,12 +118,10 @@ export class AccountAdminController {
 
   public changePassword = async (req: AuthedRequest, res: Response): Promise<void> => {
     const { currentPassword, newPassword } = req.body ?? {};
-    if (!newPassword || String(newPassword).length < 6) {
-      res.status(400).json({ success: false, error: 'La nueva contraseña debe tener al menos 6 caracteres.' });
-      return;
-    }
     const user = await this.currentUser(req);
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    const pErr = validatePassword(String(newPassword ?? ''), user.username);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     if (!(await this.hasher.compare(String(currentPassword ?? ''), user.passwordHash))) {
       res.status(400).json({ success: false, error: 'La contraseña actual es incorrecta.' });
       return;
@@ -226,7 +225,8 @@ export class AccountAdminController {
     const { username, password, role, fullName, lastName, displayName, mustChangePassword } = req.body ?? {};
     const uname = String(username ?? '').trim().toLowerCase();
     if (uname.length < 3) { res.status(400).json({ success: false, error: 'El usuario debe tener al menos 3 caracteres.' }); return; }
-    if (!password || String(password).length < 6) { res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 6 caracteres.' }); return; }
+    const pErr = validatePassword(String(password ?? ''), uname);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     if (await this.users.findByUsername(uname)) { res.status(409).json({ success: false, error: 'Ese usuario ya existe.' }); return; }
     const created = await this.users.create(
       new User({
@@ -252,10 +252,8 @@ export class AccountAdminController {
     const target = await this.users.findById(id);
     if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
     const { newPassword } = req.body ?? {};
-    if (!newPassword || String(newPassword).length < 6) {
-      res.status(400).json({ success: false, error: 'La contraseña temporal debe tener al menos 6 caracteres.' });
-      return;
-    }
+    const pErr = validatePassword(String(newPassword ?? ''), target.username);
+    if (pErr) { res.status(400).json({ success: false, error: pErr }); return; }
     await this.users.updatePassword(id, await this.hasher.hash(String(newPassword)));
     await this.users.setMustChangePassword(id, true);
     await this.users.bumpSessionVersion(id);

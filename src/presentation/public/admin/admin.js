@@ -785,7 +785,7 @@
       if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
       else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
     } else if (act === 'reset') {
-      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 6). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
+      const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 12). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
       if (!temp) return;
       const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
       if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
