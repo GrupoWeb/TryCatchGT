@@ -83,6 +83,42 @@
     document.body.appendChild(a);
   }
 
+  /* ----------------------------------------------------------
+     Menú móvil (hamburguesa). El navbar se comparte entre
+     index, blog y post, así que la lógica vive aquí.
+  ---------------------------------------------------------- */
+  function initMobileNav() {
+    const navbar = document.querySelector('.navbar');
+    const burger = document.getElementById('nav-burger');
+    const menu = document.getElementById('nav-menu');
+    if (!navbar || !burger || !menu) return;
+
+    const close = () => {
+      navbar.classList.remove('is-open');
+      burger.setAttribute('aria-expanded', 'false');
+    };
+
+    burger.addEventListener('click', () => {
+      const open = navbar.classList.toggle('is-open');
+      burger.setAttribute('aria-expanded', String(open));
+    });
+
+    // Al tocar un enlace del menú, se cierra.
+    menu.addEventListener('click', (e) => {
+      if (e.target.closest('a')) close();
+    });
+
+    // Cerrar con Escape o al tocar fuera del navbar.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+    document.addEventListener('click', (e) => {
+      if (navbar.classList.contains('is-open') && !navbar.contains(e.target)) close();
+    });
+  }
+
+  initMobileNav();
+
   loadConfig().then((cfg) => {
     renderFooter(cfg);
     renderWhatsAppFab(cfg);
