@@ -40,7 +40,8 @@ app.use(
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         formAction: ["'self'"],
-        ...(env.isProduction ? { upgradeInsecureRequests: [] } : {}),
+        // Desacoplado de isProduction (C4): solo fuerza https si FORCE_HTTPS lo pide.
+        ...(env.forceHttps ? { upgradeInsecureRequests: [] } : {}),
       },
     },
   }),

@@ -35,9 +35,12 @@ services:
     env_file: .env
     environment:
       # Solo variables no sensibles / de topología en claro:
-      # development: sobre http://localhost evita el upgrade-insecure-requests de
-      # la CSP de producción (que rompería CSS/JS al forzar https).
-      NODE_ENV: development
+      # production conserva TODO el endurecimiento (CSP estricta, cookies Secure,
+      # validación de secretos, trust proxy). FORCE_HTTPS=false desacopla solo el
+      # upgrade-insecure-requests, porque el stack local se sirve por http://localhost
+      # y forzar https rompería CSS/JS. En Hostinger (con HTTPS) omite FORCE_HTTPS.
+      NODE_ENV: production
+      FORCE_HTTPS: "false"
       PORT: "3000"
       DB_HOST: db
       DB_PORT: "3306"
