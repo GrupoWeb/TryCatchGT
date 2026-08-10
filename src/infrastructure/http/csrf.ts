@@ -57,3 +57,33 @@ export function requireCsrf(req: Request, res: Response, next: NextFunction): vo
 
   next();
 }
+
+/**
+ * Guardián CSRF para el router: exige el double-submit en toda petición mutante,
+ * salvo en las rutas exentas declaradas explícitamente.
+ *
+ * La única exención (por diseño) es el formulario público de cotización
+ * (`POST /projects`). Se documenta aquí el porqué es aceptable no protegerlo:
+ *
+ *  - Es una acción ANÓNIMA: no hay sesión de una víctima que un atacante pueda
+ *    abusar. El CSRF protege acciones que se ejecutan con la autoridad de la
+ *    víctima; aquí no hay ninguna, así que forzar el envío entre sitios no le
+ *    otorga al atacante ningún privilegio que no tenga ya con un POST directo.
+ *  - El único efecto es crear un lead/cotización. El abuso posible es spam, ya
+ *    acotado por `formLimiter` (rate limit) y el `turnstileGuard` (anti-bots).
+ *  - Exigir CSRF aquí obligaría a la landing pública a leer y reenviar el token
+ *    antes de que se emita la cookie, arriesgando romper el principal canal de
+ *    captación sin ganancia de seguridad real.
+ *
+ * Las rutas exentas se comparan contra `req.path` (relativo al router).
+ */
+export function createCsrfGuard(exemptPaths: readonly string[]) {
+  const exempt = new Set(exemptPaths);
+  return function csrfGuard(req: Request, res: Response, next: NextFunction): void {
+    if (SAFE_METHODS.has(req.method) || exempt.has(req.path)) {
+      next();
+      return;
+    }
+    requireCsrf(req, res, next);
+  };
+}
