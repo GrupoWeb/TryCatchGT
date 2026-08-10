@@ -112,6 +112,16 @@ export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHashe
   password: env.admin.password,
 });
 
+// ── SEO: acceso a datos del blog para meta server-side / sitemap ────────────
+// Devuelve el artículo solo si está publicado (para no indexar borradores).
+export async function seoGetPost(slug: string) {
+  const post = await blogRepository.findBySlug(slug);
+  return post && post.status === 'published' ? post : null;
+}
+export async function seoListPosts() {
+  return blogRepository.findPublished();
+}
+
 // ── Rutas ───────────────────────────────────────────────────────────────────
 export const apiRouter = Router();
 
