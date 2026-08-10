@@ -603,11 +603,15 @@
     $('c-msg').value = d.whatsappMessage || '';
     $('ts-enabled').checked = !!d.turnstileEnabled;
     $('ts-site').value = d.turnstileSiteKey || '';
-    $('ts-secret').value = d.turnstileSecretKey || '';
+    // Los secretos no llegan del servidor (enmascarados): se dejan vacíos y solo se
+    // reescriben si el admin teclea uno nuevo. El placeholder indica si ya hay uno.
+    $('ts-secret').value = '';
+    $('ts-secret').placeholder = d.turnstileSecretConfigured ? '•••••••• (ya configurada)' : '0x4AAAAAAA...';
     $('smtp-host').value = d.smtpHost || '';
     $('smtp-port').value = d.smtpPort || '587';
     $('smtp-user').value = d.smtpUser || '';
-    $('smtp-pass').value = d.smtpPass || '';
+    $('smtp-pass').value = '';
+    $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
     $('smtp-from').value = d.smtpFrom || '';
     $('smtp-secure').checked = !!d.smtpSecure;
   }
