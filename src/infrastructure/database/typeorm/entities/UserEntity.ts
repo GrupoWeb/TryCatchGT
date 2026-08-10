@@ -23,6 +23,10 @@ export class UserEntity {
   @Column({ type: 'varchar', length: 500, nullable: true })
   avatar!: string | null;
 
+  // Punto de enfoque de la foto (background-position, p. ej. "50% 30%").
+  @Column({ name: 'avatar_position', type: 'varchar', length: 20, nullable: true })
+  avatarPosition!: string | null;
+
   @Column({ name: 'mfa_secret', type: 'varchar', length: 64, nullable: true })
   mfaSecret!: string | null;
 
