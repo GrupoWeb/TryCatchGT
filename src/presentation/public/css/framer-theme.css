@@ -84,8 +84,13 @@ section { position: relative; z-index: 2; }
 .navbar {
   position: fixed;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  /* Centrado con margin:auto (no con left:50% + translate) para que el ancho
+     disponible sea todo el viewport y el contenido no se parta en dos líneas. */
+  left: 0;
+  right: 0;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: 0 auto;
   z-index: 50;
   display: flex;
   align-items: center;
@@ -125,6 +130,7 @@ section { position: relative; z-index: 2; }
   padding: 9px 18px;
   border-radius: 999px;
   text-decoration: none;
+  white-space: nowrap;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .navbar__cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2); }
@@ -742,8 +748,9 @@ button:focus-visible,
   .navbar {
     left: 12px;
     right: 12px;
-    transform: none;
     width: auto;
+    max-width: none;
+    margin: 0;
     justify-content: space-between;
     padding: 8px 8px 8px 18px;
   }
