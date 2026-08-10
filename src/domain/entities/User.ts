@@ -8,6 +8,7 @@ export interface UserProps {
   role?: UserRole;
   email?: string | null;
   avatar?: string | null;
+  avatarPosition?: string | null;
   mfaEnabled?: boolean;
   mfaSecret?: string | null;
   mfaBackupCodes?: string[] | null;
@@ -41,6 +42,7 @@ export class User {
   public readonly role: UserRole;
   public readonly email: string | null;
   public readonly avatar: string | null;
+  public readonly avatarPosition: string | null;
   public readonly mfaEnabled: boolean;
   public readonly mfaSecret: string | null;
   public readonly mfaBackupCodes: string[] | null;
@@ -69,6 +71,7 @@ export class User {
     this.role = props.role || 'admin';
     this.email = props.email?.trim() || null;
     this.avatar = props.avatar?.trim() || null;
+    this.avatarPosition = props.avatarPosition?.trim() || null;
     this.mfaEnabled = props.mfaEnabled ?? false;
     this.mfaSecret = props.mfaSecret || null;
     this.mfaBackupCodes = props.mfaBackupCodes ?? null;

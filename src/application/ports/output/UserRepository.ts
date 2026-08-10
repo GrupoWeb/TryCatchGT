@@ -9,6 +9,7 @@ export interface UserAccountStateUpdate {
 export interface UserProfileUpdate {
   email?: string | null;
   avatar?: string | null;
+  avatarPosition?: string | null;
   role?: 'admin' | 'editor';
   fullName?: string | null;
   lastName?: string | null;

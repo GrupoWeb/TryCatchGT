@@ -324,8 +324,9 @@
           <h2 class="admin-sec__title">Mi perfil</h2>
 
           <div class="profile-head">
-            <div class="profile-avatar" id="profile-avatar">
+            <div class="profile-avatar" id="profile-avatar" title="Arrastra la foto para reposicionarla">
               <span id="profile-initials">?</span>
+              <span class="avatar-handle" id="avatar-handle" aria-hidden="true"></span>
               <button type="button" class="profile-avatar__btn" id="avatar-btn" title="Cambiar foto">📷</button>
             </div>
             <input type="file" id="avatar-file" accept="image/*" hidden />
@@ -445,6 +446,14 @@
       </main>
     </div>
   </section>
+
+  <!-- Loader de marca: se muestra durante guardar/eliminar/crear/subir -->
+  <div class="tc-loader" id="tc-loader" role="alert" aria-live="assertive" aria-busy="true" hidden>
+    <div class="tc-loader__box">
+      <div class="tc-loader__spinner"></div>
+      <div class="tc-loader__label">TryCatch<span>GT</span></div>
+    </div>
+  </div>
 
   <script src="/admin/admin.js"></script>
 </body>

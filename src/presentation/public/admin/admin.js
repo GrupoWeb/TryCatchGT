@@ -14,15 +14,47 @@
     return match ? { 'X-CSRF-Token': decodeURIComponent(match.slice('XSRF-TOKEN='.length)) } : {};
   }
 
+  // ── Loader de marca ───────────────────────────────────────
+  // Overlay que aparece durante las mutaciones (guardar, eliminar, crear, subir).
+  // Ref-count para peticiones concurrentes; un pequeño retardo evita el parpadeo
+  // en operaciones instantáneas.
+  let loaderCount = 0, loaderTimer = null;
+  function showLoader() {
+    loaderCount++;
+    if (loaderCount === 1 && !loaderTimer) {
+      loaderTimer = setTimeout(() => { loaderTimer = null; const el = $('tc-loader'); if (el) el.hidden = false; }, 120);
+    }
+  }
+  function hideLoader() {
+    loaderCount = Math.max(0, loaderCount - 1);
+    if (loaderCount === 0) {
+      if (loaderTimer) { clearTimeout(loaderTimer); loaderTimer = null; }
+      const el = $('tc-loader'); if (el) el.hidden = true;
+    }
+  }
+  // Envuelve una promesa mostrando el loader mientras dura (para subidas u otras
+  // acciones que no pasan por api()).
+  async function withLoader(promise) {
+    showLoader();
+    try { return await promise; } finally { hideLoader(); }
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch(path, {
-      credentials: 'same-origin',
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
-    });
-    let body = null;
-    try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
-    return { ok: res.ok, status: res.status, body };
+    const method = (options.method || 'GET').toUpperCase();
+    const mutating = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+    if (mutating) showLoader();
+    try {
+      const res = await fetch(path, {
+        credentials: 'same-origin',
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
+      });
+      let body = null;
+      try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
+      return { ok: res.ok, status: res.status, body };
+    } finally {
+      if (mutating) hideLoader();
+    }
   }
 
   function esc(value) {
@@ -540,7 +572,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const res = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
+    const res = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
     let body = null; try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
     if (res.ok && body && body.success) { $('f-cover').value = body.data.url; updateCoverPreview(); toast('Imagen subida'); }
     else toast((body && body.error) || 'No se pudo subir la imagen.', 'error');
@@ -673,10 +705,18 @@
     if (!u.email) { $('p-email-status').textContent = 'Sin correo'; $('email-verify-btn').hidden = true; }
     else if (u.emailVerified) { $('p-email-status').textContent = '✅ Verificado'; $('email-verify-btn').hidden = true; }
     else { $('p-email-status').textContent = '⚠️ Sin verificar'; $('email-verify-btn').hidden = false; }
-    // Avatar
+    // Avatar (con su punto de enfoque reposicionable)
     const av = $('profile-avatar');
-    if (u.avatar) { av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`; av.classList.add('has-img'); }
-    else { av.style.backgroundImage = ''; av.classList.remove('has-img'); $('profile-initials').textContent = (u.username[0] || '?').toUpperCase(); }
+    avatarPos = u.avatarPosition || '50% 50%';
+    if (u.avatar) {
+      av.style.backgroundImage = `url("${String(u.avatar).replace(/"/g, '%22')}")`;
+      av.style.backgroundPosition = avatarPos;
+      av.classList.add('has-img');
+      applyAvatarHandle();
+    } else {
+      av.style.backgroundImage = ''; av.classList.remove('has-img');
+      $('profile-initials').textContent = (u.username[0] || '?').toUpperCase();
+    }
     // Estado MFA
     $('mfa-off').hidden = u.mfaEnabled;
     $('mfa-on').hidden = !u.mfaEnabled;
@@ -799,7 +839,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
+    const up = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
     let ub = null; try { ub = await up.json(); } catch (_) {}
     if (!up.ok || !ub || !ub.success) { toast((ub && ub.error) || 'No se pudo subir la foto.', 'error'); return; }
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ avatar: ub.data.url }) });
@@ -807,9 +847,41 @@
     $('avatar-file').value = '';
   });
 
+  // Reposición del avatar por arrastre (mismo mecanismo que la portada del blog).
+  // Se guarda al pulsar "Guardar perfil".
+  let avatarPos = '50% 50%';
+  const avEl = $('profile-avatar');
+  const avHandle = $('avatar-handle');
+  function applyAvatarHandle() {
+    if (!avHandle) return;
+    const [x, y] = parsePos(avatarPos);
+    avHandle.style.left = x + '%';
+    avHandle.style.top = y + '%';
+  }
+  function setAvatarPos(x, y) {
+    const cx = Math.max(0, Math.min(100, Math.round(x)));
+    const cy = Math.max(0, Math.min(100, Math.round(y)));
+    avatarPos = `${cx}% ${cy}%`;
+    avEl.style.backgroundPosition = avatarPos;
+    applyAvatarHandle();
+  }
+  let avatarDragging = false;
+  function avatarPointer(e) {
+    const r = avEl.getBoundingClientRect();
+    setAvatarPos(((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+  }
+  avEl.addEventListener('pointerdown', (e) => {
+    if (!avEl.classList.contains('has-img')) return;
+    if (e.target.closest('.profile-avatar__btn')) return; // pulsar 📷 no arrastra
+    avatarDragging = true; avEl.setPointerCapture(e.pointerId); avatarPointer(e);
+  });
+  avEl.addEventListener('pointermove', (e) => { if (avatarDragging) avatarPointer(e); });
+  avEl.addEventListener('pointerup', () => { avatarDragging = false; });
+  avEl.addEventListener('pointercancel', () => { avatarDragging = false; });
+
   $('profile-save').addEventListener('click', async () => {
     $('profile-error').textContent = '';
-    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value }) });
+    const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ email: $('p-email').value, fullName: $('p-fullname').value, lastName: $('p-lastname').value, displayName: $('p-displayname').value, avatarPosition: avatarPos }) });
     if (r.ok) { loadProfile(); toast('Perfil actualizado'); }
     else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('profile-error').textContent = m; toast(m, 'error'); }
   });
