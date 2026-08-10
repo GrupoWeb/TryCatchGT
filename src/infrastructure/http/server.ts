@@ -87,8 +87,7 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ success: false, error: 'Ocurrió un error inesperado.' });
 });
 
-async function bootstrap(): Promise<void> {
-  assertSecureSecrets();
+function listen(): void {
   app.listen(env.port, () => {
     console.log('');
     console.log('  ⚡ TryCatch GT — Estudio de Ingeniería de Software');
@@ -97,21 +96,39 @@ async function bootstrap(): Promise<void> {
     if (liveReload) console.log('  🔁 Live reload activo (el navegador se refresca solo)');
     console.log('');
   });
+}
 
-  // Inicializa el ORM (probe de base de datos) y siembra el admin inicial. No
-  // bloquean el arranque del servidor; si la DB falla, las peticiones que la usen
-  // devolverán error (ya no hay degradación a memoria).
+async function bootstrap(): Promise<void> {
+  assertSecureSecrets();
+
+  // Inicializa el ORM (conexión + migraciones) ANTES de escuchar. Si se escuchara
+  // primero, una petición que llegue durante el arranque tocaría la BD y lanzaría
+  // un error async no capturado (Express 4 no atrapa las promesas de los handlers)
+  // que tumba el proceso ANTES de que terminen las migraciones: en producción eso
+  // dejaba la app en bucle de reinicio con las tablas sin crear.
   try {
     await AppDataSource.initialize();
-    console.log('  🗃️  TypeORM inicializado');
+    console.log('  🗃️  TypeORM inicializado (migraciones al día)');
     try {
       await ensureAdminUser.execute();
     } catch (error) {
       console.warn('⚠️  No se pudo sembrar el admin inicial:', (error as Error).message);
     }
   } catch (error) {
-    console.warn('⚠️  No se pudo conectar a la base de datos:', (error as Error).message);
+    // La BD no respondió: se arranca igual en modo degradado para servir la landing
+    // y que /api/health devuelva 503 (el healthcheck del contenedor lo detecta). Las
+    // rutas que usan la BD responderán error; no se degrada a memoria.
+    console.error('⚠️  No se pudo inicializar la base de datos (modo degradado):', (error as Error).message);
   }
+
+  listen();
 }
+
+// Red de seguridad: un rechazo de promesa no gestionado (p. ej. un handler async
+// que falla al tocar la BD) NO debe tumbar todo el servidor en producción. Se
+// registra y el proceso sigue sirviendo el resto de peticiones.
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️  Rechazo de promesa no gestionado:', reason instanceof Error ? (reason.stack ?? reason.message) : reason);
+});
 
 void bootstrap();
