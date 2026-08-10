@@ -629,3 +629,53 @@ body { min-height: 100vh; }
 .audit-table th { color: var(--text-dim); font-weight: 600; }
 .audit-table td code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; }
 .audit-table tbody tr:hover { background: rgba(139, 92, 246, 0.06); }
+
+/* ── Loader de marca ─────────────────────────────────────────
+   Overlay que aparece durante guardar / eliminar / crear / subir. */
+.tc-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 10, 12, 0.6);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: tc-loader-in 0.15s ease;
+}
+.tc-loader[hidden] { display: none; }
+@keyframes tc-loader-in { from { opacity: 0; } to { opacity: 1; } }
+
+.tc-loader__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* Anillo con degradado de marca girando (violeta → rosa). */
+.tc-loader__spinner {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #8b5cf6, #ec4899, #8b5cf6);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 5px));
+  animation: tc-spin 0.85s linear infinite;
+}
+@keyframes tc-spin { to { transform: rotate(360deg); } }
+
+.tc-loader__label {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.3px;
+  color: #fff;
+  animation: tc-pulse 1.2s ease-in-out infinite;
+}
+.tc-loader__label span { color: #8b5cf6; }
+@keyframes tc-pulse { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tc-loader__spinner { animation-duration: 1.6s; }
+  .tc-loader__label { animation: none; opacity: 1; }
+}

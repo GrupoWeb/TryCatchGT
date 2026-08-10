@@ -14,15 +14,47 @@
     return match ? { 'X-CSRF-Token': decodeURIComponent(match.slice('XSRF-TOKEN='.length)) } : {};
   }
 
+  // ── Loader de marca ───────────────────────────────────────
+  // Overlay que aparece durante las mutaciones (guardar, eliminar, crear, subir).
+  // Ref-count para peticiones concurrentes; un pequeño retardo evita el parpadeo
+  // en operaciones instantáneas.
+  let loaderCount = 0, loaderTimer = null;
+  function showLoader() {
+    loaderCount++;
+    if (loaderCount === 1 && !loaderTimer) {
+      loaderTimer = setTimeout(() => { loaderTimer = null; const el = $('tc-loader'); if (el) el.hidden = false; }, 120);
+    }
+  }
+  function hideLoader() {
+    loaderCount = Math.max(0, loaderCount - 1);
+    if (loaderCount === 0) {
+      if (loaderTimer) { clearTimeout(loaderTimer); loaderTimer = null; }
+      const el = $('tc-loader'); if (el) el.hidden = true;
+    }
+  }
+  // Envuelve una promesa mostrando el loader mientras dura (para subidas u otras
+  // acciones que no pasan por api()).
+  async function withLoader(promise) {
+    showLoader();
+    try { return await promise; } finally { hideLoader(); }
+  }
+
   async function api(path, options = {}) {
-    const res = await fetch(path, {
-      credentials: 'same-origin',
-      ...options,
-      headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
-    });
-    let body = null;
-    try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
-    return { ok: res.ok, status: res.status, body };
+    const method = (options.method || 'GET').toUpperCase();
+    const mutating = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+    if (mutating) showLoader();
+    try {
+      const res = await fetch(path, {
+        credentials: 'same-origin',
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader(), ...(options.headers || {}) },
+      });
+      let body = null;
+      try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
+      return { ok: res.ok, status: res.status, body };
+    } finally {
+      if (mutating) hideLoader();
+    }
   }
 
   function esc(value) {
@@ -540,7 +572,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const res = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
+    const res = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
     let body = null; try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
     if (res.ok && body && body.success) { $('f-cover').value = body.data.url; updateCoverPreview(); toast('Imagen subida'); }
     else toast((body && body.error) || 'No se pudo subir la imagen.', 'error');
@@ -799,7 +831,7 @@
     if (!file) return;
     const fd = new FormData();
     fd.append('image', file);
-    const up = await fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd });
+    const up = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
     let ub = null; try { ub = await up.json(); } catch (_) {}
     if (!up.ok || !ub || !ub.success) { toast((ub && ub.error) || 'No se pudo subir la foto.', 'error'); return; }
     const r = await api('/api/admin/account', { method: 'PUT', body: JSON.stringify({ avatar: ub.data.url }) });
