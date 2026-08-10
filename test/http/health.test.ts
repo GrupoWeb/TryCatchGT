@@ -45,4 +45,26 @@ describe('createHealthCheck — refleja el estado real de la BD (auditoría fase
     await health({} as any, res);
     expect(JSON.stringify(res.body)).not.toContain('Access denied');
   });
+
+  it('cachea el sondeo: un burst de peticiones no dispara un SELECT 1 por cada una', async () => {
+    let queries = 0;
+    const health = createHealthCheck(
+      { isInitialized: true, query: async () => { queries++; return [{ 1: 1 }]; } },
+      { cacheMs: 5000 },
+    );
+    await Promise.all(Array.from({ length: 10 }, () => health({} as any, mockRes())));
+    await health({} as any, mockRes());
+    expect(queries).toBe(1);
+  });
+
+  it('con cacheMs 0 vuelve a sondear en cada petición', async () => {
+    let queries = 0;
+    const health = createHealthCheck(
+      { isInitialized: true, query: async () => { queries++; return [{ 1: 1 }]; } },
+      { cacheMs: 0 },
+    );
+    await health({} as any, mockRes());
+    await health({} as any, mockRes());
+    expect(queries).toBe(2);
+  });
 });

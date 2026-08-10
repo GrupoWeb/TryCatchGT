@@ -20,7 +20,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
-import { authLimiter, formLimiter, uploadLimiter } from '../rateLimit.js';
+import { authLimiter, formLimiter, uploadLimiter, healthLimiter } from '../rateLimit.js';
 import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
 import { createHealthCheck } from '../health.js';
 import { AppDataSource } from '../../database/typeorm/data-source.js';
@@ -121,8 +121,9 @@ apiRouter.use(createCsrfGuard(['/projects']));
 apiRouter.use(auditLog);
 
 // Refleja el estado real de la BD (503 si no responde) para que el HEALTHCHECK
-// del contenedor detecte una BD caída en vez de dar por sano al server.
-apiRouter.get('/health', createHealthCheck(AppDataSource));
+// del contenedor detecte una BD caída en vez de dar por sano al server. El
+// sondeo va cacheado y con rate limit para no amplificar carga contra la BD.
+apiRouter.get('/health', healthLimiter, createHealthCheck(AppDataSource));
 
 // Público
 apiRouter.get('/config', siteConfigController.publicConfig);
