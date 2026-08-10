@@ -32,8 +32,10 @@ USER node
 
 EXPOSE 3000
 
-# Chequeo de salud: la landing responde 200 cuando el server está arriba.
+# Chequeo de salud: /api/health devuelve 200 solo si la BD responde (503 si no).
+# Con --spider wget falla ante un 503, así un contenedor con la BD caída se marca
+# unhealthy en vez de aparentar estar sano por servir la landing.
 HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
-  CMD wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1
+  CMD wget -q --spider http://localhost:3000/api/health || exit 1
 
 CMD ["node", "dist/infrastructure/http/server.js"]

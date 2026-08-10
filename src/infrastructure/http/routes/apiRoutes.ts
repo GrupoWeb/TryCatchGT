@@ -21,7 +21,9 @@ import { createAuditLog } from '../middleware/auditLog.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
 import { authLimiter, formLimiter, uploadLimiter } from '../rateLimit.js';
-import { issueCsrfToken, requireCsrf } from '../csrf.js';
+import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
+import { createHealthCheck } from '../health.js';
+import { AppDataSource } from '../../database/typeorm/data-source.js';
 
 // Use cases
 import { GetServices } from '../../../application/use-cases/GetServices.js';
@@ -111,20 +113,16 @@ export const apiRouter = Router();
 // Emite el token CSRF en los GET; el SPA lo reenvía como header en las mutaciones.
 apiRouter.use(issueCsrfToken);
 
-// Exige token CSRF en toda petición mutante. Excepción: el formulario público de
-// cotización (POST /projects), que es anónimo y ya está acotado por formLimiter.
-apiRouter.use((req, res, next) => {
-  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') { next(); return; }
-  if (req.path === '/projects') { next(); return; }
-  requireCsrf(req, res, next);
-});
+// Exige token CSRF en toda petición mutante. La única excepción (documentada en
+// createCsrfGuard) es el formulario público de cotización (POST /projects).
+apiRouter.use(createCsrfGuard(['/projects']));
 
 // Registra en la bitácora las mutaciones de autenticación y del panel admin.
 apiRouter.use(auditLog);
 
-apiRouter.get('/health', (_req, res) => {
-  res.status(200).json({ success: true, status: 'ok', service: 'trycatch-gt-api' });
-});
+// Refleja el estado real de la BD (503 si no responde) para que el HEALTHCHECK
+// del contenedor detecte una BD caída en vez de dar por sano al server.
+apiRouter.get('/health', createHealthCheck(AppDataSource));
 
 // Público
 apiRouter.get('/config', siteConfigController.publicConfig);
