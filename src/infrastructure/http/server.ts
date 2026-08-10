@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
 import { apiRouter, ensureAdminUser } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
+import { buildCspDirectives } from './csp.js';
 import { AppDataSource } from '../database/typeorm/data-source.js';
 
 // Los assets del frontend (HTML/CSS/JS) no los compila tsc, así que se sirven
@@ -25,24 +26,7 @@ app.use(
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
       useDefaults: false,
-      directives: {
-        defaultSrc: ["'self'"],
-        baseUri: ["'self'"],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        // Cloudflare Turnstile carga su script y renderiza en un iframe desde challenges.cloudflare.com.
-        scriptSrc: env.isProduction
-          ? ["'self'", 'https://challenges.cloudflare.com']
-          : ["'self'", "'unsafe-inline'", 'https://challenges.cloudflare.com'],
-        imgSrc: ["'self'", 'data:', 'https:'],
-        connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
-        frameSrc: ["'self'", 'https://challenges.cloudflare.com'],
-        objectSrc: ["'none'"],
-        frameAncestors: ["'none'"],
-        formAction: ["'self'"],
-        // Desacoplado de isProduction (C4): solo fuerza https si FORCE_HTTPS lo pide.
-        ...(env.forceHttps ? { upgradeInsecureRequests: [] } : {}),
-      },
+      directives: buildCspDirectives({ isProduction: env.isProduction, forceHttps: env.forceHttps }),
     },
   }),
 );
