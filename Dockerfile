@@ -24,6 +24,12 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=builder /app/dist ./dist
 COPY src/presentation/public ./src/presentation/public
 
+# La app corre como usuario sin privilegios (no root). Necesita poder escribir en
+# public/uploads (upload.ts hace mkdirSync al arrancar), por eso se ajusta la
+# propiedad del árbol de la app antes de bajar de privilegios.
+RUN chown -R node:node /app
+USER node
+
 EXPOSE 3000
 
 # Chequeo de salud: la landing responde 200 cuando el server está arriba.

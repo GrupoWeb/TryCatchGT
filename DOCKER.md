@@ -48,15 +48,17 @@ docker compose down -v     # además borra el volumen de MySQL (empieza de cero)
 ```
 
 ## Notas
-- **Puertos:** el sitio se expone en `3000`; MySQL en `3307` del host (para no chocar
-  con un MySQL/MariaDB local de Kali). Conéctate con:
-  `mysql -h 127.0.0.1 -P 3307 -uroot -proot trycatch_db`
+- **Puertos:** solo el sitio se expone (`3000`). **MySQL no se publica en el host**;
+  la app le habla por la red interna de Compose. Para inspeccionar la BD:
+  `docker compose exec db mysql -u"$MYSQL_USER" -p trycatch_db`
+- **Usuario de la app:** la app se conecta a MySQL con un usuario dedicado
+  (`MYSQL_USER`, no root) limitado a `trycatch_db`. El contenedor de la app corre
+  como usuario **no root** (`USER node`).
 - **Persistencia:** los datos de MySQL viven en el volumen `db_data`. Las imágenes
   que subas por el panel son efímeras (se pierden al recrear el contenedor); para
   esta prueba es suficiente.
-- **Entorno:** se usa `NODE_ENV=development` a propósito, porque sobre `http://localhost`
-  la CSP de producción fuerza `upgrade-insecure-requests` y rompería CSS/JS. Para un
-  despliegue real (Hostinger) se usa `NODE_ENV=production` con HTTPS y secretos fuertes
-  (`SESSION_SECRET` ≥16 y `ADMIN_PASSWORD` ≥8).
-- **Credenciales:** las de `docker-compose.yml` son solo para pruebas. No las uses en
-  producción.
+- **Entorno:** corre en `NODE_ENV=production` (CSP estricta, cookies `Secure`,
+  validación de secretos). Solo `FORCE_HTTPS=false` desacopla el `upgrade-insecure-requests`
+  para poder servir por `http://localhost`. En Hostinger (con HTTPS) omite `FORCE_HTTPS`.
+- **Credenciales:** genera secretos fuertes en `.env` (`openssl rand -hex 32`). Como se
+  corre en producción, un `SESSION_SECRET`/`ADMIN_PASSWORD` débil aborta el arranque.

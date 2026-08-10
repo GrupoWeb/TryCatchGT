@@ -14,8 +14,13 @@ services:
       # ':?' aborta con un mensaje claro si la variable no está en .env.
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?define MYSQL_ROOT_PASSWORD en .env}
       MYSQL_DATABASE: trycatch_db
-    ports:
-      - "3307:3306"   # host 3307 para no chocar con un MySQL/MariaDB local en Kali
+      # Usuario dedicado de la app (no root), con ALL PRIVILEGES solo sobre
+      # trycatch_db — suficiente para el CRUD y el DDL de las migraciones.
+      MYSQL_USER: ${MYSQL_USER:?define MYSQL_USER en .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?define MYSQL_PASSWORD en .env}
+    # Sin `ports`: MySQL NO se publica en el host. La app le habla por la red
+    # interna de Compose (DB_HOST=db). Para inspeccionar la BD desde el host:
+    #   docker compose exec db mysql -u"$MYSQL_USER" -p trycatch_db
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
