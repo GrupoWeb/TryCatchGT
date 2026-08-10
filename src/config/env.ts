@@ -77,9 +77,17 @@ export function assertSecureSecrets(): void {
   const problems: string[] = [];
   if (env.session.secret === INSECURE_DEFAULTS.session || env.session.secret.length < 16) problems.push('SESSION_SECRET (≥16 chars aleatorios)');
   if (env.admin.password === INSECURE_DEFAULTS.admin || env.admin.password.length < 8) problems.push('ADMIN_PASSWORD (≥8 chars)');
-  if (!problems.length) return;
-  if (env.isProduction) {
-    throw new Error(`Configura secretos fuertes antes de producción: ${problems.join(', ')}`);
+  if (problems.length) {
+    if (env.isProduction) {
+      throw new Error(`Configura secretos fuertes antes de producción: ${problems.join(', ')}`);
+    }
+    console.warn(`⚠️  Secretos débiles (aceptable solo en desarrollo): ${problems.join(', ')}`);
   }
-  console.warn(`⚠️  Secretos débiles (aceptable solo en desarrollo): ${problems.join(', ')}`);
+
+  // APP_URL no es secreto, así que no aborta el arranque; pero si falta en
+  // producción los enlaces de los correos (verificación, reset) apuntarían a
+  // http://localhost y no funcionarían para el usuario final. Se avisa fuerte.
+  if (env.isProduction && !process.env.APP_URL) {
+    console.warn(`⚠️  APP_URL no está definido: los correos usarán ${env.appUrl}. Define APP_URL (p. ej. https://trycatchgt.org).`);
+  }
 }
