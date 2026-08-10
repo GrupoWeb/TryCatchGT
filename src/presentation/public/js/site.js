@@ -117,7 +117,23 @@
     });
   }
 
+  // En las páginas legales, sustituye el contenido por el editado en el panel
+  // (si existe). El HTML de la página sirve de respaldo si la API o el JS fallan.
+  async function loadLegalContent() {
+    const el = document.querySelector('[data-legal-slug]');
+    if (!el) return;
+    const slug = el.getAttribute('data-legal-slug');
+    try {
+      const res = await fetch(`/api/legal/${encodeURIComponent(slug)}`);
+      const payload = await res.json();
+      if (res.ok && payload.success && payload.data && typeof payload.data.html === 'string' && payload.data.html.trim()) {
+        el.innerHTML = payload.data.html;
+      }
+    } catch (_) { /* se conserva el contenido por defecto del HTML */ }
+  }
+
   initMobileNav();
+  loadLegalContent();
 
   loadConfig().then((cfg) => {
     renderFooter(cfg);

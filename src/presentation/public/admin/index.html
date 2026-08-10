@@ -111,6 +111,7 @@
         <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
         <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
         <button class="admin__nav-btn" data-section="users">👥 Usuarios</button>
+        <button class="admin__nav-btn" data-section="legal">📄 Legal</button>
         <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
       </aside>
 
@@ -425,6 +426,41 @@
             <p class="admin-error" id="user-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
           </form>
+        </section>
+
+        <!-- LEGAL (solo admin) -->
+        <section class="admin-sec" id="sec-legal" hidden>
+          <h2 class="admin-sec__title">Páginas legales</h2>
+          <p class="admin-muted">Edita el contenido de Términos, Privacidad y Cookies. Se muestra tal cual en las páginas públicas del sitio.</p>
+          <div class="admin-field" style="max-width:340px">
+            <label for="legal-page">Página a editar</label>
+            <select id="legal-page">
+              <option value="terminos">Términos y Condiciones</option>
+              <option value="privacidad">Política de Privacidad</option>
+              <option value="cookies">Política de Cookies</option>
+            </select>
+          </div>
+          <div class="rt">
+            <div class="rt__toolbar" id="rt-legal-toolbar">
+              <button type="button" class="rt__btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+              <button type="button" class="rt__btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+              <button type="button" class="rt__btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h2" title="Título">H2</button>
+              <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h3" title="Subtítulo">H3</button>
+              <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="p" title="Párrafo">¶</button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+              <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+              <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="blockquote" title="Cita">❝</button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+              <button type="button" class="rt__btn" data-cmd="removeFormat" title="Limpiar formato">✕</button>
+            </div>
+            <div class="rt__area" id="rt-legal-area" contenteditable="true" data-placeholder="Contenido de la página legal…"></div>
+          </div>
+          <p class="admin-error" id="legal-error"></p>
+          <div class="admin__editor-actions"><button type="button" class="btn-primary" id="legal-save">Guardar página</button></div>
         </section>
 
         <!-- AUDITORÍA -->
