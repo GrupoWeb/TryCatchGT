@@ -193,6 +193,8 @@ export class AuthController {
   };
 
   public me = (req: AuthedRequest, res: Response): void => {
-    res.status(200).json({ success: true, authenticated: true, userId: req.userId, mustChangePassword: req.authUser?.mustChangePassword ?? false });
+    // `role` solo alimenta el ocultamiento cosmético de la UI solo-admin; la
+    // autorización real vive en el servidor (requireRole).
+    res.status(200).json({ success: true, authenticated: true, userId: req.userId, role: req.authUser?.role, mustChangePassword: req.authUser?.mustChangePassword ?? false });
   };
 }

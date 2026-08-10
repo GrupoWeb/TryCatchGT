@@ -96,7 +96,9 @@ export class AccountAdminController {
     if (!user || user.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
 
     const b = req.body ?? {};
-    const fields: { email?: string | null; avatar?: string | null; role?: 'admin' | 'editor'; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
+    // El rol NO se edita desde el propio perfil (evita auto-escalada editor→admin).
+    // Se cambia solo desde la gestión de usuarios, que exige rol admin (ver updateUser).
+    const fields: { email?: string | null; avatar?: string | null; fullName?: string | null; lastName?: string | null; displayName?: string | null } = {};
 
     if (b.email !== undefined) {
       const email = String(b.email).trim();
@@ -107,15 +109,6 @@ export class AccountAdminController {
     if (b.fullName !== undefined) fields.fullName = String(b.fullName).trim() || null;
     if (b.lastName !== undefined) fields.lastName = String(b.lastName).trim() || null;
     if (b.displayName !== undefined) fields.displayName = String(b.displayName).trim() || null;
-    if (b.role !== undefined) {
-      const role = b.role === 'admin' ? 'admin' : 'editor';
-      // Evita que el único admin se quite el rol y quede el sistema sin administradores.
-      if (user.role === 'admin' && role !== 'admin' && (await this.users.countAdmins()) <= 1) {
-        res.status(400).json({ success: false, error: 'No puedes quitarte el rol admin: eres el único administrador.' });
-        return;
-      }
-      fields.role = role;
-    }
 
     await this.users.updateProfile(user.id, fields);
     const updated = await this.users.findById(user.id);
