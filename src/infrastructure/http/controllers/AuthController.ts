@@ -11,6 +11,7 @@ import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 import { env } from '../../../config/env.js';
 import { validatePassword } from '../../security/passwordPolicy.js';
+import { escapeHtml } from '../../security/escapeHtml.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 
 function resultPage(message: string, ok: boolean): string {
@@ -48,7 +49,7 @@ export class AuthController {
     await this.email.send({
       to: user.email,
       subject: 'Restablece tu contraseña — TryCatch GT',
-      html: `<p>Hola ${user.label},</p><p>Recibimos una solicitud para restablecer tu contraseña:</p><p><a href="${link}">Restablecer contraseña</a></p><p>El enlace vence en 60 minutos. Si no lo pediste, ignora este correo.</p>`,
+      html: `<p>Hola ${escapeHtml(user.label)},</p><p>Recibimos una solicitud para restablecer tu contraseña:</p><p><a href="${escapeHtml(link)}">Restablecer contraseña</a></p><p>El enlace vence en 60 minutos. Si no lo pediste, ignora este correo.</p>`,
       text: `Restablece tu contraseña: ${link}`,
     });
     generic();

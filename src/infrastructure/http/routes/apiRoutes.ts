@@ -20,7 +20,7 @@ import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, saveValidatedImage } from '../upload.js';
-import { authLimiter, formLimiter } from '../rateLimit.js';
+import { authLimiter, formLimiter, uploadLimiter } from '../rateLimit.js';
 import { issueCsrfToken, requireCsrf } from '../csrf.js';
 
 // Use cases
@@ -148,7 +148,7 @@ apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
 // Subida de imágenes (portadas del blog, etc.)
-apiRouter.post('/admin/uploads', requireAuth, (req, res) => {
+apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req, res) => {
   uploadImage.single('image')(req, res, (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }

@@ -10,6 +10,7 @@ import { EmailService } from '../../email/EmailService.js';
 import { UserSessionRepository } from '../../../application/ports/output/UserSessionRepository.js';
 import { env } from '../../../config/env.js';
 import { validatePassword } from '../../security/passwordPolicy.js';
+import { escapeHtml } from '../../security/escapeHtml.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -75,7 +76,7 @@ export class AccountAdminController {
     const { sent } = await this.email.send({
       to: user.email,
       subject: 'Verifica tu correo — TryCatch GT',
-      html: `<p>Hola ${user.label},</p><p>Confirma tu correo:</p><p><a href="${link}">Verificar correo</a></p><p>El enlace vence en 60 minutos.</p>`,
+      html: `<p>Hola ${escapeHtml(user.label)},</p><p>Confirma tu correo:</p><p><a href="${escapeHtml(link)}">Verificar correo</a></p><p>El enlace vence en 60 minutos.</p>`,
       text: `Verifica tu correo: ${link}`,
     });
     res.status(200).json({ success: true, sent });

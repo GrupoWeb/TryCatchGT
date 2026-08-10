@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { SiteConfigRepository } from '../../application/ports/output/SiteConfigRepository.js';
+import { env } from '../../config/env.js';
 
 export interface EmailMessage {
   to: string;
@@ -25,7 +26,13 @@ export class EmailService {
     const port = Number(c.smtpPort) || 587;
 
     if (!host || !user || !pass) {
-      console.log(`✉️  [DEV email] Para: ${msg.to}\n   Asunto: ${msg.subject}\n   ${msg.text || msg.html}`);
+      // En producción NO se imprime el cuerpo: contendría enlaces con tokens de
+      // verificación/reset en claro (M5). Solo se registra destinatario y asunto.
+      if (env.isProduction) {
+        console.warn(`✉️  Correo no enviado (SMTP no configurado). Para: ${msg.to} · Asunto: ${msg.subject}`);
+      } else {
+        console.log(`✉️  [DEV email] Para: ${msg.to}\n   Asunto: ${msg.subject}\n   ${msg.text || msg.html}`);
+      }
       return { sent: false };
     }
 
