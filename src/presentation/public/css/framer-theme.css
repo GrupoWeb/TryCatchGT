@@ -808,8 +808,17 @@ button:focus-visible,
   .field textarea { font-size: 16px; }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .quote__panel { padding: 22px 16px; }
-  .hero__actions { width: 100%; }
-  .hero__actions .btn { flex: 1; justify-content: center; }
+  /* CTAs del hero apilados a ancho completo, cada uno en una sola línea */
+  .hero__actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .hero__actions .btn {
+    width: 100%;
+    justify-content: center;
+    white-space: nowrap;
+  }
 }
