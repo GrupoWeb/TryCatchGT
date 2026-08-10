@@ -15,14 +15,15 @@ import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
 import { AuditController } from '../controllers/AuditController.js';
-import { createRequireAuth } from '../middleware/requireAuth.js';
+import { createRequireAuth, AuthedRequest } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
-import { uploadImage, saveValidatedImage } from '../upload.js';
+import { uploadImage, sniffImageMime } from '../upload.js';
 import { authLimiter, formLimiter, uploadLimiter, healthLimiter } from '../rateLimit.js';
 import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
 import { createHealthCheck } from '../health.js';
+import { createMediaHandler } from '../media.js';
 import { AppDataSource } from '../../database/typeorm/data-source.js';
 
 // Use cases
@@ -46,6 +47,7 @@ import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteC
 import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLogRepository.js';
 import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
 import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
+import { TypeOrmMediaRepository } from '../../database/typeorm/TypeOrmMediaRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
@@ -61,6 +63,7 @@ const siteConfigRepository = new TypeOrmSiteConfigRepository();
 const auditRepository = new TypeOrmAuditLogRepository();
 const userTokenRepository = new TypeOrmUserTokenRepository();
 const userSessionRepository = new TypeOrmUserSessionRepository();
+const mediaRepository = new TypeOrmMediaRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
@@ -146,19 +149,26 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
-// Subida de imágenes (portadas del blog, etc.)
-apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req, res) => {
-  uploadImage.single('image')(req, res, (err) => {
+// Subida de imágenes (portadas del blog, avatar). Se validan por magic bytes y se
+// guardan en la BD (no en disco): en hostings con deploy inmutable + CDN los
+// archivos escritos en runtime no se sirven ni sobreviven al redeploy.
+apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req: AuthedRequest, res) => {
+  uploadImage.single('image')(req, res, async (err) => {
     if (err) { res.status(400).json({ success: false, error: (err as Error).message || 'Error al subir.' }); return; }
     if (!req.file) { res.status(400).json({ success: false, error: 'No se recibió ninguna imagen.' }); return; }
+    const mime = sniffImageMime(req.file.buffer);
+    if (!mime) { res.status(400).json({ success: false, error: 'El archivo no es una imagen válida. Usa JPG, PNG, WEBP, GIF o AVIF.' }); return; }
     try {
-      const filename = saveValidatedImage(req.file);
-      res.status(201).json({ success: true, data: { url: `/uploads/${filename}` } });
+      const id = await mediaRepository.save({ mime, data: req.file.buffer, size: req.file.size, createdBy: req.userId ?? null });
+      res.status(201).json({ success: true, data: { url: `/api/media/${id}` } });
     } catch (e) {
       res.status(400).json({ success: false, error: (e as Error).message });
     }
   });
 });
+
+// Servido público de las imágenes guardadas en la BD (portadas del blog, avatar).
+apiRouter.get('/media/:id', createMediaHandler(mediaRepository));
 
 // Blog
 apiRouter.get('/admin/posts', requireAuth, adminBlogController.list);
