@@ -45,6 +45,7 @@ import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLo
 import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
 import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
+import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
 
@@ -59,6 +60,7 @@ const auditRepository = new TypeOrmAuditLogRepository();
 const userTokenRepository = new TypeOrmUserTokenRepository();
 const userSessionRepository = new TypeOrmUserSessionRepository();
 const passwordHasher = new BcryptPasswordHasher();
+const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
 const emailService = new EmailService(siteConfigRepository);
 
@@ -86,7 +88,7 @@ const authController = new AuthController(new AuthenticateUser(userRepository, p
 // Admin
 const adminBlogController = new AdminBlogController(
   getBlogPosts,
-  new SaveBlogPost(blogRepository),
+  new SaveBlogPost(blogRepository, htmlSanitizer),
   new DeleteBlogPost(blogRepository),
   blogRepository,
 );

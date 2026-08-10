@@ -51,7 +51,9 @@
     const cover = post.coverImage
       ? `<img class="article__cover" style="object-position:${esc(post.coverPosition || '50% 50%')}" src="${esc(post.coverImage)}" alt="${esc(post.title)}" />`
       : '';
-    // El contenido lo redacta el admin (fuente confiable), por eso se inserta como HTML.
+    // El contenido se sanea en el servidor al guardar (sanitizeBlogHtml), por eso se
+    // inserta como HTML: hace falta para el formato del artículo y el control es el
+    // saneado del servidor, no la confianza en quien lo redacta.
     container.innerHTML = `
       <a class="back-link" href="/blog" style="color:var(--text-muted);text-decoration:none;font-size:14px;display:inline-block;margin-bottom:20px">← Volver al blog</a>
       <div class="article__meta">
