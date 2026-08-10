@@ -1,24 +1,25 @@
 # Entorno de prueba local (p. ej. en Kali): app Node + MySQL.
-#   docker compose up --build
+#   1) cp .env.example .env   y completa los secretos (ver DOCKER.md)
+#   2) docker compose up --build
 #   → sitio:  http://localhost:3000
-#   → panel:  http://localhost:3000/admin   (admin / admin12345)
+#   → panel:  http://localhost:3000/admin
 #
-# Las migraciones y el seed corren solas al arrancar (migrationsRun: true), así
-# que el blog, servicios y planes aparecen sin pasos manuales.
+# Los secretos NO viven en este archivo: se cargan desde .env (gitignored).
 
 services:
   db:
     image: mysql:8.0
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      # ':?' aborta con un mensaje claro si la variable no está en .env.
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?define MYSQL_ROOT_PASSWORD en .env}
       MYSQL_DATABASE: trycatch_db
     ports:
       - "3307:3306"   # host 3307 para no chocar con un MySQL/MariaDB local en Kali
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -29,22 +30,18 @@ services:
     depends_on:
       db:
         condition: service_healthy   # espera a que MySQL acepte conexiones
+    # Secretos (credenciales de BD, SESSION_SECRET, ENCRYPTION_KEY, admin…) desde
+    # .env — nunca se commitean. Copia .env.example a .env y complétalo.
+    env_file: .env
     environment:
+      # Solo variables no sensibles / de topología en claro:
       # development: sobre http://localhost evita el upgrade-insecure-requests de
       # la CSP de producción (que rompería CSS/JS al forzar https).
       NODE_ENV: development
       PORT: "3000"
       DB_HOST: db
       DB_PORT: "3306"
-      DB_USER: root
-      DB_PASSWORD: root
       DB_NAME: trycatch_db
-      # Usuario admin inicial (se siembra si la tabla users está vacía).
-      ADMIN_USER: admin
-      ADMIN_PASSWORD: admin12345
-      SESSION_SECRET: dev-session-secret-cambia-esto-0123456789
-      CONTACT_EMAIL: contacto@trycatchgt.org
-      WHATSAPP_NUMBER: "50200000000"
     ports:
       - "3000:3000"
 

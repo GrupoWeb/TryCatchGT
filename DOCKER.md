@@ -11,13 +11,25 @@ Levanta la aplicación **Node + MySQL** en contenedores, sin instalar nada más 
   sudo usermod -aG docker "$USER"   # requiere cerrar y volver a abrir sesión
   ```
 
+## Configurar los secretos (una vez)
+Los secretos no están en `docker-compose.yml`: viven en un `.env` que **no** se
+commitea. Créalo desde la plantilla y genera valores fuertes:
+```bash
+cp .env.example .env
+# genera secretos y pégalos en .env (SESSION_SECRET, ENCRYPTION_KEY):
+openssl rand -hex 32
+```
+En `.env` define al menos: `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`/`MYSQL_PASSWORD`
+(= `DB_USER`/`DB_PASSWORD`), `SESSION_SECRET`, `ENCRYPTION_KEY` y `ADMIN_PASSWORD`
+(mín. 12 caracteres).
+
 ## Arranque
 Desde la raíz del proyecto:
 ```bash
 docker compose up --build
 ```
 - Sitio:  http://localhost:3000
-- Panel:  http://localhost:3000/admin  → usuario `admin`, contraseña `admin12345`
+- Panel:  http://localhost:3000/admin  → usuario `admin`, contraseña la de `ADMIN_PASSWORD`
 
 El contenedor `app` espera a que MySQL esté sano (`healthcheck`) y al iniciar corre
 las **migraciones y el seed automáticamente** (`migrationsRun: true`): blog,

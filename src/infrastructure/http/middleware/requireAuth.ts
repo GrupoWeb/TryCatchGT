@@ -38,15 +38,20 @@ export function createRequireAuth(users: UserRepository, sessions: UserSessionRe
       return;
     }
 
-    // Revocación por dispositivo: si el token trae sid, la sesión debe seguir activa.
-    if (session.sid) {
-      const active = await sessions.findActiveBySid(session.sid);
-      if (!active || active.userId !== session.uid) {
-        res.status(401).json({ success: false, error: 'Esta sesión fue cerrada. Inicia sesión de nuevo.' });
-        return;
-      }
-      req.sessionSid = session.sid;
+    // Revocación por dispositivo: el token DEBE traer `sid`. Todo login legítimo lo
+    // emite (AuthController.startSession, en sus dos caminos), así que un token forjado
+    // sin `sid` —aunque su HMAC sea válido— se rechaza aquí y no puede saltarse la
+    // comprobación de sesión activa en `user_sessions`.
+    if (!session.sid) {
+      res.status(401).json({ success: false, error: 'Tu sesión ya no es válida. Inicia sesión de nuevo.' });
+      return;
     }
+    const active = await sessions.findActiveBySid(session.sid);
+    if (!active || active.userId !== session.uid) {
+      res.status(401).json({ success: false, error: 'Esta sesión fue cerrada. Inicia sesión de nuevo.' });
+      return;
+    }
+    req.sessionSid = session.sid;
 
     req.userId = session.uid;
     req.authUser = user;

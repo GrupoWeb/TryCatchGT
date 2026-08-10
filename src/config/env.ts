@@ -35,6 +35,11 @@ export const env = {
     maxAgeMs: 1000 * 60 * 60 * 8, // 8 horas
     cookieName: 'tcgt_session',
   },
+  // Clave independiente para cifrar los secretos MFA (AES-256). Se separa de
+  // SESSION_SECRET para poder rotar el secreto de sesión sin volver ilegibles los
+  // secretos MFA. Fallback a SESSION_SECRET solo si no se define, para no romper
+  // instalaciones existentes. Ver security/crypto.ts y M7 de la auditoría.
+  encryptionKey: process.env.ENCRYPTION_KEY || process.env.SESSION_SECRET || 'dev-session-secret-cambia-esto',
   contact: {
     email: process.env.CONTACT_EMAIL || 'ing.jolon@gmail.com',
     // Número de WhatsApp en formato internacional, solo dígitos (ej. 50255555555).

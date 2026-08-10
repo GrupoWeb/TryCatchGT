@@ -1,9 +1,10 @@
 import crypto from 'node:crypto';
 import { env } from '../../config/env.js';
 
-// Clave AES-256 derivada del SESSION_SECRET. Si cambias SESSION_SECRET, los
-// secretos MFA cifrados existentes dejarán de poder descifrarse.
-const key = crypto.scryptSync(env.session.secret, 'tcgt-mfa-salt-v1', 32);
+// Clave AES-256 derivada de ENCRYPTION_KEY (independiente de SESSION_SECRET; ver
+// M7). Si no se define ENCRYPTION_KEY, cae a SESSION_SECRET por compatibilidad.
+// Cambiar la clave que estuviera en uso vuelve ilegibles los secretos MFA cifrados.
+const key = crypto.scryptSync(env.encryptionKey, 'tcgt-mfa-salt-v1', 32);
 
 /** Cifra un texto con AES-256-GCM. Prefijo "enc:" para distinguir de legado. */
 export function encryptSecret(plain: string): string {
