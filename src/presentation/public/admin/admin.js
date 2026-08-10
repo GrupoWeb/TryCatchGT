@@ -112,10 +112,9 @@
   // control real es requireRole en las rutas.
   function applyRoleGate(role) {
     const isAdmin = role === 'admin';
-    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"]').forEach((b) => { b.hidden = !isAdmin; });
-    const usersList = $('users-list');
-    const heading = usersList ? usersList.previousElementSibling : null; // <h3>Usuarios</h3>
-    [usersList, $('user-form'), heading].forEach((el) => { if (el) el.hidden = !isAdmin; });
+    // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
+    // navegación a los editores. El control real es requireRole en las rutas.
+    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
@@ -232,7 +231,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -634,7 +633,7 @@
   // ── PERFIL ────────────────────────────────────────────────
   let mfaPendingSecret = null;
 
-  async function loadAccount() { await Promise.all([loadProfile(), loadUsers(), loadSessions()]); }
+  async function loadAccount() { await Promise.all([loadProfile(), loadSessions()]); }
 
   async function loadSessions() {
     const r = await api('/api/admin/account/sessions');
@@ -884,7 +883,7 @@
   $('user-save').addEventListener('click', async () => {
     $('user-error').textContent = '';
     const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value, mustChangePassword: $('u-mustchange').checked }) });
-    if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadAccount(); }
+    if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadUsers(); }
     else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
   });
 
