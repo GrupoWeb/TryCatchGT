@@ -45,7 +45,7 @@ export class AuthController {
     const user = await this.users.findByEmail(email);
     if (!user || user.id === undefined || !user.canLogin || !user.email) { generic(); return; }
     const token = await this.tokens.issue(user.id, 'password_reset', 60);
-    const link = `${env.appUrl}/admin/reset-password?token=${token}`;
+    const link = `${env.appUrl}${env.adminPath}/reset-password?token=${token}`;
     await this.email.send({
       to: user.email,
       subject: 'Restablece tu contraseña — TryCatch GT',

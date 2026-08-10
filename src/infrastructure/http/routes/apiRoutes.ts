@@ -15,6 +15,7 @@ import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
 import { AuditController } from '../controllers/AuditController.js';
+import { LegalController } from '../controllers/LegalController.js';
 import { createRequireAuth, AuthedRequest } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
@@ -103,6 +104,7 @@ const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository);
 const auditController = new AuditController(auditRepository, userRepository);
+const legalController = new LegalController(siteConfigRepository, htmlSanitizer);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
 export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHasher, {
@@ -144,6 +146,7 @@ apiRouter.get('/services', serviceController.list);
 apiRouter.get('/plans', planController.list);
 apiRouter.post('/projects', formLimiter, turnstileGuard, projectRequestController.create);
 apiRouter.get('/blog', blogController.list);
+apiRouter.get('/legal/:slug', legalController.getPublic);
 apiRouter.get('/blog/:slug', blogController.detail);
 
 // Autenticación
@@ -158,6 +161,10 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
+
+// Páginas legales (Términos, Privacidad, Cookies) — edición solo admin.
+apiRouter.get('/admin/legal', requireAuth, requireAdmin, legalController.getAllAdmin);
+apiRouter.put('/admin/legal/:slug', requireAuth, requireAdmin, legalController.update);
 
 // Subida de imágenes (portadas del blog, avatar). Se validan por magic bytes y se
 // guardan en la BD (no en disco): en hostings con deploy inmutable + CDN los

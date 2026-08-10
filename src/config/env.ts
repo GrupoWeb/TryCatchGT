@@ -27,6 +27,16 @@ export const env = {
   })(),
   // URL base pública, para construir enlaces en correos (verificación, reset).
   appUrl: process.env.APP_URL || `http://localhost:${Number(process.env.PORT) || 3000}`,
+  // Ruta del panel de administración. Por defecto /admin; se puede mover a una ruta
+  // secreta (ADMIN_PATH=/mi-panel-x7k2) para que no sea trivial de encontrar. Es
+  // ofuscación que complementa la auth (no la reemplaza). Se sanea: debe empezar por
+  // "/", solo alfanumérico/-/_//, sin barra final; si es inválida, cae a /admin.
+  adminPath: (() => {
+    const raw = (process.env.ADMIN_PATH || '/admin').trim();
+    const withSlash = raw.startsWith('/') ? raw : `/${raw}`;
+    const noTrail = withSlash.replace(/\/+$/, '') || '/admin';
+    return /^\/[A-Za-z0-9\-_/]+$/.test(noTrail) ? noTrail : '/admin';
+  })(),
   db: {
     host: required('DB_HOST', 'localhost'),
     port: Number(process.env.DB_PORT) || 3306,
