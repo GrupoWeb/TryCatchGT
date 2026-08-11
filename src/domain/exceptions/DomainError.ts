@@ -25,3 +25,17 @@ export class InvalidContactError extends DomainError {
     this.name = 'InvalidContactError';
   }
 }
+
+export class InvalidEmailTemplateError extends DomainError {
+  constructor(reason: string) {
+    super(`Plantilla inválida: ${reason}`);
+    this.name = 'InvalidEmailTemplateError';
+  }
+}
+
+export class InvalidCrmMessageError extends DomainError {
+  constructor(reason: string) {
+    super(`Mensaje inválido: ${reason}`);
+    this.name = 'InvalidCrmMessageError';
+  }
+}

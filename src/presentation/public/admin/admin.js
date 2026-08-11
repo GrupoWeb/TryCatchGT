@@ -265,7 +265,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -498,6 +498,9 @@
           ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
           ${webTag}
         </div>
+        <div class="crm-card__actions">
+          <button class="btn-ghost crm-mail-btn" data-id="${c.id}">✉️ Enviar correo</button>
+        </div>
         <details class="crm-followup">
           <summary>Notas y seguimiento</summary>
           <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
@@ -543,6 +546,12 @@
           if (c) { c.notes = notes; c.nextActionAt = nextRaw || null; }
           toast('Contacto guardado');
         } else toast((res.body && res.body.error) || 'No se pudo guardar', 'error');
+      });
+    });
+    cont.querySelectorAll('.crm-mail-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = allContacts.find((x) => String(x.id) === btn.getAttribute('data-id'));
+        if (c) openMailComposer(c);
       });
     });
   }
@@ -830,6 +839,160 @@
   $('plan-save').addEventListener('click', plans.save);
   $('plan-cancel').addEventListener('click', plans.close);
   $('plan-delete').addEventListener('click', plans.remove);
+
+  // ── PLANTILLAS DE CORREO ──────────────────────────────────
+  const TPL_SEGMENTS = { all: 'Todos', alta: 'Prioridad alta', media: 'Prioridad media', base: 'Prioridad base', 'sin-web': 'Sin sitio web' };
+  const tplEditor = makeRichEditor($('rt-tpl-area'), $('rt-tpl-toolbar'));
+  const tpl = makeCrud({
+    path: '/api/admin/templates', listEl: 'tpl-list', editorEl: $('tpl-editor'), emptyEl: $('tpl-empty'),
+    deleteBtn: $('tpl-delete'), errorEl: $('tpl-error'), entityName: 'Plantilla',
+    blank: { segment: 'all' },
+    renderItem: (t) => `<div class="admin-item" data-id="${t.id}"><div class="admin-item__title">${esc(t.name)}</div><div class="admin-item__meta"><span class="badge-status published">${esc(TPL_SEGMENTS[t.segment] || t.segment)}</span><span>${esc(t.subject)}</span></div></div>`,
+    toForm: (t) => { $('tpl-id').value = t.id || ''; $('tpl-name').value = t.name || ''; $('tpl-subject').value = t.subject || ''; $('tpl-segment').value = t.segment || 'all'; tplEditor.set(t.bodyHtml || ''); },
+    fromForm: () => ({ name: $('tpl-name').value.trim(), subject: $('tpl-subject').value.trim(), segment: $('tpl-segment').value, bodyHtml: tplEditor.get() }),
+  });
+  function loadTemplates() { tpl.load(); }
+  $('tpl-new').addEventListener('click', tpl.create);
+  $('tpl-save').addEventListener('click', tpl.save);
+  $('tpl-cancel').addEventListener('click', tpl.close);
+  $('tpl-delete').addEventListener('click', tpl.remove);
+  // Inserta la variable en el cuerpo (en el punto del cursor) o en el asunto.
+  $('tpl-vars').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-var]');
+    if (!btn) return;
+    const token = `{${btn.getAttribute('data-var')}}`;
+    $('rt-tpl-area').focus();
+    if (!document.execCommand('insertText', false, token)) {
+      $('rt-tpl-area').innerHTML += token; // fallback navegadores sin execCommand
+    }
+  });
+
+  // Cache de plantillas para el compositor de correo (se refresca al abrirlo).
+  let mailTemplates = [];
+
+  // Sustitución de variables en cliente (espejo de domain/services/renderTemplate),
+  // solo para la vista previa. El envío real lo renderiza el servidor.
+  function varVals(c) {
+    return { nombre: c.name || '', empresa: c.company || c.name || '', sector: c.sector || '', ubicacion: c.location || '', sitio: c.website || '' };
+  }
+  function fillSubject(text, c) {
+    const v = varVals(c);
+    return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
+  }
+  function fillBody(html, c) {
+    const v = varVals(c);
+    return String(html || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
+  }
+
+  const MSG_STATUS = { sent: 'Enviado', failed: 'Falló', received: 'Recibido', read: 'Leído' };
+
+  function messageItem(m) {
+    const when = m.createdAt ? new Date(m.createdAt).toLocaleString('es-GT') : '—';
+    const dirIcon = m.direction === 'out' ? '↑' : '↓';
+    const okStatus = m.status === 'sent' || m.status === 'received' || m.status === 'read';
+    return `
+      <details class="mail-msg mail-msg--${esc(m.direction)}">
+        <summary>
+          <span class="mail-msg__dir">${dirIcon}</span>
+          <span class="mail-msg__subject">${esc(m.subject)}</span>
+          <span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(MSG_STATUS[m.status] || m.status)}</span>
+          <span class="mail-msg__date">${esc(when)}</span>
+        </summary>
+        <div class="mail-msg__body">${m.bodyHtml || '<em>(sin contenido)</em>'}</div>
+      </details>`;
+  }
+
+  // Compositor de correo + historial de un contacto (modal).
+  async function openMailComposer(contact) {
+    const [tplRes, msgRes] = await Promise.all([
+      api('/api/admin/templates'),
+      api(`/api/admin/contacts/${contact.id}/messages`),
+    ]);
+    if (!guard(tplRes) || !guard(msgRes)) return;
+    mailTemplates = (tplRes.ok && tplRes.body.data) || [];
+    const messages = (msgRes.ok && msgRes.body.data) || [];
+
+    const tplOptions = ['<option value="">— Escribir a mano —</option>']
+      .concat(mailTemplates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`))
+      .join('');
+    const advanceDefault = contact.stage === 'nuevo' ? 'checked' : '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal modal--wide" role="dialog" aria-modal="true" aria-label="Enviar correo">
+        <h3 class="modal__title">Enviar correo a ${esc(contact.name)}</h3>
+        <p class="mail-to">Para: <strong>${esc(contact.email)}</strong></p>
+        <div class="admin-field"><label>Plantilla</label><select class="modal__input" id="mail-tpl">${tplOptions}</select></div>
+        <div class="admin-field"><label>Asunto *</label><input class="modal__input" id="mail-subject" type="text" placeholder="Asunto del correo" /></div>
+        <div class="admin-field"><label>Mensaje *</label><div class="mail-body" id="mail-body" contenteditable="true" data-placeholder="Escribe el mensaje…"></div></div>
+        <label class="mail-advance"><input type="checkbox" id="mail-advance" ${advanceDefault} /> Avanzar a "Contactado" al enviar</label>
+        <details class="mail-preview"><summary>Vista previa (con los datos del contacto)</summary><div class="mail-preview__box"><p class="mail-preview__subject" id="mail-prev-subject"></p><div id="mail-prev-body"></div></div></details>
+        <p class="admin-error" id="mail-error"></p>
+        <div class="modal__actions">
+          <button class="btn-ghost" data-act="cancel">Cerrar</button>
+          <button class="btn-primary" data-act="send">Enviar</button>
+        </div>
+        <h4 class="mail-history__title">Historial (${messages.length})</h4>
+        <div class="mail-history" id="mail-history">${messages.length ? messages.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>'}</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+
+    const selEl = overlay.querySelector('#mail-tpl');
+    const subjEl = overlay.querySelector('#mail-subject');
+    const bodyEl = overlay.querySelector('#mail-body');
+    const errEl = overlay.querySelector('#mail-error');
+
+    function refreshPreview() {
+      overlay.querySelector('#mail-prev-subject').textContent = fillSubject(subjEl.value, contact) || '(sin asunto)';
+      overlay.querySelector('#mail-prev-body').innerHTML = fillBody(bodyEl.innerHTML, contact);
+    }
+    selEl.addEventListener('change', () => {
+      const t = mailTemplates.find((x) => String(x.id) === selEl.value);
+      if (t) { subjEl.value = t.subject; bodyEl.innerHTML = t.bodyHtml; }
+      refreshPreview();
+    });
+    subjEl.addEventListener('input', refreshPreview);
+    bodyEl.addEventListener('input', refreshPreview);
+
+    function close() { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); }
+    overlay.addEventListener('click', async (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.getAttribute('data-act') === 'cancel') return close();
+      // Enviar
+      errEl.textContent = '';
+      if (!subjEl.value.trim() || !bodyEl.innerHTML.trim()) { errEl.textContent = 'El asunto y el mensaje son obligatorios.'; return; }
+      a.disabled = true;
+      const res = await api(`/api/admin/contacts/${contact.id}/email`, {
+        method: 'POST',
+        body: JSON.stringify({
+          templateId: selEl.value || null,
+          subject: subjEl.value.trim(),
+          bodyHtml: bodyEl.innerHTML,
+          advanceStage: overlay.querySelector('#mail-advance').checked,
+        }),
+      });
+      a.disabled = false;
+      if (!res.ok) { errEl.textContent = (res.body && res.body.error) || 'No se pudo enviar.'; return; }
+      const sent = res.body && res.body.sent;
+      if (sent === false) toast('Registrado, pero SMTP no está configurado: el correo no salió.', 'error');
+      else toast('Correo enviado');
+      // Refresca el historial y, si se avanzó, la etapa local.
+      if (sent && overlay.querySelector('#mail-advance').checked && contact.stage === 'nuevo') {
+        contact.stage = 'contactado';
+        const card = document.querySelector(`.contact-card[data-id="${contact.id}"] .crm-stage`);
+        if (card) card.value = 'contactado';
+      }
+      const fresh = await api(`/api/admin/contacts/${contact.id}/messages`);
+      const list = (fresh.ok && fresh.body.data) || [];
+      overlay.querySelector('#mail-history').innerHTML = list.length ? list.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>';
+      overlay.querySelector('.mail-history__title').textContent = `Historial (${list.length})`;
+      subjEl.value = ''; bodyEl.innerHTML = ''; selEl.value = ''; refreshPreview();
+    });
+  }
 
   // ── CONTACTO ──────────────────────────────────────────────
   async function loadContact() {

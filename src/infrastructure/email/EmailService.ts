@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { SiteConfigRepository } from '../../application/ports/output/SiteConfigRepository.js';
+import { EmailSender } from '../../application/ports/output/EmailSender.js';
 import { env } from '../../config/env.js';
 
 export interface EmailMessage {
@@ -13,11 +14,13 @@ export interface EmailMessage {
  * Envío de correo por SMTP (nodemailer). La configuración se lee del panel
  * (site_config). Si no hay SMTP configurado, degrada a "modo dev": registra el
  * correo en el log del servidor en vez de enviarlo, para no bloquear los flujos.
+ * Implementa el puerto `EmailSender` para que los use-cases (CRM) no dependan del
+ * transporte concreto.
  */
-export class EmailService {
+export class EmailService implements EmailSender {
   constructor(private readonly config: SiteConfigRepository) {}
 
-  public async send(msg: EmailMessage): Promise<{ sent: boolean }> {
+  public async send(msg: EmailMessage): Promise<{ sent: boolean; messageId?: string }> {
     const c = await this.config.getAll();
     const host = c.smtpHost;
     const user = c.smtpUser;
@@ -42,7 +45,7 @@ export class EmailService {
       secure: c.smtpSecure === 'true' || port === 465,
       auth: { user, pass },
     });
-    await transport.sendMail({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
-    return { sent: true };
+    const info = await transport.sendMail({ from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text });
+    return { sent: true, messageId: info.messageId };
   }
 }

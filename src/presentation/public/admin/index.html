@@ -107,6 +107,7 @@
         <button class="admin__nav-btn is-active" data-section="home">🏠 Inicio</button>
         <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
         <button class="admin__nav-btn" data-section="crm">📇 Clientes</button>
+        <button class="admin__nav-btn" data-section="templates">✉️ Plantillas</button>
         <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
         <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
@@ -202,6 +203,65 @@
           <p class="admin-muted" id="crm-count"></p>
           <div class="leads-list" id="crm-list"><p class="admin-muted">Cargando…</p></div>
           <div class="leads-more" id="crm-more" hidden><button class="btn-ghost" id="crm-more-btn">Ver más</button></div>
+        </section>
+
+        <!-- PLANTILLAS DE CORREO -->
+        <section class="admin-sec" id="sec-templates" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Plantillas de correo</h2>
+            <button class="btn-ghost" id="tpl-new">+ Nueva plantilla</button>
+          </div>
+          <p class="admin-muted">Variables disponibles: <code>{nombre}</code>, <code>{empresa}</code>, <code>{sector}</code>, <code>{ubicacion}</code>, <code>{sitio}</code>. Se sustituyen por los datos del contacto al enviar.</p>
+          <div class="admin-split">
+            <aside class="admin__list" id="tpl-list"></aside>
+            <div>
+              <form class="admin__editor" id="tpl-editor" hidden>
+                <input type="hidden" id="tpl-id" />
+                <div class="admin-field"><label for="tpl-name">Nombre *</label><input type="text" id="tpl-name" autocomplete="off" placeholder="Presentación inicial" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="tpl-subject">Asunto *</label><input type="text" id="tpl-subject" autocomplete="off" placeholder="Hola {nombre}, una idea para {empresa}" /></div>
+                  <div class="admin-field"><label for="tpl-segment">Segmento</label><select id="tpl-segment"><option value="all">Todos</option><option value="alta">Prioridad alta</option><option value="media">Prioridad media</option><option value="base">Prioridad base</option><option value="sin-web">Sin sitio web</option></select></div>
+                </div>
+                <div class="admin-field">
+                  <label>Cuerpo *</label>
+                  <div class="rt">
+                    <div class="rt__toolbar" id="rt-tpl-toolbar">
+                      <button type="button" class="rt__btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+                      <button type="button" class="rt__btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+                      <button type="button" class="rt__btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h2" title="Título">H2</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h3" title="Subtítulo">H3</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="p" title="Párrafo">¶</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="blockquote" title="Cita">❝</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+                      <button type="button" class="rt__btn" data-cmd="removeFormat" title="Limpiar formato">✕</button>
+                    </div>
+                    <div class="rt__area" id="rt-tpl-area" contenteditable="true" data-placeholder="Escribe el mensaje…"></div>
+                  </div>
+                  <div class="tpl-vars" id="tpl-vars">
+                    <span class="admin-hint">Insertar variable:</span>
+                    <button type="button" class="chip" data-var="nombre">{nombre}</button>
+                    <button type="button" class="chip" data-var="empresa">{empresa}</button>
+                    <button type="button" class="chip" data-var="sector">{sector}</button>
+                    <button type="button" class="chip" data-var="ubicacion">{ubicacion}</button>
+                    <button type="button" class="chip" data-var="sitio">{sitio}</button>
+                  </div>
+                </div>
+                <p class="admin-error" id="tpl-error"></p>
+                <div class="admin__editor-actions">
+                  <button type="button" class="btn-primary" id="tpl-save">Guardar</button>
+                  <button type="button" class="btn-ghost" id="tpl-cancel">Cancelar</button>
+                  <button type="button" class="btn-danger" id="tpl-delete" hidden>Eliminar</button>
+                </div>
+              </form>
+              <div class="admin__empty" id="tpl-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">✉️</div><p>Selecciona una plantilla o crea una nueva.</p></div></div>
+            </div>
+          </div>
         </section>
 
         <!-- BLOG -->

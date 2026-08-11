@@ -10,6 +10,8 @@ import { AdminBlogController } from '../controllers/AdminBlogController.js';
 import { AuthController } from '../controllers/AuthController.js';
 import { LeadAdminController } from '../controllers/LeadAdminController.js';
 import { ContactAdminController } from '../controllers/ContactAdminController.js';
+import { TemplateAdminController } from '../controllers/TemplateAdminController.js';
+import { CrmMailController } from '../controllers/CrmMailController.js';
 import { ServiceAdminController } from '../controllers/ServiceAdminController.js';
 import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
@@ -35,6 +37,11 @@ import { CreateProjectRequest } from '../../../application/use-cases/CreateProje
 import { ListContacts } from '../../../application/use-cases/ListContacts.js';
 import { CreateContact } from '../../../application/use-cases/CreateContact.js';
 import { UpdateContact } from '../../../application/use-cases/UpdateContact.js';
+import { GetEmailTemplates } from '../../../application/use-cases/GetEmailTemplates.js';
+import { SaveEmailTemplate } from '../../../application/use-cases/SaveEmailTemplate.js';
+import { DeleteEmailTemplate } from '../../../application/use-cases/DeleteEmailTemplate.js';
+import { SendContactEmail } from '../../../application/use-cases/SendContactEmail.js';
+import { GetContactMessages } from '../../../application/use-cases/GetContactMessages.js';
 import { GetBlogPosts } from '../../../application/use-cases/GetBlogPosts.js';
 import { GetBlogPostBySlug } from '../../../application/use-cases/GetBlogPostBySlug.js';
 import { SaveBlogPost } from '../../../application/use-cases/SaveBlogPost.js';
@@ -47,6 +54,8 @@ import { TypeOrmServiceRepository } from '../../database/typeorm/TypeOrmServiceR
 import { TypeOrmPlanRepository } from '../../database/typeorm/TypeOrmPlanRepository.js';
 import { TypeOrmProjectRequestRepository } from '../../database/typeorm/TypeOrmProjectRequestRepository.js';
 import { TypeOrmContactRepository } from '../../database/typeorm/TypeOrmContactRepository.js';
+import { TypeOrmEmailTemplateRepository } from '../../database/typeorm/TypeOrmEmailTemplateRepository.js';
+import { TypeOrmCrmMessageRepository } from '../../database/typeorm/TypeOrmCrmMessageRepository.js';
 import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPostRepository.js';
 import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
 import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
@@ -64,6 +73,8 @@ const serviceRepository = new TypeOrmServiceRepository();
 const planRepository = new TypeOrmPlanRepository();
 const projectRequestRepository = new TypeOrmProjectRequestRepository();
 const contactRepository = new TypeOrmContactRepository();
+const emailTemplateRepository = new TypeOrmEmailTemplateRepository();
+const crmMessageRepository = new TypeOrmCrmMessageRepository();
 const blogRepository = new TypeOrmBlogPostRepository();
 const userRepository = new TypeOrmUserRepository();
 const siteConfigRepository = new TypeOrmSiteConfigRepository();
@@ -110,6 +121,22 @@ const contactAdminController = new ContactAdminController(
   new ListContacts(contactRepository),
   new CreateContact(contactRepository),
   new UpdateContact(contactRepository),
+);
+const templateAdminController = new TemplateAdminController(
+  emailTemplateRepository,
+  new GetEmailTemplates(emailTemplateRepository),
+  new SaveEmailTemplate(emailTemplateRepository, htmlSanitizer),
+  new DeleteEmailTemplate(emailTemplateRepository),
+);
+const crmMailController = new CrmMailController(
+  new SendContactEmail(
+    contactRepository,
+    emailTemplateRepository,
+    crmMessageRepository,
+    emailService,
+    htmlSanitizer,
+  ),
+  new GetContactMessages(crmMessageRepository),
 );
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
@@ -217,6 +244,16 @@ apiRouter.get('/admin/contacts/:id', requireAuth, contactAdminController.getById
 apiRouter.post('/admin/contacts', requireAuth, contactAdminController.create);
 apiRouter.patch('/admin/contacts/:id/stage', requireAuth, contactAdminController.updateStage);
 apiRouter.put('/admin/contacts/:id', requireAuth, contactAdminController.update);
+// Correo del CRM: enviar a un contacto y ver su timeline de mensajes.
+apiRouter.get('/admin/contacts/:id/messages', requireAuth, crmMailController.listMessages);
+apiRouter.post('/admin/contacts/:id/email', requireAuth, formLimiter, crmMailController.sendEmail);
+
+// CRM · Plantillas de correo
+apiRouter.get('/admin/templates', requireAuth, templateAdminController.list);
+apiRouter.get('/admin/templates/:id', requireAuth, templateAdminController.getById);
+apiRouter.post('/admin/templates', requireAuth, templateAdminController.create);
+apiRouter.put('/admin/templates/:id', requireAuth, templateAdminController.update);
+apiRouter.delete('/admin/templates/:id', requireAuth, templateAdminController.remove);
 
 // Servicios
 apiRouter.get('/admin/services', requireAuth, serviceAdminController.list);
