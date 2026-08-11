@@ -108,6 +108,7 @@
         <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
         <button class="admin__nav-btn" data-section="crm">📇 Clientes</button>
         <button class="admin__nav-btn" data-section="templates">✉️ Plantillas</button>
+        <button class="admin__nav-btn" data-section="cadences">🔁 Cadencias</button>
         <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
         <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
@@ -260,6 +261,41 @@
                 </div>
               </form>
               <div class="admin__empty" id="tpl-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">✉️</div><p>Selecciona una plantilla o crea una nueva.</p></div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CADENCIAS DE SEGUIMIENTO -->
+        <section class="admin-sec" id="sec-cadences" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Cadencias de seguimiento</h2>
+            <div class="crm-head-actions">
+              <button class="btn-ghost" id="cad-process">▶ Procesar ahora</button>
+              <button class="btn-ghost" id="cad-new">+ Nueva cadencia</button>
+            </div>
+          </div>
+          <p class="admin-muted">Secuencias de correos que se envían solos con retrasos configurables y se detienen cuando el contacto responde. Un proceso las revisa periódicamente; también puedes forzarlo con "Procesar ahora".</p>
+          <div class="admin-split">
+            <aside class="admin__list" id="cad-list"></aside>
+            <div>
+              <form class="admin__editor" id="cad-editor" hidden>
+                <input type="hidden" id="cad-id" />
+                <div class="admin-field"><label for="cad-name">Nombre *</label><input type="text" id="cad-name" autocomplete="off" placeholder="Seguimiento MIPYMEs sin web" /></div>
+                <label class="admin-check"><input type="checkbox" id="cad-active" checked /> Cadencia activa</label>
+                <div class="admin-field">
+                  <label>Pasos</label>
+                  <div id="cad-steps"></div>
+                  <button type="button" class="btn-ghost" id="cad-add-step">+ Añadir paso</button>
+                  <p class="admin-hint">Cada paso: días de espera (desde la inscripción o desde el paso anterior) y la plantilla a enviar.</p>
+                </div>
+                <p class="admin-error" id="cad-error"></p>
+                <div class="admin__editor-actions">
+                  <button type="button" class="btn-primary" id="cad-save">Guardar</button>
+                  <button type="button" class="btn-ghost" id="cad-cancel">Cancelar</button>
+                  <button type="button" class="btn-danger" id="cad-delete" hidden>Eliminar</button>
+                </div>
+              </form>
+              <div class="admin__empty" id="cad-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">🔁</div><p>Selecciona una cadencia o crea una nueva.</p></div></div>
             </div>
           </div>
         </section>

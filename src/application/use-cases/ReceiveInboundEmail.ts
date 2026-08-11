@@ -5,6 +5,7 @@ import {
 } from '../ports/input/ReceiveInboundEmailUseCase.js';
 import { ContactRepository } from '../ports/output/ContactRepository.js';
 import { CrmMessageRepository } from '../ports/output/CrmMessageRepository.js';
+import { CadenceRunRepository } from '../ports/output/CadenceRunRepository.js';
 import { HtmlSanitizer } from '../ports/output/HtmlSanitizer.js';
 import { Contact } from '../../domain/entities/Contact.js';
 import { CrmMessage } from '../../domain/entities/CrmMessage.js';
@@ -26,6 +27,9 @@ export class ReceiveInboundEmail implements ReceiveInboundEmailUseCase {
     private readonly contacts: ContactRepository,
     private readonly messages: CrmMessageRepository,
     private readonly sanitizer: HtmlSanitizer,
+    // Opcional (Fase 4): al recibir respuesta, corta las cadencias activas del
+    // contacto para no seguir persiguiendo a quien ya contestó.
+    private readonly cadenceRuns?: CadenceRunRepository,
   ) {}
 
   public async execute(email: InboundEmail): Promise<ReceiveInboundEmailResult> {
@@ -71,6 +75,11 @@ export class ReceiveInboundEmail implements ReceiveInboundEmailUseCase {
     // Nos escribió: avanza el embudo desde las etapas iniciales.
     if (contact.stage === 'nuevo' || contact.stage === 'contactado') {
       await this.contacts.updateStage(contact.id!, 'respondio');
+    }
+
+    // Y corta cualquier cadencia de seguimiento activa (ya respondió).
+    if (this.cadenceRuns) {
+      await this.cadenceRuns.stopActiveByContact(contact.id!);
     }
 
     return { outcome: 'stored', message, contactCreated };
