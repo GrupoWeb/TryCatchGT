@@ -574,10 +574,11 @@
   };
   const CRM_TIERS = { alta: 'Alta', media: 'Media', base: 'Base' };
   let allContacts = [];
-  let crmQuery = '', crmTier = 'all', crmWeb = 'all', crmStage = 'all', crmLimit = PAGE;
+  let crmQuery = '', crmTier = 'all', crmWeb = 'all', crmStage = 'all', crmArchived = 'active', crmLimit = PAGE;
 
   async function loadCrm() {
-    const r = await api('/api/admin/contacts');
+    // Se traen también los dados de baja; el filtro por estado se aplica en cliente.
+    const r = await api('/api/admin/contacts?includeArchived=true');
     if (!guard(r)) return;
     if (!r.ok) { $('crm-list').innerHTML = '<p class="admin-muted">No se pudieron cargar los contactos.</p>'; return; }
     allContacts = r.body.data || [];
@@ -588,6 +589,8 @@
   function filteredContacts() {
     const q = crmQuery.trim().toLowerCase();
     return allContacts.filter((c) => {
+      if (crmArchived === 'active' && c.archived) return false;
+      if (crmArchived === 'archived' && !c.archived) return false;
       if (crmTier !== 'all' && c.tier !== crmTier) return false;
       if (crmStage !== 'all' && c.stage !== crmStage) return false;
       const hasWeb = !!(c.website && c.website.trim());
@@ -620,12 +623,13 @@
       ? `<span class="lead-tag lead-tag--next"><span aria-hidden="true">🗓️</span> ${esc(fmtDate(c.nextActionAt))}</span>`
       : '';
     return `
-      <article class="lead-card contact-card" data-id="${c.id}">
+      <article class="lead-card contact-card${c.archived ? ' is-archived' : ''}" data-id="${c.id}">
         <div class="contact-card__head">
           <div class="lead-card__avatar" style="--c:${leadColor(c.name)}">${esc(leadInitials(c.name))}</div>
           <div class="contact-card__id">
             <div class="contact-card__name-row">
               <span class="lead-card__name">${esc(c.name)}</span>
+              ${c.archived ? '<span class="badge-archived">Dado de baja</span>' : ''}
               ${tierBadge}
               ${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}
             </div>
@@ -646,82 +650,122 @@
       </article>`;
   }
 
-  // Drawer lateral de seguimiento: notas amplias, próxima acción y etapa.
-  // Se construye al vuelo (mismo patrón de overlay que los diálogos) y al guardar
-  // re-renderiza la lista para reflejar el indicador y el tag de próxima acción.
+  // Drawer lateral: edición del contacto, seguimiento (notas / próxima acción /
+  // etapa) y baja lógica. Se construye al vuelo (mismo patrón de overlay que los
+  // diálogos) y al guardar re-renderiza la lista.
   function openCrmDrawer(contact) {
     const stageOpts = Object.entries(CRM_STAGES)
       .map(([k, v]) => `<option value="${k}" ${k === contact.stage ? 'selected' : ''}>${v}</option>`)
       .join('');
-    const tierBadge = contact.tier ? `<span class="crm-tier crm-tier--${contact.tier}">${CRM_TIERS[contact.tier]}</span>` : '';
+    const tierOpts = ['<option value="">Sin prioridad</option>']
+      .concat(Object.entries(CRM_TIERS).map(([k, v]) => `<option value="${k}" ${k === contact.tier ? 'selected' : ''}>${v}</option>`))
+      .join('');
     const nextVal = contact.nextActionAt ? String(contact.nextActionAt).slice(0, 10) : '';
+    const val = (v) => esc(v || '');
     const overlay = document.createElement('div');
     overlay.className = 'drawer-overlay';
     overlay.innerHTML = `
-      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Seguimiento de ${esc(contact.name)}">
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Editar ${esc(contact.name)}">
         <header class="drawer__head">
           <div class="drawer__id">
             <div class="lead-card__avatar" style="--c:${leadColor(contact.name)}">${esc(leadInitials(contact.name))}</div>
             <div class="drawer__idtext">
-              <div class="drawer__name">${esc(contact.name)}${tierBadge}</div>
+              <div class="drawer__name">${esc(contact.name)}${contact.archived ? '<span class="badge-archived">Dado de baja</span>' : ''}</div>
               <a class="lead-card__email" href="mailto:${esc(contact.email)}"><span aria-hidden="true">✉</span> ${esc(contact.email)}</a>
             </div>
           </div>
           <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
         </header>
         <div class="drawer__body">
-          <div class="admin-field">
-            <label for="drw-stage">Etapa del pipeline</label>
-            <select id="drw-stage" class="crm-select">${stageOpts}</select>
+          <p class="drawer__section">Datos del contacto</p>
+          <div class="admin-field"><label for="drw-name">Nombre</label><input type="text" id="drw-name" value="${val(contact.name)}" /></div>
+          <div class="admin-field"><label for="drw-company">Empresa</label><input type="text" id="drw-company" value="${val(contact.company)}" /></div>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="drw-sector">Sector</label><input type="text" id="drw-sector" value="${val(contact.sector)}" /></div>
+            <div class="admin-field"><label for="drw-location">Ubicación</label><input type="text" id="drw-location" value="${val(contact.location)}" /></div>
           </div>
-          <div class="admin-field">
-            <label for="drw-notes">Notas</label>
-            <textarea id="drw-notes" rows="9" placeholder="Contexto, acuerdos, historial de la conversación…">${esc(contact.notes || '')}</textarea>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="drw-phone">Teléfono</label><input type="text" id="drw-phone" value="${val(contact.phone)}" /></div>
+            <div class="admin-field"><label for="drw-tier">Prioridad</label><select id="drw-tier" class="crm-select">${tierOpts}</select></div>
           </div>
-          <div class="admin-field">
-            <label for="drw-next">Próxima acción</label>
-            <input type="date" id="drw-next" value="${nextVal}" />
-          </div>
+          <div class="admin-field"><label for="drw-website">Sitio web</label><input type="text" id="drw-website" value="${val(contact.website)}" placeholder="https://…" /></div>
+
+          <p class="drawer__section">Seguimiento</p>
+          <div class="admin-field"><label for="drw-stage">Etapa del pipeline</label><select id="drw-stage" class="crm-select">${stageOpts}</select></div>
+          <div class="admin-field"><label for="drw-notes">Notas</label><textarea id="drw-notes" rows="7" placeholder="Contexto, acuerdos, historial de la conversación…">${esc(contact.notes || '')}</textarea></div>
+          <div class="admin-field"><label for="drw-next">Próxima acción</label><input type="date" id="drw-next" value="${nextVal}" /></div>
         </div>
         <footer class="drawer__foot">
-          <button class="btn-ghost" data-act="cancel">Cancelar</button>
-          <button class="btn-primary" data-act="save">Guardar</button>
+          <button class="btn-danger" data-act="archive">${contact.archived ? 'Reactivar' : 'Dar de baja'}</button>
+          <div class="drawer__foot-right">
+            <button class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button class="btn-primary" data-act="save">Guardar</button>
+          </div>
         </footer>
       </aside>`;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('is-open'));
 
-    const notesEl = overlay.querySelector('#drw-notes');
-    const nextEl = overlay.querySelector('#drw-next');
-    const stageEl = overlay.querySelector('#drw-stage');
-
+    const q = (sel) => overlay.querySelector(sel);
     function close() { overlay.classList.remove('is-open'); document.removeEventListener('keydown', onKey); setTimeout(() => overlay.remove(), 240); }
     function onKey(e) { if (e.key === 'Escape') close(); }
+
     async function save() {
-      const notes = notesEl.value.trim();
-      const nextRaw = nextEl.value;
-      const stage = stageEl.value;
-      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify({ notes, nextActionAt: nextRaw || null }) });
+      const stage = q('#drw-stage').value;
+      const payload = {
+        name: q('#drw-name').value.trim(),
+        company: q('#drw-company').value.trim(),
+        sector: q('#drw-sector').value.trim(),
+        location: q('#drw-location').value.trim(),
+        phone: q('#drw-phone').value.trim(),
+        website: q('#drw-website').value.trim(),
+        tier: q('#drw-tier').value || null,
+        notes: q('#drw-notes').value.trim(),
+        nextActionAt: q('#drw-next').value || null,
+      };
+      if (!payload.name) { toast('El nombre es obligatorio', 'error'); return; }
+      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify(payload) });
       if (!res.ok) { toast((res.body && res.body.error) || 'No se pudo guardar', 'error'); return; }
       // La etapa vive en otro endpoint; solo se persiste si cambió.
       if (stage !== contact.stage) {
         const rs = await api(`/api/admin/contacts/${contact.id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) });
         if (rs.ok) contact.stage = stage;
       }
-      contact.notes = notes;
-      contact.nextActionAt = nextRaw || null;
-      toast('Seguimiento guardado');
+      Object.assign(contact, payload);
+      toast('Contacto guardado');
       close();
       renderContacts();
     }
+
+    async function toggleArchive() {
+      const willArchive = !contact.archived;
+      if (willArchive) {
+        const ok = await confirmDialog({
+          title: 'Dar de baja el contacto',
+          message: `Se dará de baja a “${contact.name}”. Se conserva su historial y correos, pero saldrá del pipeline activo. Puedes reactivarlo después.`,
+          confirmText: 'Dar de baja', danger: true,
+        });
+        if (!ok) return;
+      }
+      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify({ archived: willArchive }) });
+      if (!res.ok) { toast((res.body && res.body.error) || 'No se pudo completar', 'error'); return; }
+      contact.archived = willArchive;
+      toast(willArchive ? 'Contacto dado de baja' : 'Contacto reactivado');
+      close();
+      renderContacts();
+    }
+
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) return close();
       const a = e.target.closest('[data-act]');
       if (!a) return;
-      if (a.getAttribute('data-act') === 'save') save(); else close();
+      const act = a.getAttribute('data-act');
+      if (act === 'save') save();
+      else if (act === 'archive') toggleArchive();
+      else close();
     });
     document.addEventListener('keydown', onKey);
-    setTimeout(() => notesEl.focus(), 60);
+    setTimeout(() => q('#drw-name').focus(), 60);
   }
 
   function renderContacts() {
@@ -771,6 +815,12 @@
     const chip = e.target.closest('.chip'); if (!chip) return;
     crmWeb = chip.getAttribute('data-web'); crmLimit = PAGE;
     $('crm-web-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-archived-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmArchived = chip.getAttribute('data-arch'); crmLimit = PAGE;
+    $('crm-archived-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
     renderContacts();
   });
   $('crm-more-btn').addEventListener('click', () => { crmLimit += PAGE; renderContacts(); });

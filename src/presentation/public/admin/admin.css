@@ -973,9 +973,21 @@ a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
 .drawer__close:hover { color: var(--text-strong); background: var(--surface-2); }
 .drawer__body { flex: 1; overflow-y: auto; padding: 22px; }
 .drawer__body .admin-field:last-child { margin-bottom: 0; }
-.drawer__body textarea { min-height: 150px; }
-.drawer__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
+.drawer__body textarea { min-height: 120px; }
+.drawer__section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin: 4px 0 12px; }
+.drawer__section:not(:first-child) { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
+.drawer__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
+.drawer__foot-right { display: flex; gap: 10px; }
 @media (max-width: 560px) { .drawer { max-width: 100%; } }
+
+/* Contactos dados de baja */
+.badge-archived {
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; line-height: 1.6;
+  color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, transparent);
+}
+.contact-card.is-archived { opacity: 0.68; }
+.contact-card.is-archived:hover { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .drawer, .drawer-overlay { transition: none; } }
 
 .copy-row { display: flex; gap: 8px; align-items: center; }
