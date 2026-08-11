@@ -39,3 +39,10 @@ export class InvalidCrmMessageError extends DomainError {
     this.name = 'InvalidCrmMessageError';
   }
 }
+
+export class InvalidCadenceError extends DomainError {
+  constructor(reason: string) {
+    super(`Cadencia inválida: ${reason}`);
+    this.name = 'InvalidCadenceError';
+  }
+}
