@@ -80,6 +80,12 @@ export const env = {
     // Carpeta a la que mover el correo procesado (vacío = solo marcar como leído).
     processedFolder: process.env.HOSTINGER_MAIL_PROCESSED_FOLDER || '',
   },
+  cadence: {
+    // Cada cuántos minutos el scheduler procesa las cadencias de seguimiento
+    // vencidas. 0 (o negativo) desactiva el scheduler en proceso (se puede seguir
+    // disparando manualmente desde el panel con "Procesar ahora").
+    intervalMinutes: Number(process.env.CADENCE_INTERVAL_MINUTES ?? 15),
+  },
 } as const;
 
 const INSECURE_DEFAULTS = {

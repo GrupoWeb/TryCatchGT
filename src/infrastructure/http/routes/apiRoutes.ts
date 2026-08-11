@@ -13,6 +13,7 @@ import { ContactAdminController } from '../controllers/ContactAdminController.js
 import { TemplateAdminController } from '../controllers/TemplateAdminController.js';
 import { CrmMailController } from '../controllers/CrmMailController.js';
 import { HostingerMailWebhookController } from '../controllers/HostingerMailWebhookController.js';
+import { CadenceAdminController } from '../controllers/CadenceAdminController.js';
 import { ServiceAdminController } from '../controllers/ServiceAdminController.js';
 import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
@@ -44,6 +45,11 @@ import { DeleteEmailTemplate } from '../../../application/use-cases/DeleteEmailT
 import { SendContactEmail } from '../../../application/use-cases/SendContactEmail.js';
 import { GetContactMessages } from '../../../application/use-cases/GetContactMessages.js';
 import { ReceiveInboundEmail } from '../../../application/use-cases/ReceiveInboundEmail.js';
+import { SaveCadence } from '../../../application/use-cases/SaveCadence.js';
+import { GetCadences } from '../../../application/use-cases/GetCadences.js';
+import { DeleteCadence } from '../../../application/use-cases/DeleteCadence.js';
+import { EnrollContactInCadence } from '../../../application/use-cases/EnrollContactInCadence.js';
+import { ProcessDueCadences } from '../../../application/use-cases/ProcessDueCadences.js';
 import { GetBlogPosts } from '../../../application/use-cases/GetBlogPosts.js';
 import { GetBlogPostBySlug } from '../../../application/use-cases/GetBlogPostBySlug.js';
 import { SaveBlogPost } from '../../../application/use-cases/SaveBlogPost.js';
@@ -58,6 +64,8 @@ import { TypeOrmProjectRequestRepository } from '../../database/typeorm/TypeOrmP
 import { TypeOrmContactRepository } from '../../database/typeorm/TypeOrmContactRepository.js';
 import { TypeOrmEmailTemplateRepository } from '../../database/typeorm/TypeOrmEmailTemplateRepository.js';
 import { TypeOrmCrmMessageRepository } from '../../database/typeorm/TypeOrmCrmMessageRepository.js';
+import { TypeOrmCadenceRepository } from '../../database/typeorm/TypeOrmCadenceRepository.js';
+import { TypeOrmCadenceRunRepository } from '../../database/typeorm/TypeOrmCadenceRunRepository.js';
 import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPostRepository.js';
 import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
 import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
@@ -78,6 +86,8 @@ const projectRequestRepository = new TypeOrmProjectRequestRepository();
 const contactRepository = new TypeOrmContactRepository();
 const emailTemplateRepository = new TypeOrmEmailTemplateRepository();
 const crmMessageRepository = new TypeOrmCrmMessageRepository();
+const cadenceRepository = new TypeOrmCadenceRepository();
+const cadenceRunRepository = new TypeOrmCadenceRunRepository();
 const blogRepository = new TypeOrmBlogPostRepository();
 const userRepository = new TypeOrmUserRepository();
 const siteConfigRepository = new TypeOrmSiteConfigRepository();
@@ -133,20 +143,40 @@ const templateAdminController = new TemplateAdminController(
   new SaveEmailTemplate(emailTemplateRepository, htmlSanitizer),
   new DeleteEmailTemplate(emailTemplateRepository),
 );
+// Envío de correo a un contacto: lo comparten el panel (CrmMailController) y el
+// scheduler de cadencias (ProcessDueCadences).
+const sendContactEmail = new SendContactEmail(
+  contactRepository,
+  emailTemplateRepository,
+  crmMessageRepository,
+  emailService,
+  htmlSanitizer,
+);
 const crmMailController = new CrmMailController(
-  new SendContactEmail(
-    contactRepository,
-    emailTemplateRepository,
-    crmMessageRepository,
-    emailService,
-    htmlSanitizer,
-  ),
+  sendContactEmail,
   new GetContactMessages(crmMessageRepository),
 );
 const hostingerMailWebhookController = new HostingerMailWebhookController(
-  new ReceiveInboundEmail(contactRepository, crmMessageRepository, htmlSanitizer),
+  // Con el repo de cadencias, una respuesta entrante corta el seguimiento activo.
+  new ReceiveInboundEmail(contactRepository, crmMessageRepository, htmlSanitizer, cadenceRunRepository),
   siteConfigRepository,
   inboundMailGateway,
+);
+
+// Procesa las cadencias vencidas; se exporta para el scheduler de server.ts.
+export const processDueCadences = new ProcessDueCadences(
+  cadenceRunRepository,
+  cadenceRepository,
+  sendContactEmail,
+);
+const cadenceAdminController = new CadenceAdminController(
+  cadenceRepository,
+  cadenceRunRepository,
+  new GetCadences(cadenceRepository),
+  new SaveCadence(cadenceRepository),
+  new DeleteCadence(cadenceRepository),
+  new EnrollContactInCadence(contactRepository, cadenceRepository, cadenceRunRepository),
+  processDueCadences,
 );
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
@@ -265,12 +295,24 @@ apiRouter.put('/admin/contacts/:id', requireAuth, contactAdminController.update)
 apiRouter.get('/admin/contacts/:id/messages', requireAuth, crmMailController.listMessages);
 apiRouter.post('/admin/contacts/:id/email', requireAuth, formLimiter, crmMailController.sendEmail);
 
+// CRM · Cadencias de seguimiento (inscripción/estado por contacto)
+apiRouter.get('/admin/contacts/:id/cadences', requireAuth, cadenceAdminController.contactRuns);
+apiRouter.post('/admin/contacts/:id/enroll', requireAuth, cadenceAdminController.enrollContact);
+
 // CRM · Plantillas de correo
 apiRouter.get('/admin/templates', requireAuth, templateAdminController.list);
 apiRouter.get('/admin/templates/:id', requireAuth, templateAdminController.getById);
 apiRouter.post('/admin/templates', requireAuth, templateAdminController.create);
 apiRouter.put('/admin/templates/:id', requireAuth, templateAdminController.update);
 apiRouter.delete('/admin/templates/:id', requireAuth, templateAdminController.remove);
+
+// CRM · Cadencias (CRUD + disparo manual del procesamiento)
+apiRouter.get('/admin/cadences', requireAuth, cadenceAdminController.list);
+apiRouter.post('/admin/cadences/process', requireAuth, cadenceAdminController.process);
+apiRouter.get('/admin/cadences/:id', requireAuth, cadenceAdminController.getById);
+apiRouter.post('/admin/cadences', requireAuth, cadenceAdminController.create);
+apiRouter.put('/admin/cadences/:id', requireAuth, cadenceAdminController.update);
+apiRouter.delete('/admin/cadences/:id', requireAuth, cadenceAdminController.remove);
 
 // Servicios
 apiRouter.get('/admin/services', requireAuth, serviceAdminController.list);

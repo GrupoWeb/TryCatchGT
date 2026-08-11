@@ -265,7 +265,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -867,6 +867,71 @@
     }
   });
 
+  // ── CADENCIAS DE SEGUIMIENTO ──────────────────────────────
+  let cadTemplates = [];
+  function tplSelectOptions(selectedId) {
+    const opts = ['<option value="">— Elige plantilla —</option>'];
+    let found = false;
+    for (const t of cadTemplates) {
+      const sel = String(t.id) === String(selectedId) ? ' selected' : '';
+      if (sel) found = true;
+      opts.push(`<option value="${t.id}"${sel}>${esc(t.name)}</option>`);
+    }
+    // Plantilla referenciada pero ya borrada: se conserva su id para no perderla.
+    if (selectedId && !found) opts.push(`<option value="${esc(selectedId)}" selected>#${esc(selectedId)} (borrada)</option>`);
+    return opts.join('');
+  }
+  function addStepRow(step) {
+    const row = document.createElement('div');
+    row.className = 'cad-step';
+    row.innerHTML = `
+      <label class="cad-step__delay">Espera <input type="number" min="0" class="cad-step-delay" value="${Number(step && step.delayDays) || 0}" /> día(s)</label>
+      <select class="cad-step-tpl">${tplSelectOptions(step && step.templateId)}</select>
+      <button type="button" class="btn-danger cad-step-del" title="Quitar paso">✕</button>`;
+    row.querySelector('.cad-step-del').addEventListener('click', () => row.remove());
+    $('cad-steps').appendChild(row);
+  }
+  const cad = makeCrud({
+    path: '/api/admin/cadences', listEl: 'cad-list', editorEl: $('cad-editor'), emptyEl: $('cad-empty'),
+    deleteBtn: $('cad-delete'), errorEl: $('cad-error'), entityName: 'Cadencia',
+    blank: { isActive: true, steps: [] },
+    renderItem: (c) => `<div class="admin-item" data-id="${c.id}"><div class="admin-item__title">${esc(c.name)}</div><div class="admin-item__meta"><span class="badge-status ${c.isActive ? 'published' : 'draft'}">${c.isActive ? 'Activa' : 'Inactiva'}</span><span>${(c.steps || []).length} paso(s)</span></div></div>`,
+    toForm: (c) => {
+      $('cad-id').value = c.id || '';
+      $('cad-name').value = c.name || '';
+      $('cad-active').checked = c.isActive !== false;
+      $('cad-steps').innerHTML = '';
+      const steps = (c.steps && c.steps.length) ? c.steps : [{ delayDays: 0, templateId: '' }];
+      steps.forEach(addStepRow);
+    },
+    fromForm: () => ({
+      name: $('cad-name').value.trim(),
+      isActive: $('cad-active').checked,
+      steps: Array.from($('cad-steps').querySelectorAll('.cad-step')).map((row) => ({
+        delayDays: Number(row.querySelector('.cad-step-delay').value) || 0,
+        templateId: Number(row.querySelector('.cad-step-tpl').value) || 0,
+      })),
+    }),
+  });
+  async function loadCadences() {
+    // Las plantillas alimentan los selectores de cada paso.
+    const tr = await api('/api/admin/templates');
+    if (!guard(tr)) return;
+    cadTemplates = (tr.ok && tr.body.data) || [];
+    cad.load();
+  }
+  $('cad-new').addEventListener('click', cad.create);
+  $('cad-save').addEventListener('click', cad.save);
+  $('cad-cancel').addEventListener('click', cad.close);
+  $('cad-delete').addEventListener('click', cad.remove);
+  $('cad-add-step').addEventListener('click', () => addStepRow({ delayDays: 0, templateId: '' }));
+  $('cad-process').addEventListener('click', async () => {
+    const r = await api('/api/admin/cadences/process', { method: 'POST' });
+    if (!guard(r)) return;
+    if (r.ok) { const d = r.body.data; toast(`Procesadas ${d.processed} · ${d.sent} enviadas · ${d.completed} completadas`); }
+    else toast((r.body && r.body.error) || 'No se pudo procesar.', 'error');
+  });
+
   // Cache de plantillas para el compositor de correo (se refresca al abrirlo).
   let mailTemplates = [];
 
@@ -902,15 +967,27 @@
       </details>`;
   }
 
-  // Compositor de correo + historial de un contacto (modal).
+  const RUN_STATUS = { active: 'En curso', completed: 'Completada', stopped: 'Detenida' };
+
+  // Compositor de correo + historial + cadencias de un contacto (modal).
   async function openMailComposer(contact) {
-    const [tplRes, msgRes] = await Promise.all([
+    const [tplRes, msgRes, cadRes, runRes] = await Promise.all([
       api('/api/admin/templates'),
       api(`/api/admin/contacts/${contact.id}/messages`),
+      api('/api/admin/cadences'),
+      api(`/api/admin/contacts/${contact.id}/cadences`),
     ]);
     if (!guard(tplRes) || !guard(msgRes)) return;
     mailTemplates = (tplRes.ok && tplRes.body.data) || [];
     const messages = (msgRes.ok && msgRes.body.data) || [];
+    const cadences = ((cadRes.ok && cadRes.body.data) || []).filter((c) => c.isActive);
+    let runs = (runRes.ok && runRes.body.data) || [];
+    const cadName = (id) => { const c = ((cadRes.ok && cadRes.body.data) || []).find((x) => String(x.id) === String(id)); return c ? c.name : `#${id}`; };
+    const renderRuns = (list) => list.length
+      ? list.map((r) => `<li>${esc(cadName(r.cadenceId))} — <span class="badge-status ${r.status === 'active' ? 'published' : 'draft'}">${esc(RUN_STATUS[r.status] || r.status)}</span> <span class="admin-hint">paso ${r.currentStep}</span></li>`).join('')
+      : '<li class="admin-muted">Sin cadencias.</li>';
+    const cadOptions = ['<option value="">— Elige cadencia —</option>']
+      .concat(cadences.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`)).join('');
 
     const tplOptions = ['<option value="">— Escribir a mano —</option>']
       .concat(mailTemplates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`))
@@ -933,7 +1010,13 @@
           <button class="btn-ghost" data-act="cancel">Cerrar</button>
           <button class="btn-primary" data-act="send">Enviar</button>
         </div>
-        <h4 class="mail-history__title">Historial (${messages.length})</h4>
+        <h4 class="mail-history__title">Cadencias de seguimiento</h4>
+        <ul class="mail-runs" id="mail-runs">${renderRuns(runs)}</ul>
+        <div class="mail-enroll">
+          <select class="modal__input" id="mail-cadence">${cadOptions}</select>
+          <button class="btn-ghost" data-act="enroll"${cadences.length ? '' : ' disabled'}>Inscribir</button>
+        </div>
+        <h4 class="mail-history__title" id="mail-history-title">Historial (${messages.length})</h4>
         <div class="mail-history" id="mail-history">${messages.length ? messages.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>'}</div>
       </div>`;
     document.body.appendChild(overlay);
@@ -962,6 +1045,21 @@
       const a = e.target.closest('[data-act]');
       if (!a) return;
       if (a.getAttribute('data-act') === 'cancel') return close();
+      if (a.getAttribute('data-act') === 'enroll') {
+        errEl.textContent = '';
+        const cadenceId = overlay.querySelector('#mail-cadence').value;
+        if (!cadenceId) { errEl.textContent = 'Elige una cadencia.'; return; }
+        a.disabled = true;
+        const er = await api(`/api/admin/contacts/${contact.id}/enroll`, { method: 'POST', body: JSON.stringify({ cadenceId: Number(cadenceId) }) });
+        a.disabled = false;
+        if (!er.ok) { errEl.textContent = (er.body && er.body.error) || 'No se pudo inscribir.'; return; }
+        toast('Contacto inscrito en la cadencia');
+        const fr = await api(`/api/admin/contacts/${contact.id}/cadences`);
+        runs = (fr.ok && fr.body.data) || [];
+        overlay.querySelector('#mail-runs').innerHTML = renderRuns(runs);
+        overlay.querySelector('#mail-cadence').value = '';
+        return;
+      }
       // Enviar
       errEl.textContent = '';
       if (!subjEl.value.trim() || !bodyEl.innerHTML.trim()) { errEl.textContent = 'El asunto y el mensaje son obligatorios.'; return; }
@@ -989,7 +1087,7 @@
       const fresh = await api(`/api/admin/contacts/${contact.id}/messages`);
       const list = (fresh.ok && fresh.body.data) || [];
       overlay.querySelector('#mail-history').innerHTML = list.length ? list.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>';
-      overlay.querySelector('.mail-history__title').textContent = `Historial (${list.length})`;
+      overlay.querySelector('#mail-history-title').textContent = `Historial (${list.length})`;
       subjEl.value = ''; bodyEl.innerHTML = ''; selEl.value = ''; refreshPreview();
     });
   }

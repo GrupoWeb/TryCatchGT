@@ -129,4 +129,23 @@ describe('ReceiveInboundEmail', () => {
     const uc = new ReceiveInboundEmail(contactRepo(), messageRepo(), passthrough);
     await expect(uc.execute({ fromEmail: '  ' })).rejects.toBeInstanceOf(InvalidCrmMessageError);
   });
+
+  it('corta las cadencias activas del contacto al recibir respuesta', async () => {
+    const stopActiveByContact = vi.fn(async () => 2);
+    const cadenceRuns = {
+      save: async (r: any) => r,
+      findDue: async () => [],
+      findByContact: async () => [],
+      findActive: async () => null,
+      stopActiveByContact,
+    };
+    const uc = new ReceiveInboundEmail(
+      contactRepo({ findByEmail: async () => new Contact({ id: 1, name: 'A', email: 'a@x.com', stage: 'contactado' }) }),
+      messageRepo(),
+      passthrough,
+      cadenceRuns,
+    );
+    await uc.execute({ fromEmail: 'a@x.com', subject: 'Re' });
+    expect(stopActiveByContact).toHaveBeenCalledWith(1);
+  });
 });
