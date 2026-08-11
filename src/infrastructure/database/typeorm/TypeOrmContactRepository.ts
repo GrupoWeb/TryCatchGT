@@ -24,6 +24,7 @@ function toDomain(e: ContactEntity): Contact {
     ownerId: e.ownerId,
     notes: e.notes ?? undefined,
     nextActionAt: e.nextActionAt,
+    archived: e.archived,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
   });
@@ -49,6 +50,7 @@ export class TypeOrmContactRepository implements ContactRepository {
       ownerId: contact.ownerId,
       notes: contact.notes || null,
       nextActionAt: contact.nextActionAt,
+      archived: contact.archived,
     });
     const saved = await this.repo.save(entity);
     return toDomain(saved);
@@ -57,6 +59,7 @@ export class TypeOrmContactRepository implements ContactRepository {
   public async findAll(filters: ContactFilters = {}): Promise<Contact[]> {
     const qb = this.repo.createQueryBuilder('c');
 
+    if (!filters.includeArchived) qb.andWhere('c.archived = :archived', { archived: false });
     if (filters.stage) qb.andWhere('c.stage = :stage', { stage: filters.stage });
     if (filters.tier) qb.andWhere('c.tier = :tier', { tier: filters.tier });
     if (filters.sector) qb.andWhere('c.sector = :sector', { sector: filters.sector });
@@ -111,6 +114,7 @@ export class TypeOrmContactRepository implements ContactRepository {
     if (patch.tier !== undefined) set.tier = patch.tier;
     if (patch.notes !== undefined) set.notes = patch.notes || null;
     if (patch.nextActionAt !== undefined) set.nextActionAt = patch.nextActionAt;
+    if (patch.archived !== undefined) set.archived = patch.archived;
     if (Object.keys(set).length === 0) return false;
     const result = await this.repo.update({ id }, set);
     return (result.affected ?? 0) > 0;
@@ -121,6 +125,7 @@ export class TypeOrmContactRepository implements ContactRepository {
       .createQueryBuilder('c')
       .select('c.stage', 'stage')
       .addSelect('COUNT(*)', 'count')
+      .where('c.archived = :archived', { archived: false })
       .groupBy('c.stage')
       .getRawMany<{ stage: string; count: string }>();
     const out: Record<string, number> = {};

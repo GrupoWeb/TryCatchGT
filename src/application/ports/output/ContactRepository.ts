@@ -6,6 +6,8 @@ export interface ContactFilters {
   sector?: string;
   hasWebsite?: boolean;
   search?: string;
+  /** Por defecto se excluyen los dados de baja; true los incluye. */
+  includeArchived?: boolean;
 }
 
 /** Campos que el CRM puede editar de un contacto (parche parcial). */
@@ -19,6 +21,7 @@ export interface ContactPatch {
   tier?: ContactTier | null;
   notes?: string;
   nextActionAt?: Date | null;
+  archived?: boolean;
 }
 
 export interface ContactRepository {
