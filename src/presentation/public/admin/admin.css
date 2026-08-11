@@ -303,6 +303,14 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 
 /* Split lista + editor */
 .admin-split { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
+
+/* Paneles de ajustes en dos columnas (Contacto, Perfil, Usuarios). */
+.panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; margin-top: 20px; }
+.panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); padding: 22px; }
+.panel__title { font-size: 15px; font-weight: 700; color: var(--text-strong); margin-bottom: 6px; }
+.panel > .admin-muted { margin-bottom: 16px; }
+.panel .admin__editor-actions { margin-top: 4px; }
+@media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
 /* Listas de entidades (blog, servicios, planes, plantillas, cadencias) como
    rejilla de tarjetas; la edición ocurre en un drawer lateral. */
 .admin__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }

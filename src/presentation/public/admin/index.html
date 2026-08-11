@@ -498,57 +498,69 @@
         <!-- CONTACTO -->
         <section class="admin-sec" id="sec-contact" hidden>
           <h2 class="admin-sec__title">Contacto del sitio</h2>
-          <p class="admin-muted">Estos datos aparecen en el footer y el botón de WhatsApp de todo el sitio.</p>
-          <form class="admin__editor admin__editor--narrow" id="contact-form">
-            <div class="admin-field"><label for="c-email">Correo de contacto</label><input type="email" id="c-email" /></div>
-            <div class="admin-field"><label for="c-wa">WhatsApp <span class="admin-hint">(solo dígitos, con código de país)</span></label><input type="text" id="c-wa" placeholder="50255555555" /></div>
-            <div class="admin-field"><label for="c-msg">Mensaje predefinido de WhatsApp</label><textarea id="c-msg" rows="2"></textarea></div>
-            <p class="admin-error" id="contact-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Protección de formularios (Cloudflare Turnstile)</h3>
-          <p class="admin-muted">Anti-bots para el formulario de cotización y el login. Crea un widget en el panel de Cloudflare Turnstile y pega aquí las llaves.</p>
-          <form class="admin__editor admin__editor--narrow" id="turnstile-form">
-            <label class="admin-check"><input type="checkbox" id="ts-enabled" /> Activar protección Turnstile</label>
-            <div class="admin-field"><label for="ts-site">Site key (pública)</label><input type="text" id="ts-site" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
-            <div class="admin-field"><label for="ts-secret">Secret key <span class="admin-hint">(privada, se guarda en el servidor)</span></label><input type="password" id="ts-secret" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
-            <p class="admin-error" id="turnstile-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Correo saliente (SMTP)</h3>
-          <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
-          <form class="admin__editor admin__editor--narrow" id="smtp-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
-              <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+          <p class="admin-muted">Ajustes globales del sitio y de la mensajería. Cada panel se guarda por separado.</p>
+          <div class="panel-grid">
+            <div class="panel">
+              <h3 class="panel__title">Datos de contacto</h3>
+              <p class="admin-muted">Aparecen en el footer y el botón de WhatsApp de todo el sitio.</p>
+              <form id="contact-form">
+                <div class="admin-field"><label for="c-email">Correo de contacto</label><input type="email" id="c-email" /></div>
+                <div class="admin-field"><label for="c-wa">WhatsApp <span class="admin-hint">(solo dígitos, con código de país)</span></label><input type="text" id="c-wa" placeholder="50255555555" /></div>
+                <div class="admin-field"><label for="c-msg">Mensaje predefinido de WhatsApp</label><textarea id="c-msg" rows="2"></textarea></div>
+                <p class="admin-error" id="contact-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
+              </form>
             </div>
-            <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
-            <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
-            <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
-            <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
-            <p class="admin-error" id="smtp-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
-          </form>
 
-          <h3 class="admin-sec__subtitle">Correo entrante (CRM)</h3>
-          <p class="admin-muted">Recibe respuestas de los clientes en el timeline del CRM vía el webhook de Hostinger Agentic Mail. Registra en hPanel el webhook <code>message.received</code> apuntando a la URL de abajo y define un secreto compartido aquí.</p>
-          <form class="admin__editor admin__editor--narrow" id="mailhook-form">
-            <div class="admin-field">
-              <label for="mailhook-url">URL del webhook <span class="admin-hint">(pégala en hPanel)</span></label>
-              <div class="copy-row"><input type="text" id="mailhook-url" readonly /><button type="button" class="btn-ghost" id="mailhook-copy">Copiar</button></div>
+            <div class="panel">
+              <h3 class="panel__title">Protección de formularios (Cloudflare Turnstile)</h3>
+              <p class="admin-muted">Anti-bots para el formulario de cotización y el login. Crea un widget en el panel de Cloudflare Turnstile y pega aquí las llaves.</p>
+              <form id="turnstile-form">
+                <label class="admin-check"><input type="checkbox" id="ts-enabled" /> Activar protección Turnstile</label>
+                <div class="admin-field"><label for="ts-site">Site key (pública)</label><input type="text" id="ts-site" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+                <div class="admin-field"><label for="ts-secret">Secret key <span class="admin-hint">(privada, se guarda en el servidor)</span></label><input type="password" id="ts-secret" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+                <p class="admin-error" id="turnstile-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
+              </form>
             </div>
-            <div class="admin-field"><label for="mailhook-secret">Secreto compartido <span class="admin-hint">(privado, se guarda en el servidor)</span></label><input type="password" id="mailhook-secret" placeholder="Genera una cadena larga y aleatoria" autocomplete="off" /></div>
-            <p class="admin-hint">Hostinger debe enviarlo en el header <code>X-Webhook-Secret</code> o como <code>?token=</code> en la URL.</p>
-            <div class="admin-field"><label for="mailhook-apitoken">Token del API de Agentic Mail <span class="admin-hint">(opcional; marca el correo como leído tras procesarlo)</span></label><input type="password" id="mailhook-apitoken" placeholder="Bearer token del API" autocomplete="off" /></div>
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="mailhook-apibase">URL base del API <span class="admin-hint">(ajusta si el proveedor cambia el endpoint)</span></label><input type="text" id="mailhook-apibase" placeholder="https://api.mail.hostinger.com" autocomplete="off" /></div>
-              <div class="admin-field"><label for="mailhook-apifolder">Carpeta de procesados <span class="admin-hint">(vacío = solo marcar leído)</span></label><input type="text" id="mailhook-apifolder" placeholder="Procesados" autocomplete="off" /></div>
+
+            <div class="panel">
+              <h3 class="panel__title">Correo saliente (SMTP)</h3>
+              <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
+              <form id="smtp-form">
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
+                  <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+                </div>
+                <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
+                <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
+                <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
+                <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
+                <p class="admin-error" id="smtp-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
+              </form>
             </div>
-            <p class="admin-error" id="mailhook-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mailhook-save">Guardar</button></div>
-          </form>
+
+            <div class="panel">
+              <h3 class="panel__title">Correo entrante (CRM)</h3>
+              <p class="admin-muted">Recibe respuestas de los clientes en el timeline del CRM vía el webhook de Hostinger Agentic Mail. Registra en hPanel el webhook <code>message.received</code> apuntando a la URL de abajo y define un secreto compartido aquí.</p>
+              <form id="mailhook-form">
+                <div class="admin-field">
+                  <label for="mailhook-url">URL del webhook <span class="admin-hint">(pégala en hPanel)</span></label>
+                  <div class="copy-row"><input type="text" id="mailhook-url" readonly /><button type="button" class="btn-ghost" id="mailhook-copy">Copiar</button></div>
+                </div>
+                <div class="admin-field"><label for="mailhook-secret">Secreto compartido <span class="admin-hint">(privado, se guarda en el servidor)</span></label><input type="password" id="mailhook-secret" placeholder="Genera una cadena larga y aleatoria" autocomplete="off" /></div>
+                <p class="admin-hint">Hostinger debe enviarlo en el header <code>X-Webhook-Secret</code> o como <code>?token=</code> en la URL.</p>
+                <div class="admin-field"><label for="mailhook-apitoken">Token del API de Agentic Mail <span class="admin-hint">(opcional; marca el correo como leído tras procesarlo)</span></label><input type="password" id="mailhook-apitoken" placeholder="Bearer token del API" autocomplete="off" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="mailhook-apibase">URL base del API <span class="admin-hint">(ajusta si el proveedor cambia el endpoint)</span></label><input type="text" id="mailhook-apibase" placeholder="https://api.mail.hostinger.com" autocomplete="off" /></div>
+                  <div class="admin-field"><label for="mailhook-apifolder">Carpeta de procesados <span class="admin-hint">(vacío = solo marcar leído)</span></label><input type="text" id="mailhook-apifolder" placeholder="Procesados" autocomplete="off" /></div>
+                </div>
+                <p class="admin-error" id="mailhook-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mailhook-save">Guardar</button></div>
+              </form>
+            </div>
+          </div>
         </section>
 
         <!-- PERFIL -->
@@ -568,41 +580,50 @@
             </div>
           </div>
 
-          <form class="admin__editor admin__editor--narrow" id="profile-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
-              <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
+          <div class="panel-grid">
+            <div class="panel">
+              <h3 class="panel__title">Datos del perfil</h3>
+              <form id="profile-form">
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
+                  <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
+                  <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-role">Rol <span class="admin-hint">(lo asigna un administrador)</span></label><input type="text" id="p-role" readonly /></div>
+                  <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
+                </div>
+                <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
+                <p class="admin-error" id="profile-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
+              </form>
             </div>
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
-              <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+
+            <div class="panel">
+              <h3 class="panel__title">Contraseña</h3>
+              <form id="pass-form">
+                <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
+                <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
+                <p class="admin-error" id="pass-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
+              </form>
             </div>
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-role">Rol <span class="admin-hint">(lo asigna un administrador)</span></label><input type="text" id="p-role" readonly /></div>
-              <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
+
+            <div class="panel">
+              <h3 class="panel__title">Sesiones activas</h3>
+              <div id="sessions-panel">
+                <p class="admin-muted">Dispositivos donde tu cuenta tiene sesión abierta.</p>
+                <div class="users-list" id="sessions-list"></div>
+                <div class="admin__editor-actions" style="margin-top:12px"><button type="button" class="btn-ghost" id="sessions-revoke-btn">Cerrar las demás sesiones</button></div>
+              </div>
             </div>
-            <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
-            <p class="admin-error" id="profile-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
-          </form>
 
-          <h3 class="admin-sec__subtitle">Contraseña</h3>
-          <form class="admin__editor admin__editor--narrow" id="pass-form">
-            <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
-            <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
-            <p class="admin-error" id="pass-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Sesiones activas</h3>
-          <div class="admin__editor admin__editor--narrow" id="sessions-panel">
-            <p class="admin-muted">Dispositivos donde tu cuenta tiene sesión abierta.</p>
-            <div class="users-list" id="sessions-list"></div>
-            <div class="admin__editor-actions" style="margin-top:12px"><button type="button" class="btn-ghost" id="sessions-revoke-btn">Cerrar las demás sesiones</button></div>
-          </div>
-
-          <h3 class="admin-sec__subtitle">Autenticación en dos pasos (2FA)</h3>
-          <div class="admin__editor admin__editor--narrow" id="mfa-panel">
+            <div class="panel">
+              <h3 class="panel__title">Autenticación en dos pasos (2FA)</h3>
+              <div id="mfa-panel">
             <div id="mfa-off" hidden>
               <p class="admin-muted">Añade una capa extra de seguridad. Necesitarás una app como Google Authenticator, Authy o 1Password.</p>
               <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mfa-setup-btn">Activar 2FA</button></div>
@@ -638,25 +659,34 @@
                 <button type="button" class="btn-primary" id="mfa-backup-done">Ya los guardé</button>
               </div>
             </div>
+              </div>
+            </div>
           </div>
-
         </section>
 
         <!-- USUARIOS (solo admin) -->
         <section class="admin-sec" id="sec-users" hidden>
           <h2 class="admin-sec__title">Usuarios</h2>
           <p class="admin-muted">Gestiona las cuentas del equipo: crea, edita, activa/desactiva, restablece contraseñas y restaura usuarios.</p>
-          <div class="users-list" id="users-list"></div>
-          <form class="admin__editor admin__editor--narrow" id="user-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
-              <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
+          <div class="panel-grid">
+            <div class="panel">
+              <h3 class="panel__title">Cuentas del equipo</h3>
+              <div class="users-list" id="users-list"></div>
             </div>
-            <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
-            <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
-            <p class="admin-error" id="user-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
-          </form>
+            <div class="panel">
+              <h3 class="panel__title">Invitar usuario</h3>
+              <form id="user-form">
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
+                  <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
+                </div>
+                <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
+                <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
+                <p class="admin-error" id="user-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
+              </form>
+            </div>
+          </div>
         </section>
 
         <!-- LEGAL (solo admin) -->
