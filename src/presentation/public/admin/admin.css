@@ -876,6 +876,16 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   color: var(--text-strong); border: 1px solid var(--border-strong); font-size: 14px; cursor: pointer;
 }
 .crm-select option { color: var(--text-strong); background: var(--surface); }
+/* Lista de contactos en cuadrícula responsiva (2–3 columnas según el ancho).
+   align-items:start evita que las tarjetas se estiren a la altura de la fila. */
+#crm-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  align-items: start;
+  gap: 16px;
+  max-width: none;
+}
+
 /* Tarjeta de contacto: cabecera alineada, meta densa y pie con acciones. */
 .contact-card { padding: 18px 20px; }
 .contact-card__head { display: flex; align-items: flex-start; gap: 14px; }
