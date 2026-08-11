@@ -305,7 +305,11 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .admin-split { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
 /* Listas de entidades (blog, servicios, planes, plantillas, cadencias) como
    rejilla de tarjetas; la edición ocurre en un drawer lateral. */
-.admin__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
+.admin__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+/* En pantallas angostas las tarjetas pasan a una sola columna. */
+@media (max-width: 760px) {
+  #crm-list, #leads-list, .admin__list { grid-template-columns: 1fr; }
+}
 .admin__editor--narrow { max-width: 520px; }
 
 /* ============================================================
@@ -884,7 +888,7 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 #crm-list,
 #leads-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: 16px;
   max-width: none;
