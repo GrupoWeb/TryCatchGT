@@ -138,6 +138,12 @@
   const dashboardView = $('dashboard-view');
   const forceView = $('force-pass-view');
 
+  // Los drawers de las secciones (blog, servicios, planes, plantillas, cadencias)
+  // vienen estáticos dentro del contenido; se reubican al <body> para que el overlay
+  // fijo cubra toda la pantalla —incluida la barra superior— igual que los drawers
+  // dinámicos del CRM/usuarios. Anidados en el flujo, la barra sticky tapaba su encabezado.
+  document.querySelectorAll('#dashboard-view .drawer-overlay').forEach((ov) => document.body.appendChild(ov));
+
   function showLogin() { loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true; showLoginStep('password'); }
   function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; applyRoleGate(currentUserRole); showSection('home'); loadOverview(); }
 
