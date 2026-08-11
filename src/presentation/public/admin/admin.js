@@ -265,7 +265,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -441,6 +441,186 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast(`Exportadas ${rows.length} cotización(es)`);
   }
+
+  // ── CLIENTES / CRM ────────────────────────────────────────
+  const CRM_STAGES = {
+    nuevo: 'Nuevo', contactado: 'Contactado', respondio: 'Respondió', reunion: 'Reunión',
+    propuesta: 'Propuesta', ganado: 'Ganado', perdido: 'Perdido', dormido: 'Dormido',
+  };
+  const CRM_TIERS = { alta: 'Alta', media: 'Media', base: 'Base' };
+  let allContacts = [];
+  let crmQuery = '', crmTier = 'all', crmWeb = 'all', crmStage = 'all', crmLimit = PAGE;
+
+  async function loadCrm() {
+    const r = await api('/api/admin/contacts');
+    if (!guard(r)) return;
+    if (!r.ok) { $('crm-list').innerHTML = '<p class="admin-muted">No se pudieron cargar los contactos.</p>'; return; }
+    allContacts = r.body.data || [];
+    crmLimit = PAGE;
+    renderContacts();
+  }
+
+  function filteredContacts() {
+    const q = crmQuery.trim().toLowerCase();
+    return allContacts.filter((c) => {
+      if (crmTier !== 'all' && c.tier !== crmTier) return false;
+      if (crmStage !== 'all' && c.stage !== crmStage) return false;
+      const hasWeb = !!(c.website && c.website.trim());
+      if (crmWeb === 'si' && !hasWeb) return false;
+      if (crmWeb === 'no' && hasWeb) return false;
+      if (!q) return true;
+      return [c.name, c.email, c.company, c.sector, c.location]
+        .some((f) => String(f || '').toLowerCase().includes(q));
+    });
+  }
+
+  function contactCard(c) {
+    const stageOpts = Object.entries(CRM_STAGES)
+      .map(([k, v]) => `<option value="${k}" ${k === c.stage ? 'selected' : ''}>${v}</option>`)
+      .join('');
+    const tierBadge = c.tier ? `<span class="crm-tier crm-tier--${c.tier}">${CRM_TIERS[c.tier]}</span>` : '';
+    const webTag = (c.website && c.website.trim())
+      ? `<a class="lead-tag" href="${esc(c.website)}" target="_blank" rel="noopener"><span aria-hidden="true">🔗</span> ${esc(c.website.replace(/^https?:\/\//, ''))}</a>`
+      : '<span class="lead-tag lead-tag--warn"><span aria-hidden="true">🚫</span> Sin sitio</span>';
+    const nextVal = c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '';
+    return `
+      <article class="lead-card contact-card" data-id="${c.id}">
+        <div class="lead-card__top">
+          <div class="lead-card__avatar" style="--c:${leadColor(c.name)}">${esc(leadInitials(c.name))}</div>
+          <div class="lead-card__id">
+            <div class="lead-card__name">${esc(c.name)}${tierBadge}${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}</div>
+            <a class="lead-card__email" href="mailto:${esc(c.email)}"><span aria-hidden="true">✉</span> ${esc(c.email)}</a>
+          </div>
+          <select class="lead-card__status crm-stage" data-id="${c.id}" aria-label="Etapa del pipeline">${stageOpts}</select>
+        </div>
+        <div class="lead-card__tags">
+          ${c.sector ? `<span class="lead-tag"><span aria-hidden="true">🏷️</span> ${esc(c.sector)}</span>` : ''}
+          ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
+          ${webTag}
+        </div>
+        <div class="crm-card__actions">
+          <button class="btn-ghost crm-mail-btn" data-id="${c.id}">✉️ Enviar correo</button>
+        </div>
+        <details class="crm-followup">
+          <summary>Notas y seguimiento</summary>
+          <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
+          <div class="crm-followup__row">
+            <div class="admin-field"><label for="cn-next-${c.id}">Próxima acción</label><input type="date" id="cn-next-${c.id}" class="crm-next" value="${nextVal}" /></div>
+            <button class="btn-primary crm-save" data-id="${c.id}">Guardar</button>
+          </div>
+        </details>
+      </article>`;
+  }
+
+  function renderContacts() {
+    const cont = $('crm-list');
+    if (!allContacts.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay contactos.</p>'; $('crm-count').textContent = ''; $('crm-more').hidden = true; return; }
+    const all = filteredContacts();
+    $('crm-count').textContent = `${all.length} contacto(s)`;
+    if (!all.length) { cont.innerHTML = '<p class="admin-muted">Ninguno coincide con el filtro.</p>'; $('crm-more').hidden = true; return; }
+    cont.innerHTML = all.slice(0, crmLimit).map(contactCard).join('');
+    $('crm-more').hidden = all.length <= crmLimit;
+
+    cont.querySelectorAll('.crm-stage').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const id = sel.getAttribute('data-id');
+        const res = await api(`/api/admin/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: sel.value }) });
+        if (res.ok) {
+          const c = allContacts.find((x) => String(x.id) === id);
+          if (c) c.stage = sel.value;
+          toast('Etapa actualizada');
+        } else toast('No se pudo actualizar la etapa', 'error');
+      });
+    });
+    cont.querySelectorAll('.crm-save').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const notes = cont.querySelector(`#cn-notes-${id}`).value.trim();
+        const nextRaw = cont.querySelector(`#cn-next-${id}`).value;
+        const res = await api(`/api/admin/contacts/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ notes, nextActionAt: nextRaw || null }),
+        });
+        if (res.ok) {
+          const c = allContacts.find((x) => String(x.id) === id);
+          if (c) { c.notes = notes; c.nextActionAt = nextRaw || null; }
+          toast('Contacto guardado');
+        } else toast((res.body && res.body.error) || 'No se pudo guardar', 'error');
+      });
+    });
+    cont.querySelectorAll('.crm-mail-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = allContacts.find((x) => String(x.id) === btn.getAttribute('data-id'));
+        if (c) openMailComposer(c);
+      });
+    });
+  }
+
+  $('crm-search').addEventListener('input', (e) => { crmQuery = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-stage-filter').addEventListener('change', (e) => { crmStage = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-tier-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmTier = chip.getAttribute('data-tier'); crmLimit = PAGE;
+    $('crm-tier-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-web-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmWeb = chip.getAttribute('data-web'); crmLimit = PAGE;
+    $('crm-web-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-more-btn').addEventListener('click', () => { crmLimit += PAGE; renderContacts(); });
+
+  // Nuevo contacto
+  $('crm-new-toggle').addEventListener('click', () => { const f = $('crm-new-form'); f.hidden = !f.hidden; if (!f.hidden) $('cn-name').focus(); });
+  $('crm-new-cancel').addEventListener('click', () => { $('crm-new-form').hidden = true; $('crm-new-form').reset(); });
+  $('crm-new-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: $('cn-name').value.trim(),
+      email: $('cn-email').value.trim(),
+      company: $('cn-company').value.trim(),
+      phone: $('cn-phone').value.trim(),
+      sector: $('cn-sector').value.trim(),
+      location: $('cn-location').value.trim(),
+      website: $('cn-website').value.trim(),
+      tier: $('cn-tier').value || null,
+    };
+    if (!payload.name || !payload.email) { toast('Nombre y correo son obligatorios', 'error'); return; }
+    const res = await api('/api/admin/contacts', { method: 'POST', body: JSON.stringify(payload) });
+    if (res.ok) {
+      toast('Contacto creado');
+      $('crm-new-form').reset(); $('crm-new-form').hidden = true;
+      loadCrm();
+    } else toast((res.body && res.body.error) || 'No se pudo crear el contacto', 'error');
+  });
+
+  $('crm-export').addEventListener('click', () => {
+    const rows = filteredContacts();
+    if (!rows.length) { toast('No hay contactos para exportar', 'error'); return; }
+    const headers = ['ID', 'Nombre', 'Correo', 'Empresa', 'Sector', 'Ubicación', 'Sitio web', 'Prioridad', 'Etapa', 'Próxima acción', 'Notas'];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [headers.map(cell).join(',')];
+    for (const c of rows) {
+      lines.push([
+        c.id, c.name, c.email, c.company, c.sector, c.location, c.website,
+        CRM_TIERS[c.tier] || '', CRM_STAGES[c.stage] || c.stage,
+        c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '', c.notes,
+      ].map(cell).join(','));
+    }
+    const csv = '﻿' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Exportados ${rows.length} contacto(s)`);
+  });
 
   // ── Editor genérico (lista + formulario) ──────────────────
   function makeCrud(cfg) {
@@ -660,6 +840,160 @@
   $('plan-cancel').addEventListener('click', plans.close);
   $('plan-delete').addEventListener('click', plans.remove);
 
+  // ── PLANTILLAS DE CORREO ──────────────────────────────────
+  const TPL_SEGMENTS = { all: 'Todos', alta: 'Prioridad alta', media: 'Prioridad media', base: 'Prioridad base', 'sin-web': 'Sin sitio web' };
+  const tplEditor = makeRichEditor($('rt-tpl-area'), $('rt-tpl-toolbar'));
+  const tpl = makeCrud({
+    path: '/api/admin/templates', listEl: 'tpl-list', editorEl: $('tpl-editor'), emptyEl: $('tpl-empty'),
+    deleteBtn: $('tpl-delete'), errorEl: $('tpl-error'), entityName: 'Plantilla',
+    blank: { segment: 'all' },
+    renderItem: (t) => `<div class="admin-item" data-id="${t.id}"><div class="admin-item__title">${esc(t.name)}</div><div class="admin-item__meta"><span class="badge-status published">${esc(TPL_SEGMENTS[t.segment] || t.segment)}</span><span>${esc(t.subject)}</span></div></div>`,
+    toForm: (t) => { $('tpl-id').value = t.id || ''; $('tpl-name').value = t.name || ''; $('tpl-subject').value = t.subject || ''; $('tpl-segment').value = t.segment || 'all'; tplEditor.set(t.bodyHtml || ''); },
+    fromForm: () => ({ name: $('tpl-name').value.trim(), subject: $('tpl-subject').value.trim(), segment: $('tpl-segment').value, bodyHtml: tplEditor.get() }),
+  });
+  function loadTemplates() { tpl.load(); }
+  $('tpl-new').addEventListener('click', tpl.create);
+  $('tpl-save').addEventListener('click', tpl.save);
+  $('tpl-cancel').addEventListener('click', tpl.close);
+  $('tpl-delete').addEventListener('click', tpl.remove);
+  // Inserta la variable en el cuerpo (en el punto del cursor) o en el asunto.
+  $('tpl-vars').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-var]');
+    if (!btn) return;
+    const token = `{${btn.getAttribute('data-var')}}`;
+    $('rt-tpl-area').focus();
+    if (!document.execCommand('insertText', false, token)) {
+      $('rt-tpl-area').innerHTML += token; // fallback navegadores sin execCommand
+    }
+  });
+
+  // Cache de plantillas para el compositor de correo (se refresca al abrirlo).
+  let mailTemplates = [];
+
+  // Sustitución de variables en cliente (espejo de domain/services/renderTemplate),
+  // solo para la vista previa. El envío real lo renderiza el servidor.
+  function varVals(c) {
+    return { nombre: c.name || '', empresa: c.company || c.name || '', sector: c.sector || '', ubicacion: c.location || '', sitio: c.website || '' };
+  }
+  function fillSubject(text, c) {
+    const v = varVals(c);
+    return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
+  }
+  function fillBody(html, c) {
+    const v = varVals(c);
+    return String(html || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
+  }
+
+  const MSG_STATUS = { sent: 'Enviado', failed: 'Falló', received: 'Recibido', read: 'Leído' };
+
+  function messageItem(m) {
+    const when = m.createdAt ? new Date(m.createdAt).toLocaleString('es-GT') : '—';
+    const dirIcon = m.direction === 'out' ? '↑' : '↓';
+    const okStatus = m.status === 'sent' || m.status === 'received' || m.status === 'read';
+    return `
+      <details class="mail-msg mail-msg--${esc(m.direction)}">
+        <summary>
+          <span class="mail-msg__dir">${dirIcon}</span>
+          <span class="mail-msg__subject">${esc(m.subject)}</span>
+          <span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(MSG_STATUS[m.status] || m.status)}</span>
+          <span class="mail-msg__date">${esc(when)}</span>
+        </summary>
+        <div class="mail-msg__body">${m.bodyHtml || '<em>(sin contenido)</em>'}</div>
+      </details>`;
+  }
+
+  // Compositor de correo + historial de un contacto (modal).
+  async function openMailComposer(contact) {
+    const [tplRes, msgRes] = await Promise.all([
+      api('/api/admin/templates'),
+      api(`/api/admin/contacts/${contact.id}/messages`),
+    ]);
+    if (!guard(tplRes) || !guard(msgRes)) return;
+    mailTemplates = (tplRes.ok && tplRes.body.data) || [];
+    const messages = (msgRes.ok && msgRes.body.data) || [];
+
+    const tplOptions = ['<option value="">— Escribir a mano —</option>']
+      .concat(mailTemplates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`))
+      .join('');
+    const advanceDefault = contact.stage === 'nuevo' ? 'checked' : '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal modal--wide" role="dialog" aria-modal="true" aria-label="Enviar correo">
+        <h3 class="modal__title">Enviar correo a ${esc(contact.name)}</h3>
+        <p class="mail-to">Para: <strong>${esc(contact.email)}</strong></p>
+        <div class="admin-field"><label>Plantilla</label><select class="modal__input" id="mail-tpl">${tplOptions}</select></div>
+        <div class="admin-field"><label>Asunto *</label><input class="modal__input" id="mail-subject" type="text" placeholder="Asunto del correo" /></div>
+        <div class="admin-field"><label>Mensaje *</label><div class="mail-body" id="mail-body" contenteditable="true" data-placeholder="Escribe el mensaje…"></div></div>
+        <label class="mail-advance"><input type="checkbox" id="mail-advance" ${advanceDefault} /> Avanzar a "Contactado" al enviar</label>
+        <details class="mail-preview"><summary>Vista previa (con los datos del contacto)</summary><div class="mail-preview__box"><p class="mail-preview__subject" id="mail-prev-subject"></p><div id="mail-prev-body"></div></div></details>
+        <p class="admin-error" id="mail-error"></p>
+        <div class="modal__actions">
+          <button class="btn-ghost" data-act="cancel">Cerrar</button>
+          <button class="btn-primary" data-act="send">Enviar</button>
+        </div>
+        <h4 class="mail-history__title">Historial (${messages.length})</h4>
+        <div class="mail-history" id="mail-history">${messages.length ? messages.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>'}</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+
+    const selEl = overlay.querySelector('#mail-tpl');
+    const subjEl = overlay.querySelector('#mail-subject');
+    const bodyEl = overlay.querySelector('#mail-body');
+    const errEl = overlay.querySelector('#mail-error');
+
+    function refreshPreview() {
+      overlay.querySelector('#mail-prev-subject').textContent = fillSubject(subjEl.value, contact) || '(sin asunto)';
+      overlay.querySelector('#mail-prev-body').innerHTML = fillBody(bodyEl.innerHTML, contact);
+    }
+    selEl.addEventListener('change', () => {
+      const t = mailTemplates.find((x) => String(x.id) === selEl.value);
+      if (t) { subjEl.value = t.subject; bodyEl.innerHTML = t.bodyHtml; }
+      refreshPreview();
+    });
+    subjEl.addEventListener('input', refreshPreview);
+    bodyEl.addEventListener('input', refreshPreview);
+
+    function close() { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); }
+    overlay.addEventListener('click', async (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.getAttribute('data-act') === 'cancel') return close();
+      // Enviar
+      errEl.textContent = '';
+      if (!subjEl.value.trim() || !bodyEl.innerHTML.trim()) { errEl.textContent = 'El asunto y el mensaje son obligatorios.'; return; }
+      a.disabled = true;
+      const res = await api(`/api/admin/contacts/${contact.id}/email`, {
+        method: 'POST',
+        body: JSON.stringify({
+          templateId: selEl.value || null,
+          subject: subjEl.value.trim(),
+          bodyHtml: bodyEl.innerHTML,
+          advanceStage: overlay.querySelector('#mail-advance').checked,
+        }),
+      });
+      a.disabled = false;
+      if (!res.ok) { errEl.textContent = (res.body && res.body.error) || 'No se pudo enviar.'; return; }
+      const sent = res.body && res.body.sent;
+      if (sent === false) toast('Registrado, pero SMTP no está configurado: el correo no salió.', 'error');
+      else toast('Correo enviado');
+      // Refresca el historial y, si se avanzó, la etapa local.
+      if (sent && overlay.querySelector('#mail-advance').checked && contact.stage === 'nuevo') {
+        contact.stage = 'contactado';
+        const card = document.querySelector(`.contact-card[data-id="${contact.id}"] .crm-stage`);
+        if (card) card.value = 'contactado';
+      }
+      const fresh = await api(`/api/admin/contacts/${contact.id}/messages`);
+      const list = (fresh.ok && fresh.body.data) || [];
+      overlay.querySelector('#mail-history').innerHTML = list.length ? list.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>';
+      overlay.querySelector('.mail-history__title').textContent = `Historial (${list.length})`;
+      subjEl.value = ''; bodyEl.innerHTML = ''; selEl.value = ''; refreshPreview();
+    });
+  }
+
   // ── CONTACTO ──────────────────────────────────────────────
   async function loadContact() {
     const r = await api('/api/admin/config');
@@ -681,6 +1015,9 @@
     $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
     $('smtp-from').value = d.smtpFrom || '';
     $('smtp-secure').checked = !!d.smtpSecure;
+    $('mailhook-url').value = d.mailWebhookUrl || '';
+    $('mailhook-secret').value = '';
+    $('mailhook-secret').placeholder = d.mailWebhookConfigured ? '•••••••• (ya configurado)' : 'Genera una cadena larga y aleatoria';
   }
   $('smtp-save').addEventListener('click', async () => {
     $('smtp-error').textContent = '';
@@ -696,6 +1033,17 @@
     $('turnstile-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ turnstileEnabled: $('ts-enabled').checked, turnstileSiteKey: $('ts-site').value.trim(), turnstileSecretKey: $('ts-secret').value.trim() }) });
     if (r.ok) toast('Protección actualizada'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('turnstile-error').textContent = m; toast(m, 'error'); }
+  });
+  $('mailhook-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('mailhook-url').value); toast('URL copiada'); }
+    catch (_) { $('mailhook-url').select(); toast('Selecciona y copia la URL', 'error'); }
+  });
+  $('mailhook-save').addEventListener('click', async () => {
+    $('mailhook-error').textContent = '';
+    const secret = $('mailhook-secret').value.trim();
+    if (!secret) { const m = 'Escribe un secreto para guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); return; }
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ mailWebhookSecret: secret }) });
+    if (r.ok) { toast('Correo entrante actualizado'); loadContact(); } else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); }
   });
 
   // ── PERFIL ────────────────────────────────────────────────
