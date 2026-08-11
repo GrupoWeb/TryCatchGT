@@ -9,6 +9,7 @@ import { BlogController } from '../controllers/BlogController.js';
 import { AdminBlogController } from '../controllers/AdminBlogController.js';
 import { AuthController } from '../controllers/AuthController.js';
 import { LeadAdminController } from '../controllers/LeadAdminController.js';
+import { ContactAdminController } from '../controllers/ContactAdminController.js';
 import { ServiceAdminController } from '../controllers/ServiceAdminController.js';
 import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
@@ -31,6 +32,9 @@ import { AppDataSource } from '../../database/typeorm/data-source.js';
 import { GetServices } from '../../../application/use-cases/GetServices.js';
 import { GetPlans } from '../../../application/use-cases/GetPlans.js';
 import { CreateProjectRequest } from '../../../application/use-cases/CreateProjectRequest.js';
+import { ListContacts } from '../../../application/use-cases/ListContacts.js';
+import { CreateContact } from '../../../application/use-cases/CreateContact.js';
+import { UpdateContact } from '../../../application/use-cases/UpdateContact.js';
 import { GetBlogPosts } from '../../../application/use-cases/GetBlogPosts.js';
 import { GetBlogPostBySlug } from '../../../application/use-cases/GetBlogPostBySlug.js';
 import { SaveBlogPost } from '../../../application/use-cases/SaveBlogPost.js';
@@ -42,6 +46,7 @@ import { EnsureAdminUser } from '../../../application/use-cases/EnsureAdminUser.
 import { TypeOrmServiceRepository } from '../../database/typeorm/TypeOrmServiceRepository.js';
 import { TypeOrmPlanRepository } from '../../database/typeorm/TypeOrmPlanRepository.js';
 import { TypeOrmProjectRequestRepository } from '../../database/typeorm/TypeOrmProjectRequestRepository.js';
+import { TypeOrmContactRepository } from '../../database/typeorm/TypeOrmContactRepository.js';
 import { TypeOrmBlogPostRepository } from '../../database/typeorm/TypeOrmBlogPostRepository.js';
 import { TypeOrmUserRepository } from '../../database/typeorm/TypeOrmUserRepository.js';
 import { TypeOrmSiteConfigRepository } from '../../database/typeorm/TypeOrmSiteConfigRepository.js';
@@ -58,6 +63,7 @@ import { EmailService } from '../../email/EmailService.js';
 const serviceRepository = new TypeOrmServiceRepository();
 const planRepository = new TypeOrmPlanRepository();
 const projectRequestRepository = new TypeOrmProjectRequestRepository();
+const contactRepository = new TypeOrmContactRepository();
 const blogRepository = new TypeOrmBlogPostRepository();
 const userRepository = new TypeOrmUserRepository();
 const siteConfigRepository = new TypeOrmSiteConfigRepository();
@@ -99,6 +105,12 @@ const adminBlogController = new AdminBlogController(
   blogRepository,
 );
 const leadAdminController = new LeadAdminController(projectRequestRepository);
+const contactAdminController = new ContactAdminController(
+  contactRepository,
+  new ListContacts(contactRepository),
+  new CreateContact(contactRepository),
+  new UpdateContact(contactRepository),
+);
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
@@ -197,6 +209,14 @@ apiRouter.delete('/admin/posts/:id', requireAuth, adminBlogController.remove);
 // Cotizaciones / Leads
 apiRouter.get('/admin/leads', requireAuth, leadAdminController.list);
 apiRouter.patch('/admin/leads/:id/status', requireAuth, leadAdminController.updateStatus);
+
+// CRM · Clientes/prospectos
+apiRouter.get('/admin/contacts', requireAuth, contactAdminController.list);
+apiRouter.get('/admin/contacts/stats', requireAuth, contactAdminController.stats);
+apiRouter.get('/admin/contacts/:id', requireAuth, contactAdminController.getById);
+apiRouter.post('/admin/contacts', requireAuth, contactAdminController.create);
+apiRouter.patch('/admin/contacts/:id/stage', requireAuth, contactAdminController.updateStage);
+apiRouter.put('/admin/contacts/:id', requireAuth, contactAdminController.update);
 
 // Servicios
 apiRouter.get('/admin/services', requireAuth, serviceAdminController.list);

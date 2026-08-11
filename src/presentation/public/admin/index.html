@@ -106,6 +106,7 @@
       <aside class="admin__nav" id="admin-nav">
         <button class="admin__nav-btn is-active" data-section="home">🏠 Inicio</button>
         <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
+        <button class="admin__nav-btn" data-section="crm">📇 Clientes</button>
         <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
         <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
         <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
@@ -141,6 +142,66 @@
           <p class="admin-muted" id="leads-count"></p>
           <div class="leads-list" id="leads-list"><p class="admin-muted">Cargando…</p></div>
           <div class="leads-more" id="leads-more" hidden><button class="btn-ghost" id="leads-more-btn">Ver más</button></div>
+        </section>
+
+        <!-- CLIENTES / CRM -->
+        <section class="admin-sec" id="sec-crm" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Clientes</h2>
+            <div class="crm-head-actions">
+              <button class="btn-ghost" id="crm-new-toggle">+ Nuevo contacto</button>
+              <button class="btn-ghost" id="crm-export">⬇ Exportar CSV</button>
+            </div>
+          </div>
+
+          <form class="crm-new-form" id="crm-new-form" hidden>
+            <div class="admin-field"><label for="cn-name">Nombre *</label><input type="text" id="cn-name" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-email">Correo *</label><input type="email" id="cn-email" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-company">Empresa</label><input type="text" id="cn-company" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-phone">Teléfono</label><input type="text" id="cn-phone" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-sector">Sector</label><input type="text" id="cn-sector" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-location">Ubicación</label><input type="text" id="cn-location" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-website">Sitio web</label><input type="text" id="cn-website" autocomplete="off" /></div>
+            <div class="admin-field">
+              <label for="cn-tier">Prioridad</label>
+              <select id="cn-tier"><option value="">— Sin prioridad —</option><option value="alta">Alta</option><option value="media">Media</option><option value="base">Base</option></select>
+            </div>
+            <div class="crm-new-form__actions">
+              <button type="submit" class="btn-primary">Guardar contacto</button>
+              <button type="button" class="btn-ghost" id="crm-new-cancel">Cancelar</button>
+            </div>
+          </form>
+
+          <div class="leads-toolbar">
+            <input type="text" id="crm-search" class="leads-search" placeholder="Buscar por nombre, correo, empresa, sector…" autocomplete="off" />
+            <select id="crm-stage-filter" class="crm-select" aria-label="Filtrar por etapa">
+              <option value="all">Toda etapa</option>
+              <option value="nuevo">Nuevo</option>
+              <option value="contactado">Contactado</option>
+              <option value="respondio">Respondió</option>
+              <option value="reunion">Reunión</option>
+              <option value="propuesta">Propuesta</option>
+              <option value="ganado">Ganado</option>
+              <option value="perdido">Perdido</option>
+              <option value="dormido">Dormido</option>
+            </select>
+          </div>
+          <div class="leads-toolbar">
+            <div class="leads-filter" id="crm-tier-filter">
+              <button class="chip is-active" data-tier="all">Toda prioridad</button>
+              <button class="chip" data-tier="alta">Alta</button>
+              <button class="chip" data-tier="media">Media</button>
+              <button class="chip" data-tier="base">Base</button>
+            </div>
+            <div class="leads-filter" id="crm-web-filter">
+              <button class="chip is-active" data-web="all">Web: todas</button>
+              <button class="chip" data-web="no">Sin sitio</button>
+              <button class="chip" data-web="si">Con sitio</button>
+            </div>
+          </div>
+          <p class="admin-muted" id="crm-count"></p>
+          <div class="leads-list" id="crm-list"><p class="admin-muted">Cargando…</p></div>
+          <div class="leads-more" id="crm-more" hidden><button class="btn-ghost" id="crm-more-btn">Ver más</button></div>
         </section>
 
         <!-- BLOG -->

@@ -696,3 +696,34 @@ body { min-height: 100vh; }
   .tc-loader__spinner { animation-duration: 1.6s; }
   .tc-loader__label { animation: none; opacity: 1; }
 }
+
+/* ── CLIENTES / CRM ─────────────────────────────────────────── */
+.crm-head-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.crm-new-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 18px;
+  padding: 18px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+}
+.crm-new-form__actions { grid-column: 1 / -1; display: flex; gap: 10px; margin-top: 4px; }
+.crm-select {
+  padding: 10px 12px; border-radius: 10px; background: var(--surface);
+  color: var(--text); border: 1px solid var(--border-strong); font-size: 14px; cursor: pointer;
+}
+.crm-select option { color: var(--text); background: #16161a; }
+.contact-card .lead-card__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.crm-tier {
+  font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 999px; line-height: 1.6;
+}
+.crm-tier--alta { background: rgba(16, 185, 129, 0.16); color: #34d399; }
+.crm-tier--media { background: rgba(245, 158, 11, 0.16); color: #fbbf24; }
+.crm-tier--base { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+.lead-tag--warn { background: rgba(16, 185, 129, 0.12); color: #34d399; }
+a.lead-tag { text-decoration: none; }
+a.lead-tag:hover { color: var(--text); }
+.crm-followup { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
+.crm-followup summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.crm-followup summary:hover { color: var(--text); }
+.crm-followup[open] summary { margin-bottom: 12px; }
+.crm-followup__row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.crm-followup__row .admin-field { margin-bottom: 0; flex: 1 1 180px; }
+.crm-notes { width: 100%; }

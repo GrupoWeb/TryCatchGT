@@ -265,7 +265,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -441,6 +441,177 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast(`Exportadas ${rows.length} cotización(es)`);
   }
+
+  // ── CLIENTES / CRM ────────────────────────────────────────
+  const CRM_STAGES = {
+    nuevo: 'Nuevo', contactado: 'Contactado', respondio: 'Respondió', reunion: 'Reunión',
+    propuesta: 'Propuesta', ganado: 'Ganado', perdido: 'Perdido', dormido: 'Dormido',
+  };
+  const CRM_TIERS = { alta: 'Alta', media: 'Media', base: 'Base' };
+  let allContacts = [];
+  let crmQuery = '', crmTier = 'all', crmWeb = 'all', crmStage = 'all', crmLimit = PAGE;
+
+  async function loadCrm() {
+    const r = await api('/api/admin/contacts');
+    if (!guard(r)) return;
+    if (!r.ok) { $('crm-list').innerHTML = '<p class="admin-muted">No se pudieron cargar los contactos.</p>'; return; }
+    allContacts = r.body.data || [];
+    crmLimit = PAGE;
+    renderContacts();
+  }
+
+  function filteredContacts() {
+    const q = crmQuery.trim().toLowerCase();
+    return allContacts.filter((c) => {
+      if (crmTier !== 'all' && c.tier !== crmTier) return false;
+      if (crmStage !== 'all' && c.stage !== crmStage) return false;
+      const hasWeb = !!(c.website && c.website.trim());
+      if (crmWeb === 'si' && !hasWeb) return false;
+      if (crmWeb === 'no' && hasWeb) return false;
+      if (!q) return true;
+      return [c.name, c.email, c.company, c.sector, c.location]
+        .some((f) => String(f || '').toLowerCase().includes(q));
+    });
+  }
+
+  function contactCard(c) {
+    const stageOpts = Object.entries(CRM_STAGES)
+      .map(([k, v]) => `<option value="${k}" ${k === c.stage ? 'selected' : ''}>${v}</option>`)
+      .join('');
+    const tierBadge = c.tier ? `<span class="crm-tier crm-tier--${c.tier}">${CRM_TIERS[c.tier]}</span>` : '';
+    const webTag = (c.website && c.website.trim())
+      ? `<a class="lead-tag" href="${esc(c.website)}" target="_blank" rel="noopener"><span aria-hidden="true">🔗</span> ${esc(c.website.replace(/^https?:\/\//, ''))}</a>`
+      : '<span class="lead-tag lead-tag--warn"><span aria-hidden="true">🚫</span> Sin sitio</span>';
+    const nextVal = c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '';
+    return `
+      <article class="lead-card contact-card" data-id="${c.id}">
+        <div class="lead-card__top">
+          <div class="lead-card__avatar" style="--c:${leadColor(c.name)}">${esc(leadInitials(c.name))}</div>
+          <div class="lead-card__id">
+            <div class="lead-card__name">${esc(c.name)}${tierBadge}${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}</div>
+            <a class="lead-card__email" href="mailto:${esc(c.email)}"><span aria-hidden="true">✉</span> ${esc(c.email)}</a>
+          </div>
+          <select class="lead-card__status crm-stage" data-id="${c.id}" aria-label="Etapa del pipeline">${stageOpts}</select>
+        </div>
+        <div class="lead-card__tags">
+          ${c.sector ? `<span class="lead-tag"><span aria-hidden="true">🏷️</span> ${esc(c.sector)}</span>` : ''}
+          ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
+          ${webTag}
+        </div>
+        <details class="crm-followup">
+          <summary>Notas y seguimiento</summary>
+          <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
+          <div class="crm-followup__row">
+            <div class="admin-field"><label for="cn-next-${c.id}">Próxima acción</label><input type="date" id="cn-next-${c.id}" class="crm-next" value="${nextVal}" /></div>
+            <button class="btn-primary crm-save" data-id="${c.id}">Guardar</button>
+          </div>
+        </details>
+      </article>`;
+  }
+
+  function renderContacts() {
+    const cont = $('crm-list');
+    if (!allContacts.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay contactos.</p>'; $('crm-count').textContent = ''; $('crm-more').hidden = true; return; }
+    const all = filteredContacts();
+    $('crm-count').textContent = `${all.length} contacto(s)`;
+    if (!all.length) { cont.innerHTML = '<p class="admin-muted">Ninguno coincide con el filtro.</p>'; $('crm-more').hidden = true; return; }
+    cont.innerHTML = all.slice(0, crmLimit).map(contactCard).join('');
+    $('crm-more').hidden = all.length <= crmLimit;
+
+    cont.querySelectorAll('.crm-stage').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const id = sel.getAttribute('data-id');
+        const res = await api(`/api/admin/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: sel.value }) });
+        if (res.ok) {
+          const c = allContacts.find((x) => String(x.id) === id);
+          if (c) c.stage = sel.value;
+          toast('Etapa actualizada');
+        } else toast('No se pudo actualizar la etapa', 'error');
+      });
+    });
+    cont.querySelectorAll('.crm-save').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const notes = cont.querySelector(`#cn-notes-${id}`).value.trim();
+        const nextRaw = cont.querySelector(`#cn-next-${id}`).value;
+        const res = await api(`/api/admin/contacts/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ notes, nextActionAt: nextRaw || null }),
+        });
+        if (res.ok) {
+          const c = allContacts.find((x) => String(x.id) === id);
+          if (c) { c.notes = notes; c.nextActionAt = nextRaw || null; }
+          toast('Contacto guardado');
+        } else toast((res.body && res.body.error) || 'No se pudo guardar', 'error');
+      });
+    });
+  }
+
+  $('crm-search').addEventListener('input', (e) => { crmQuery = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-stage-filter').addEventListener('change', (e) => { crmStage = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-tier-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmTier = chip.getAttribute('data-tier'); crmLimit = PAGE;
+    $('crm-tier-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-web-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmWeb = chip.getAttribute('data-web'); crmLimit = PAGE;
+    $('crm-web-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-more-btn').addEventListener('click', () => { crmLimit += PAGE; renderContacts(); });
+
+  // Nuevo contacto
+  $('crm-new-toggle').addEventListener('click', () => { const f = $('crm-new-form'); f.hidden = !f.hidden; if (!f.hidden) $('cn-name').focus(); });
+  $('crm-new-cancel').addEventListener('click', () => { $('crm-new-form').hidden = true; $('crm-new-form').reset(); });
+  $('crm-new-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: $('cn-name').value.trim(),
+      email: $('cn-email').value.trim(),
+      company: $('cn-company').value.trim(),
+      phone: $('cn-phone').value.trim(),
+      sector: $('cn-sector').value.trim(),
+      location: $('cn-location').value.trim(),
+      website: $('cn-website').value.trim(),
+      tier: $('cn-tier').value || null,
+    };
+    if (!payload.name || !payload.email) { toast('Nombre y correo son obligatorios', 'error'); return; }
+    const res = await api('/api/admin/contacts', { method: 'POST', body: JSON.stringify(payload) });
+    if (res.ok) {
+      toast('Contacto creado');
+      $('crm-new-form').reset(); $('crm-new-form').hidden = true;
+      loadCrm();
+    } else toast((res.body && res.body.error) || 'No se pudo crear el contacto', 'error');
+  });
+
+  $('crm-export').addEventListener('click', () => {
+    const rows = filteredContacts();
+    if (!rows.length) { toast('No hay contactos para exportar', 'error'); return; }
+    const headers = ['ID', 'Nombre', 'Correo', 'Empresa', 'Sector', 'Ubicación', 'Sitio web', 'Prioridad', 'Etapa', 'Próxima acción', 'Notas'];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [headers.map(cell).join(',')];
+    for (const c of rows) {
+      lines.push([
+        c.id, c.name, c.email, c.company, c.sector, c.location, c.website,
+        CRM_TIERS[c.tier] || '', CRM_STAGES[c.stage] || c.stage,
+        c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '', c.notes,
+      ].map(cell).join(','));
+    }
+    const csv = '﻿' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Exportados ${rows.length} contacto(s)`);
+  });
 
   // ── Editor genérico (lista + formulario) ──────────────────
   function makeCrud(cfg) {

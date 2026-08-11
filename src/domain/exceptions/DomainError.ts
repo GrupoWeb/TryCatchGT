@@ -18,3 +18,10 @@ export class InvalidProjectRequestError extends DomainError {
     this.name = 'InvalidProjectRequestError';
   }
 }
+
+export class InvalidContactError extends DomainError {
+  constructor(reason: string) {
+    super(`Contacto inválido: ${reason}`);
+    this.name = 'InvalidContactError';
+  }
+}
