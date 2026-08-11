@@ -69,6 +69,7 @@ import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
+import { HostingerAgenticMailClient } from '../../email/HostingerAgenticMailClient.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
 const serviceRepository = new TypeOrmServiceRepository();
@@ -88,6 +89,8 @@ const passwordHasher = new BcryptPasswordHasher();
 const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
 const emailService = new EmailService(siteConfigRepository);
+// Cliente del API de Agentic Mail para acusar recibo de los correos entrantes.
+const inboundMailGateway = new HostingerAgenticMailClient(siteConfigRepository);
 
 // Autenticación con validación de versión + sesión por dispositivo.
 const requireAuth = createRequireAuth(userRepository, userSessionRepository);
@@ -143,6 +146,7 @@ const crmMailController = new CrmMailController(
 const hostingerMailWebhookController = new HostingerMailWebhookController(
   new ReceiveInboundEmail(contactRepository, crmMessageRepository, htmlSanitizer),
   siteConfigRepository,
+  inboundMailGateway,
 );
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);

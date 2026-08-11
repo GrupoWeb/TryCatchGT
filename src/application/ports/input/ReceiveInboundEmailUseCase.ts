@@ -10,6 +10,10 @@ export interface InboundEmail {
   inReplyTo?: string | null;
   threadId?: string | null;
   receivedAt?: Date | null;
+  // Id interno del proveedor (Agentic Mail) para acusar recibo vía su API REST
+  // (marcar leído/mover). Distinto del Message-ID RFC (`messageId`). No lo usa el
+  // dominio: lo consume el webhook controller tras registrar el correo.
+  providerId?: string | null;
 }
 
 export interface ReceiveInboundEmailResult {

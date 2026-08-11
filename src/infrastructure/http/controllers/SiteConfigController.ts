@@ -16,6 +16,7 @@ interface ResolvedConfig {
   smtpFrom: string;
   smtpSecure: boolean;
   mailWebhookSecret: string;
+  mailApiToken: string;
 }
 
 export class SiteConfigController {
@@ -38,6 +39,7 @@ export class SiteConfigController {
       smtpFrom: stored.smtpFrom || '',
       smtpSecure: stored.smtpSecure === 'true',
       mailWebhookSecret: stored.mailWebhookSecret || '',
+      mailApiToken: stored.mailApiToken || '',
     };
   }
 
@@ -77,6 +79,8 @@ export class SiteConfigController {
       // la URL se muestra para pegarla en hPanel al registrar el webhook.
       mailWebhookConfigured: c.mailWebhookSecret.length > 0,
       mailWebhookUrl: `${env.appUrl}/api/webhooks/hostinger-mail`,
+      // Token del API de Agentic Mail (acuse de recibo). Enmascarado.
+      mailApiConfigured: c.mailApiToken.length > 0,
     };
   }
 
@@ -106,6 +110,8 @@ export class SiteConfigController {
     if (b.smtpSecure !== undefined) values.smtpSecure = b.smtpSecure ? 'true' : 'false';
     // Secreto del webhook de correo entrante: solo se reescribe si llega no vacío.
     if (b.mailWebhookSecret !== undefined && String(b.mailWebhookSecret).trim() !== '') values.mailWebhookSecret = String(b.mailWebhookSecret).trim();
+    // Token del API de Agentic Mail (acuse de recibo): idem, secreto.
+    if (b.mailApiToken !== undefined && String(b.mailApiToken).trim() !== '') values.mailApiToken = String(b.mailApiToken).trim();
     await this.repo.setMany(values);
     res.status(200).json({ success: true, data: this.adminView(await this.resolved()) });
   };

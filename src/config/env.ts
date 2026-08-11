@@ -71,6 +71,15 @@ export const env = {
     // Orígenes permitidos para CORS (coma-separados). Vacío = solo mismo origen.
     corsOrigins: (process.env.CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean),
   },
+  // API REST de Hostinger Agentic Mail: se usa para acusar recibo de los correos
+  // entrantes (marcar leído / mover) tras procesarlos en el webhook. El token va
+  // en el panel (site_config). La URL base y la carpeta destino se ajustan por env
+  // para poder alinearse al contrato real del proveedor sin tocar código.
+  mailApi: {
+    baseUrl: (process.env.HOSTINGER_MAIL_API_BASE || 'https://api.mail.hostinger.com').replace(/\/+$/, ''),
+    // Carpeta a la que mover el correo procesado (vacío = solo marcar como leído).
+    processedFolder: process.env.HOSTINGER_MAIL_PROCESSED_FOLDER || '',
+  },
 } as const;
 
 const INSECURE_DEFAULTS = {
