@@ -379,7 +379,7 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 }
 .chip:hover { color: var(--text-strong); border-color: var(--primary); }
 .chip.is-active { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
-.leads-more { max-width: 820px; text-align: center; margin-top: 16px; }
+.leads-more { text-align: center; margin-top: 16px; }
 
 .leads-list { display: flex; flex-direction: column; gap: 14px; max-width: 820px; }
 .lead-card {
@@ -876,9 +876,11 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   color: var(--text-strong); border: 1px solid var(--border-strong); font-size: 14px; cursor: pointer;
 }
 .crm-select option { color: var(--text-strong); background: var(--surface); }
-/* Lista de contactos en cuadrícula responsiva (2–3 columnas según el ancho).
-   align-items:start evita que las tarjetas se estiren a la altura de la fila. */
-#crm-list {
+/* Listas de tarjetas en cuadrícula responsiva (2–3 columnas según el ancho).
+   align-items:start evita que las tarjetas se estiren a la altura de la fila.
+   Aplica a Clientes (CRM) y Cotizaciones, que comparten el componente .lead-card. */
+#crm-list,
+#leads-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   align-items: start;
