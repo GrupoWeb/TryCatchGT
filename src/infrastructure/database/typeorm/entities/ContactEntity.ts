@@ -59,6 +59,12 @@ export class ContactEntity {
   @Column({ name: 'next_action_at', type: 'datetime', nullable: true })
   nextActionAt!: Date | null;
 
+  // Baja lógica: se conserva el registro (histórico, correos enlazados) pero se
+  // excluye del pipeline activo salvo que se pida explícitamente.
+  @Index()
+  @Column({ type: 'boolean', default: false })
+  archived!: boolean;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

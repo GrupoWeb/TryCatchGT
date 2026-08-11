@@ -27,6 +27,7 @@ function toView(c: Contact) {
     stage: c.stage,
     notes: c.notes,
     nextActionAt: c.nextActionAt,
+    archived: c.archived,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
@@ -44,6 +45,7 @@ function parseFilters(q: Request['query']): ContactFilters {
   if (q.hasWebsite === 'true') f.hasWebsite = true;
   if (q.hasWebsite === 'false') f.hasWebsite = false;
   if (typeof q.search === 'string' && q.search.trim()) f.search = q.search.trim();
+  if (q.includeArchived === 'true') f.includeArchived = true;
   return f;
 }
 
@@ -132,6 +134,7 @@ export class ContactAdminController {
       tier: b.tier,
       notes: b.notes,
       nextActionAt,
+      archived: typeof b.archived === 'boolean' ? b.archived : undefined,
     });
     if (!ok) {
       res.status(404).json({ success: false, error: 'Contacto no encontrado o sin cambios.' });

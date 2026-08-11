@@ -11,6 +11,12 @@ describe('Contact', () => {
     expect(c.tier).toBeNull();
     expect(c.source).toBe('manual');
     expect(c.ownerId).toBeNull();
+    expect(c.archived).toBe(false);
+  });
+
+  it('respeta la baja lógica cuando se indica', () => {
+    const c = new Contact({ name: 'X', email: 'a@b.com', archived: true });
+    expect(c.archived).toBe(true);
   });
 
   it('exige nombre', () => {

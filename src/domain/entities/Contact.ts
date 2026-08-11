@@ -37,6 +37,7 @@ export interface ContactProps {
   ownerId?: number | null;
   notes?: string;
   nextActionAt?: Date | null;
+  archived?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -61,6 +62,8 @@ export class Contact {
   public readonly ownerId: number | null;
   public readonly notes: string;
   public readonly nextActionAt: Date | null;
+  /** Baja lógica: el contacto se conserva pero queda fuera del pipeline activo. */
+  public readonly archived: boolean;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
 
@@ -89,6 +92,7 @@ export class Contact {
     this.ownerId = props.ownerId ?? null;
     this.notes = props.notes?.trim() || '';
     this.nextActionAt = props.nextActionAt ?? null;
+    this.archived = props.archived ?? false;
     this.createdAt = props.createdAt || new Date();
     this.updatedAt = props.updatedAt || this.createdAt;
   }

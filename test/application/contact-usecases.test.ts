@@ -51,6 +51,13 @@ describe('UpdateContact', () => {
     await expect(uc.changeStage(1, 'volando' as any)).rejects.toBeInstanceOf(InvalidContactError);
     expect(updateStage).not.toHaveBeenCalled();
   });
+
+  it('propaga la baja lógica al repositorio', async () => {
+    const update = vi.fn(async () => true);
+    const uc = new UpdateContact(fakeRepo({ update }));
+    await expect(uc.patch(7, { archived: true })).resolves.toBe(true);
+    expect(update).toHaveBeenCalledWith(7, { archived: true });
+  });
 });
 
 describe('ListContacts', () => {
