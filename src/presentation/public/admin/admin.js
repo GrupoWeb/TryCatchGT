@@ -599,6 +599,14 @@
     });
   }
 
+  // Color de la etapa del pipeline: da lectura inmediata del estado y evita que
+  // el selector se vea como un recuadro gris suelto.
+  const CRM_STAGE_COLORS = {
+    nuevo: '#4b9fd5', contactado: '#6c5ffc', respondio: '#06b6d4', reunion: '#f7b84b',
+    propuesta: '#ec4899', ganado: '#0ab39c', perdido: '#f1556c', dormido: '#98a0b3',
+  };
+  function crmStageColor(stage) { return CRM_STAGE_COLORS[stage] || '#98a0b3'; }
+
   function contactCard(c) {
     const stageOpts = Object.entries(CRM_STAGES)
       .map(([k, v]) => `<option value="${k}" ${k === c.stage ? 'selected' : ''}>${v}</option>`)
@@ -610,30 +618,36 @@
     const nextVal = c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '';
     return `
       <article class="lead-card contact-card" data-id="${c.id}">
-        <div class="lead-card__top">
+        <div class="contact-card__head">
           <div class="lead-card__avatar" style="--c:${leadColor(c.name)}">${esc(leadInitials(c.name))}</div>
-          <div class="lead-card__id">
-            <div class="lead-card__name">${esc(c.name)}${tierBadge}${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}</div>
+          <div class="contact-card__id">
+            <div class="contact-card__name-row">
+              <span class="lead-card__name">${esc(c.name)}</span>
+              ${tierBadge}
+              ${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}
+            </div>
             <a class="lead-card__email" href="mailto:${esc(c.email)}"><span aria-hidden="true">✉</span> ${esc(c.email)}</a>
           </div>
-          <select class="lead-card__status crm-stage" data-id="${c.id}" aria-label="Etapa del pipeline">${stageOpts}</select>
+          <select class="lead-card__status crm-stage" data-id="${c.id}" aria-label="Etapa del pipeline" style="--status-c:${crmStageColor(c.stage)}">${stageOpts}</select>
         </div>
-        <div class="lead-card__tags">
+        <div class="contact-card__meta">
           ${c.sector ? `<span class="lead-tag"><span aria-hidden="true">🏷️</span> ${esc(c.sector)}</span>` : ''}
           ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
           ${webTag}
         </div>
-        <div class="crm-card__actions">
-          <button class="btn-ghost crm-mail-btn" data-id="${c.id}">✉️ Enviar correo</button>
+        <div class="contact-card__foot">
+          <button class="btn-ghost btn-sm crm-mail-btn" data-id="${c.id}"><span aria-hidden="true">✉️</span> Enviar correo</button>
+          <details class="crm-followup">
+            <summary>Notas y seguimiento</summary>
+            <div class="crm-followup__body">
+              <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
+              <div class="crm-followup__row">
+                <div class="admin-field"><label for="cn-next-${c.id}">Próxima acción</label><input type="date" id="cn-next-${c.id}" class="crm-next" value="${nextVal}" /></div>
+                <button class="btn-primary crm-save" data-id="${c.id}">Guardar</button>
+              </div>
+            </div>
+          </details>
         </div>
-        <details class="crm-followup">
-          <summary>Notas y seguimiento</summary>
-          <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
-          <div class="crm-followup__row">
-            <div class="admin-field"><label for="cn-next-${c.id}">Próxima acción</label><input type="date" id="cn-next-${c.id}" class="crm-next" value="${nextVal}" /></div>
-            <button class="btn-primary crm-save" data-id="${c.id}">Guardar</button>
-          </div>
-        </details>
       </article>`;
   }
 
@@ -649,6 +663,7 @@
     cont.querySelectorAll('.crm-stage').forEach((sel) => {
       sel.addEventListener('change', async () => {
         const id = sel.getAttribute('data-id');
+        sel.style.setProperty('--status-c', crmStageColor(sel.value));
         const res = await api(`/api/admin/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: sel.value }) });
         if (res.ok) {
           const c = allContacts.find((x) => String(x.id) === id);

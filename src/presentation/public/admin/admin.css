@@ -876,7 +876,39 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   color: var(--text-strong); border: 1px solid var(--border-strong); font-size: 14px; cursor: pointer;
 }
 .crm-select option { color: var(--text-strong); background: var(--surface); }
-.contact-card .lead-card__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Tarjeta de contacto: cabecera alineada, meta densa y pie con acciones. */
+.contact-card { padding: 18px 20px; }
+.contact-card__head { display: flex; align-items: flex-start; gap: 14px; }
+.contact-card__id { flex: 1; min-width: 0; }
+.contact-card__name-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.contact-card__name-row .lead-card__name { font-size: 15px; }
+.contact-card .lead-card__company { margin-left: 0; }
+.contact-card .lead-card__email { margin-top: 5px; }
+
+/* Selector de etapa: pill compacto coloreado según el estado del pipeline. */
+.contact-card .crm-stage {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: auto;
+  min-width: 0;
+  padding: 7px 30px 7px 13px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--status-c, var(--text-muted));
+  background: color-mix(in srgb, var(--status-c, var(--text-muted)) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--status-c, var(--text-muted)) 40%, transparent);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 14px center, right 9px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.contact-card .crm-stage:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--status-c, var(--primary)) 22%, transparent); }
+
+.contact-card__meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
 .crm-tier {
   font-size: 11px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase;
   padding: 2px 8px; border-radius: 999px; line-height: 1.6;
@@ -887,10 +919,27 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .lead-tag--warn { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success); }
 a.lead-tag { text-decoration: none; }
 a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
-.crm-followup { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
-.crm-followup summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted); }
-.crm-followup summary:hover { color: var(--text-strong); }
-.crm-followup[open] summary { margin-bottom: 12px; }
+
+/* Pie de la tarjeta: botón de correo + toggle de notas en una barra con borde. */
+.contact-card__foot {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
+  margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.crm-followup { margin-left: auto; }
+.crm-followup summary {
+  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted);
+  list-style: none; display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 10px; border-radius: 8px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.crm-followup summary::-webkit-details-marker { display: none; }
+.crm-followup summary::before { content: '📝'; }
+.crm-followup summary::after { content: '⌄'; display: inline-block; font-size: 14px; transition: transform 0.15s ease; }
+.crm-followup summary:hover { color: var(--text-strong); background: var(--surface-2); }
+/* Al abrirse ocupa el ancho completo del pie, debajo del botón. */
+.crm-followup[open] { flex: 1 1 100%; margin-left: 0; order: 3; }
+.crm-followup[open] summary { margin-bottom: 14px; }
+.crm-followup[open] summary::after { transform: rotate(180deg); }
 .crm-followup__row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .crm-followup__row .admin-field { margin-bottom: 0; flex: 1 1 180px; }
 .crm-notes { width: 100%; }
