@@ -15,6 +15,7 @@ interface ResolvedConfig {
   smtpPass: string;
   smtpFrom: string;
   smtpSecure: boolean;
+  mailWebhookSecret: string;
 }
 
 export class SiteConfigController {
@@ -36,6 +37,7 @@ export class SiteConfigController {
       smtpPass: stored.smtpPass || '',
       smtpFrom: stored.smtpFrom || '',
       smtpSecure: stored.smtpSecure === 'true',
+      mailWebhookSecret: stored.mailWebhookSecret || '',
     };
   }
 
@@ -71,6 +73,10 @@ export class SiteConfigController {
       smtpConfigured: c.smtpPass.length > 0,
       smtpFrom: c.smtpFrom,
       smtpSecure: c.smtpSecure,
+      // Recepción de correo del CRM (webhook Hostinger). El secreto va enmascarado;
+      // la URL se muestra para pegarla en hPanel al registrar el webhook.
+      mailWebhookConfigured: c.mailWebhookSecret.length > 0,
+      mailWebhookUrl: `${env.appUrl}/api/webhooks/hostinger-mail`,
     };
   }
 
@@ -98,6 +104,8 @@ export class SiteConfigController {
     if (b.smtpPass !== undefined && String(b.smtpPass) !== '') values.smtpPass = String(b.smtpPass);
     if (b.smtpFrom !== undefined) values.smtpFrom = String(b.smtpFrom).trim();
     if (b.smtpSecure !== undefined) values.smtpSecure = b.smtpSecure ? 'true' : 'false';
+    // Secreto del webhook de correo entrante: solo se reescribe si llega no vacío.
+    if (b.mailWebhookSecret !== undefined && String(b.mailWebhookSecret).trim() !== '') values.mailWebhookSecret = String(b.mailWebhookSecret).trim();
     await this.repo.setMany(values);
     res.status(200).json({ success: true, data: this.adminView(await this.resolved()) });
   };

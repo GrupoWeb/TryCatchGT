@@ -12,6 +12,7 @@ import { LeadAdminController } from '../controllers/LeadAdminController.js';
 import { ContactAdminController } from '../controllers/ContactAdminController.js';
 import { TemplateAdminController } from '../controllers/TemplateAdminController.js';
 import { CrmMailController } from '../controllers/CrmMailController.js';
+import { HostingerMailWebhookController } from '../controllers/HostingerMailWebhookController.js';
 import { ServiceAdminController } from '../controllers/ServiceAdminController.js';
 import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
@@ -42,6 +43,7 @@ import { SaveEmailTemplate } from '../../../application/use-cases/SaveEmailTempl
 import { DeleteEmailTemplate } from '../../../application/use-cases/DeleteEmailTemplate.js';
 import { SendContactEmail } from '../../../application/use-cases/SendContactEmail.js';
 import { GetContactMessages } from '../../../application/use-cases/GetContactMessages.js';
+import { ReceiveInboundEmail } from '../../../application/use-cases/ReceiveInboundEmail.js';
 import { GetBlogPosts } from '../../../application/use-cases/GetBlogPosts.js';
 import { GetBlogPostBySlug } from '../../../application/use-cases/GetBlogPostBySlug.js';
 import { SaveBlogPost } from '../../../application/use-cases/SaveBlogPost.js';
@@ -138,6 +140,10 @@ const crmMailController = new CrmMailController(
   ),
   new GetContactMessages(crmMessageRepository),
 );
+const hostingerMailWebhookController = new HostingerMailWebhookController(
+  new ReceiveInboundEmail(contactRepository, crmMessageRepository, htmlSanitizer),
+  siteConfigRepository,
+);
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
@@ -169,7 +175,10 @@ apiRouter.use(issueCsrfToken);
 
 // Exige token CSRF en toda petición mutante. La única excepción (documentada en
 // createCsrfGuard) es el formulario público de cotización (POST /projects).
-apiRouter.use(createCsrfGuard(['/projects']));
+// El webhook de correo entrante se autentica con un secreto compartido, no con
+// cookie de sesión, así que el double-submit CSRF no aplica (ni sería posible:
+// Hostinger no puede leer/reenviar la cookie). Queda exento como /projects.
+apiRouter.use(createCsrfGuard(['/projects', '/webhooks/hostinger-mail']));
 
 // Registra en la bitácora las mutaciones de autenticación y del panel admin.
 apiRouter.use(auditLog);
@@ -187,6 +196,10 @@ apiRouter.post('/projects', formLimiter, turnstileGuard, projectRequestControlle
 apiRouter.get('/blog', blogController.list);
 apiRouter.get('/legal/:slug', legalController.getPublic);
 apiRouter.get('/blog/:slug', blogController.detail);
+
+// Webhook de correo entrante del CRM (Hostinger Agentic Mail). Público pero
+// autenticado por secreto compartido; ver HostingerMailWebhookController.
+apiRouter.post('/webhooks/hostinger-mail', hostingerMailWebhookController.receive);
 
 // Autenticación
 apiRouter.post('/auth/login', authLimiter, turnstileGuard, authController.login);

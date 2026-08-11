@@ -440,6 +440,19 @@
             <p class="admin-error" id="smtp-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
           </form>
+
+          <h3 class="admin-sec__subtitle">Correo entrante (CRM)</h3>
+          <p class="admin-muted">Recibe respuestas de los clientes en el timeline del CRM vía el webhook de Hostinger Agentic Mail. Registra en hPanel el webhook <code>message.received</code> apuntando a la URL de abajo y define un secreto compartido aquí.</p>
+          <form class="admin__editor admin__editor--narrow" id="mailhook-form">
+            <div class="admin-field">
+              <label for="mailhook-url">URL del webhook <span class="admin-hint">(pégala en hPanel)</span></label>
+              <div class="copy-row"><input type="text" id="mailhook-url" readonly /><button type="button" class="btn-ghost" id="mailhook-copy">Copiar</button></div>
+            </div>
+            <div class="admin-field"><label for="mailhook-secret">Secreto compartido <span class="admin-hint">(privado, se guarda en el servidor)</span></label><input type="password" id="mailhook-secret" placeholder="Genera una cadena larga y aleatoria" autocomplete="off" /></div>
+            <p class="admin-hint">Hostinger debe enviarlo en el header <code>X-Webhook-Secret</code> o como <code>?token=</code> en la URL.</p>
+            <p class="admin-error" id="mailhook-error"></p>
+            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mailhook-save">Guardar</button></div>
+          </form>
         </section>
 
         <!-- PERFIL -->

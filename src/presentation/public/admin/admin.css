@@ -728,6 +728,9 @@ a.lead-tag:hover { color: var(--text); }
 .crm-followup__row .admin-field { margin-bottom: 0; flex: 1 1 180px; }
 .crm-notes { width: 100%; }
 .crm-card__actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.copy-row { display: flex; gap: 8px; align-items: center; }
+.copy-row input { flex: 1 1 auto; }
+.copy-row .btn-ghost { white-space: nowrap; }
 
 /* ── PLANTILLAS DE CORREO ───────────────────────────────────── */
 .tpl-vars { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }

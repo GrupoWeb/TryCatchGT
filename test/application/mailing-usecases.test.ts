@@ -40,6 +40,7 @@ function messageRepo(overrides: Partial<CrmMessageRepository> = {}): CrmMessageR
   return {
     save: async (m) => m,
     findByContact: async () => [],
+    findByMessageId: async () => null,
     ...overrides,
   };
 }

@@ -50,4 +50,9 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
     });
     return rows.map(toDomain);
   }
+
+  public async findByMessageId(messageId: string): Promise<CrmMessage | null> {
+    const row = await this.repo.findOne({ where: { messageId } });
+    return row ? toDomain(row) : null;
+  }
 }

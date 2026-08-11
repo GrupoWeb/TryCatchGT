@@ -1015,6 +1015,9 @@
     $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
     $('smtp-from').value = d.smtpFrom || '';
     $('smtp-secure').checked = !!d.smtpSecure;
+    $('mailhook-url').value = d.mailWebhookUrl || '';
+    $('mailhook-secret').value = '';
+    $('mailhook-secret').placeholder = d.mailWebhookConfigured ? '•••••••• (ya configurado)' : 'Genera una cadena larga y aleatoria';
   }
   $('smtp-save').addEventListener('click', async () => {
     $('smtp-error').textContent = '';
@@ -1030,6 +1033,17 @@
     $('turnstile-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ turnstileEnabled: $('ts-enabled').checked, turnstileSiteKey: $('ts-site').value.trim(), turnstileSecretKey: $('ts-secret').value.trim() }) });
     if (r.ok) toast('Protección actualizada'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('turnstile-error').textContent = m; toast(m, 'error'); }
+  });
+  $('mailhook-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('mailhook-url').value); toast('URL copiada'); }
+    catch (_) { $('mailhook-url').select(); toast('Selecciona y copia la URL', 'error'); }
+  });
+  $('mailhook-save').addEventListener('click', async () => {
+    $('mailhook-error').textContent = '';
+    const secret = $('mailhook-secret').value.trim();
+    if (!secret) { const m = 'Escribe un secreto para guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); return; }
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ mailWebhookSecret: secret }) });
+    if (r.ok) { toast('Correo entrante actualizado'); loadContact(); } else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); }
   });
 
   // ── PERFIL ────────────────────────────────────────────────
