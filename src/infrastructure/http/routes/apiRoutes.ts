@@ -352,3 +352,4 @@ apiRouter.put('/admin/users/:id', requireAuth, requireAdmin, accountAdminControl
 apiRouter.delete('/admin/users/:id', requireAuth, requireAdmin, accountAdminController.deleteUser);
 apiRouter.post('/admin/users/:id/restore', requireAuth, requireAdmin, accountAdminController.restoreUser);
 apiRouter.post('/admin/users/:id/reset-password', requireAuth, requireAdmin, accountAdminController.resetUserPassword);
+apiRouter.post('/admin/users/:id/reset-mfa', requireAuth, requireAdmin, accountAdminController.resetUserMfa);

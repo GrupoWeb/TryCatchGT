@@ -349,4 +349,18 @@ export class AccountAdminController {
     const updated = await this.users.findById(id);
     res.status(200).json({ success: true, data: updated ? userView(updated) : userView(target) });
   };
+
+  // Admin: reinicia el 2FA de otro usuario (p. ej. si perdió su dispositivo).
+  // Borra el secreto y lo deja desactivado; el usuario podrá volver a activarlo.
+  public resetUserMfa = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!id) { res.status(400).json({ success: false, error: 'Id inválido.' }); return; }
+    if (id === req.userId) { res.status(400).json({ success: false, error: 'Gestiona tu propio 2FA desde tu perfil.' }); return; }
+    const target = await this.users.findById(id);
+    if (!target || target.id === undefined) { res.status(404).json({ success: false, error: 'Usuario no encontrado.' }); return; }
+    if (!target.mfaEnabled) { res.status(400).json({ success: false, error: 'El usuario no tiene 2FA activo.' }); return; }
+    await this.users.setMfa(id, null, false);
+    await this.users.bumpSessionVersion(id); // corta sesiones para forzar el reingreso
+    res.status(200).json({ success: true });
+  };
 }
