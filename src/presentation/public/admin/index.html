@@ -451,6 +451,10 @@
             <div class="admin-field"><label for="mailhook-secret">Secreto compartido <span class="admin-hint">(privado, se guarda en el servidor)</span></label><input type="password" id="mailhook-secret" placeholder="Genera una cadena larga y aleatoria" autocomplete="off" /></div>
             <p class="admin-hint">Hostinger debe enviarlo en el header <code>X-Webhook-Secret</code> o como <code>?token=</code> en la URL.</p>
             <div class="admin-field"><label for="mailhook-apitoken">Token del API de Agentic Mail <span class="admin-hint">(opcional; marca el correo como leído tras procesarlo)</span></label><input type="password" id="mailhook-apitoken" placeholder="Bearer token del API" autocomplete="off" /></div>
+            <div class="admin-grid-2">
+              <div class="admin-field"><label for="mailhook-apibase">URL base del API <span class="admin-hint">(ajusta si el proveedor cambia el endpoint)</span></label><input type="text" id="mailhook-apibase" placeholder="https://api.mail.hostinger.com" autocomplete="off" /></div>
+              <div class="admin-field"><label for="mailhook-apifolder">Carpeta de procesados <span class="admin-hint">(vacío = solo marcar leído)</span></label><input type="text" id="mailhook-apifolder" placeholder="Procesados" autocomplete="off" /></div>
+            </div>
             <p class="admin-error" id="mailhook-error"></p>
             <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mailhook-save">Guardar</button></div>
           </form>

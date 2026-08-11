@@ -34,6 +34,18 @@ describe('HostingerAgenticMailClient', () => {
     expect(JSON.parse(opts.body).seen).toBe(true);
   });
 
+  it('usa la URL base y la carpeta configuradas en el panel', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new HostingerAgenticMailClient(
+      config({ mailApiToken: 'tok', mailApiBaseUrl: 'https://mail.midominio.com/v2/', mailApiProcessedFolder: 'Procesados' }),
+    );
+    await client.markProcessed('m-7');
+    const [url, opts] = fetchMock.mock.calls[0];
+    expect(String(url)).toBe('https://mail.midominio.com/v2/messages/m-7');
+    expect(JSON.parse(opts.body).folder).toBe('Procesados');
+  });
+
   it('devuelve false si el API responde con error, sin lanzar', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 404 })));
     const client = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));

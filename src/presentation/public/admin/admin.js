@@ -1020,6 +1020,8 @@
     $('mailhook-secret').placeholder = d.mailWebhookConfigured ? '•••••••• (ya configurado)' : 'Genera una cadena larga y aleatoria';
     $('mailhook-apitoken').value = '';
     $('mailhook-apitoken').placeholder = d.mailApiConfigured ? '•••••••• (ya configurado)' : 'Bearer token del API';
+    $('mailhook-apibase').value = d.mailApiBaseUrl || '';
+    $('mailhook-apifolder').value = d.mailApiProcessedFolder || '';
   }
   $('smtp-save').addEventListener('click', async () => {
     $('smtp-error').textContent = '';
@@ -1044,9 +1046,12 @@
     $('mailhook-error').textContent = '';
     const secret = $('mailhook-secret').value.trim();
     const apiToken = $('mailhook-apitoken').value.trim();
-    if (!secret && !apiToken) { const m = 'Escribe el secreto o el token para guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); return; }
-    // Solo se envían los campos con valor (vacío = "déjalo como está").
-    const payload = {};
+    // URL base y carpeta (no secretos) siempre se envían; los secretos, solo si se
+    // teclearon (vacío = "déjalo como está").
+    const payload = {
+      mailApiBaseUrl: $('mailhook-apibase').value.trim(),
+      mailApiProcessedFolder: $('mailhook-apifolder').value.trim(),
+    };
     if (secret) payload.mailWebhookSecret = secret;
     if (apiToken) payload.mailApiToken = apiToken;
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify(payload) });

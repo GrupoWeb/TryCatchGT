@@ -26,9 +26,12 @@ export class HostingerAgenticMailClient implements InboundMailGateway {
     const token = c.mailApiToken;
     if (!token) return false; // Inerte hasta que se configure el token en el panel.
 
-    const url = `${env.mailApi.baseUrl}/messages/${encodeURIComponent(providerMessageId)}`;
+    // URL base y carpeta: lo guardado en el panel manda; si no, el default de env.
+    const baseUrl = (c.mailApiBaseUrl || env.mailApi.baseUrl).replace(/\/+$/, '');
+    const folder = c.mailApiProcessedFolder ?? env.mailApi.processedFolder;
+    const url = `${baseUrl}/messages/${encodeURIComponent(providerMessageId)}`;
     const body: Record<string, unknown> = { seen: true };
-    if (env.mailApi.processedFolder) body.folder = env.mailApi.processedFolder;
+    if (folder) body.folder = folder;
 
     // Timeout para no colgar el webhook si el proveedor no responde.
     const controller = new AbortController();

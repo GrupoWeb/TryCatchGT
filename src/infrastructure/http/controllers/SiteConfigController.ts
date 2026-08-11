@@ -17,6 +17,8 @@ interface ResolvedConfig {
   smtpSecure: boolean;
   mailWebhookSecret: string;
   mailApiToken: string;
+  mailApiBaseUrl: string;
+  mailApiProcessedFolder: string;
 }
 
 export class SiteConfigController {
@@ -40,6 +42,9 @@ export class SiteConfigController {
       smtpSecure: stored.smtpSecure === 'true',
       mailWebhookSecret: stored.mailWebhookSecret || '',
       mailApiToken: stored.mailApiToken || '',
+      // No secretos: lo guardado en BD manda; si está vacío, cae al default de env.
+      mailApiBaseUrl: (stored.mailApiBaseUrl || env.mailApi.baseUrl).replace(/\/+$/, ''),
+      mailApiProcessedFolder: stored.mailApiProcessedFolder ?? env.mailApi.processedFolder,
     };
   }
 
@@ -81,6 +86,9 @@ export class SiteConfigController {
       mailWebhookUrl: `${env.appUrl}/api/webhooks/hostinger-mail`,
       // Token del API de Agentic Mail (acuse de recibo). Enmascarado.
       mailApiConfigured: c.mailApiToken.length > 0,
+      // No secretos: se muestran en claro para poder editarlos/alinearlos.
+      mailApiBaseUrl: c.mailApiBaseUrl,
+      mailApiProcessedFolder: c.mailApiProcessedFolder,
     };
   }
 
@@ -112,6 +120,10 @@ export class SiteConfigController {
     if (b.mailWebhookSecret !== undefined && String(b.mailWebhookSecret).trim() !== '') values.mailWebhookSecret = String(b.mailWebhookSecret).trim();
     // Token del API de Agentic Mail (acuse de recibo): idem, secreto.
     if (b.mailApiToken !== undefined && String(b.mailApiToken).trim() !== '') values.mailApiToken = String(b.mailApiToken).trim();
+    // URL base y carpeta del API: NO son secretos; se pueden vaciar para volver al
+    // default de env (base) o a "solo marcar leído" (carpeta).
+    if (b.mailApiBaseUrl !== undefined) values.mailApiBaseUrl = String(b.mailApiBaseUrl).trim().replace(/\/+$/, '');
+    if (b.mailApiProcessedFolder !== undefined) values.mailApiProcessedFolder = String(b.mailApiProcessedFolder).trim();
     await this.repo.setMany(values);
     res.status(200).json({ success: true, data: this.adminView(await this.resolved()) });
   };
