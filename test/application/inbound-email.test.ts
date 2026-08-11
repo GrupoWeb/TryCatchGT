@@ -52,6 +52,12 @@ describe('parseInboundPayload', () => {
     expect(p!.fromName).toBe('Juan');
   });
 
+  it('extrae el id interno del proveedor (providerId) para el acuse de recibo', () => {
+    const p = parseInboundPayload({ data: { message: { from: 'a@x.com', id: 'prov-123', message_id: '<rfc@x>' } } });
+    expect(p!.providerId).toBe('prov-123');
+    expect(p!.messageId).toBe('<rfc@x>');
+  });
+
   it('devuelve null si no hay remitente', () => {
     expect(parseInboundPayload({ data: { message: { subject: 'x' } } })).toBeNull();
     expect(parseInboundPayload(null)).toBeNull();

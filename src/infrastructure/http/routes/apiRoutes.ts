@@ -77,6 +77,7 @@ import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
 import { EmailService } from '../../email/EmailService.js';
+import { HostingerAgenticMailClient } from '../../email/HostingerAgenticMailClient.js';
 
 // ── Composición de dependencias (wiring hexagonal) ──────────────────────────
 const serviceRepository = new TypeOrmServiceRepository();
@@ -98,6 +99,8 @@ const passwordHasher = new BcryptPasswordHasher();
 const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
 const emailService = new EmailService(siteConfigRepository);
+// Cliente del API de Agentic Mail para acusar recibo de los correos entrantes.
+const inboundMailGateway = new HostingerAgenticMailClient(siteConfigRepository);
 
 // Autenticación con validación de versión + sesión por dispositivo.
 const requireAuth = createRequireAuth(userRepository, userSessionRepository);
@@ -157,6 +160,7 @@ const hostingerMailWebhookController = new HostingerMailWebhookController(
   // Con el repo de cadencias, una respuesta entrante corta el seguimiento activo.
   new ReceiveInboundEmail(contactRepository, crmMessageRepository, htmlSanitizer, cadenceRunRepository),
   siteConfigRepository,
+  inboundMailGateway,
 );
 
 // Procesa las cadencias vencidas; se exporta para el scheduler de server.ts.

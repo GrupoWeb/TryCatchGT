@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { ReceiveInboundEmail } from '../../../application/use-cases/ReceiveInboundEmail.js';
 import { InboundEmail } from '../../../application/ports/input/ReceiveInboundEmailUseCase.js';
 import { SiteConfigRepository } from '../../../application/ports/output/SiteConfigRepository.js';
+import { InboundMailGateway } from '../../../application/ports/output/InboundMailGateway.js';
 import { DomainError } from '../../../domain/exceptions/DomainError.js';
 
 /** Extrae la dirección de un campo "from" que puede venir de varias formas. */
@@ -68,6 +69,8 @@ export function parseInboundPayload(body: unknown): InboundEmail | null {
     inReplyTo: firstString(msg.in_reply_to, msg.inReplyTo) ?? null,
     threadId: threadId ?? null,
     receivedAt: receivedAt && !isNaN(receivedAt.getTime()) ? receivedAt : null,
+    // Id interno del proveedor para acusar recibo por su API (distinto del Message-ID).
+    providerId: firstString(msg.id, msg.uid, msg.message_id, msg.messageId) ?? null,
   };
 }
 
@@ -82,6 +85,8 @@ export class HostingerMailWebhookController {
   constructor(
     private readonly receiveInbound: ReceiveInboundEmail,
     private readonly config: SiteConfigRepository,
+    // Opcional: acusa recibo del correo (marcar leído/mover) vía el API del proveedor.
+    private readonly mailGateway?: InboundMailGateway,
   ) {}
 
   /**
@@ -117,6 +122,12 @@ export class HostingerMailWebhookController {
 
     try {
       const result = await this.receiveInbound.execute(inbound);
+      // Acuse de recibo best-effort SOLO si se registró algo nuevo (no en duplicados).
+      // Fire-and-forget: no bloquea la respuesta del webhook (Agentic Mail podría
+      // reintentar si tardamos); markProcessed nunca lanza y trae su propio timeout.
+      if (result.outcome === 'stored' && inbound.providerId && this.mailGateway) {
+        void this.mailGateway.markProcessed(inbound.providerId);
+      }
       res.status(200).json({ success: true, outcome: result.outcome });
     } catch (err) {
       if (err instanceof DomainError) {

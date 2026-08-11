@@ -1116,6 +1116,10 @@
     $('mailhook-url').value = d.mailWebhookUrl || '';
     $('mailhook-secret').value = '';
     $('mailhook-secret').placeholder = d.mailWebhookConfigured ? '•••••••• (ya configurado)' : 'Genera una cadena larga y aleatoria';
+    $('mailhook-apitoken').value = '';
+    $('mailhook-apitoken').placeholder = d.mailApiConfigured ? '•••••••• (ya configurado)' : 'Bearer token del API';
+    $('mailhook-apibase').value = d.mailApiBaseUrl || '';
+    $('mailhook-apifolder').value = d.mailApiProcessedFolder || '';
   }
   $('smtp-save').addEventListener('click', async () => {
     $('smtp-error').textContent = '';
@@ -1139,8 +1143,16 @@
   $('mailhook-save').addEventListener('click', async () => {
     $('mailhook-error').textContent = '';
     const secret = $('mailhook-secret').value.trim();
-    if (!secret) { const m = 'Escribe un secreto para guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); return; }
-    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ mailWebhookSecret: secret }) });
+    const apiToken = $('mailhook-apitoken').value.trim();
+    // URL base y carpeta (no secretos) siempre se envían; los secretos, solo si se
+    // teclearon (vacío = "déjalo como está").
+    const payload = {
+      mailApiBaseUrl: $('mailhook-apibase').value.trim(),
+      mailApiProcessedFolder: $('mailhook-apifolder').value.trim(),
+    };
+    if (secret) payload.mailWebhookSecret = secret;
+    if (apiToken) payload.mailApiToken = apiToken;
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify(payload) });
     if (r.ok) { toast('Correo entrante actualizado'); loadContact(); } else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); }
   });
 
