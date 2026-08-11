@@ -303,7 +303,9 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 
 /* Split lista + editor */
 .admin-split { display: grid; grid-template-columns: 320px 1fr; gap: 24px; }
-.admin__list { display: flex; flex-direction: column; gap: 10px; }
+/* Listas de entidades (blog, servicios, planes, plantillas, cadencias) como
+   rejilla de tarjetas; la edición ocurre en un drawer lateral. */
+.admin__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-items: start; }
 .admin__editor--narrow { max-width: 520px; }
 
 /* ============================================================
@@ -956,9 +958,10 @@ a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
   position: fixed; inset: 0; z-index: 120;
   display: flex; justify-content: flex-end;
   background: rgba(15, 18, 34, 0.5);
-  opacity: 0; transition: opacity 0.22s ease;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
 }
-.drawer-overlay.is-open { opacity: 1; }
+.drawer-overlay.is-open { opacity: 1; visibility: visible; pointer-events: auto; }
 .drawer {
   width: 100%; max-width: 440px; height: 100%;
   display: flex; flex-direction: column;
@@ -966,6 +969,8 @@ a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
   box-shadow: var(--shadow-lg);
   transform: translateX(100%); transition: transform 0.24s ease;
 }
+/* Editores de contenido (blog, servicios, planes, plantillas, cadencias). */
+.drawer--wide { max-width: 720px; }
 .drawer-overlay.is-open .drawer { transform: none; }
 .drawer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--border); }
 .drawer__id { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -975,11 +980,12 @@ a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
 .drawer__close:hover { color: var(--text-strong); background: var(--surface-2); }
 .drawer__body { flex: 1; overflow-y: auto; padding: 22px; }
 .drawer__body .admin-field:last-child { margin-bottom: 0; }
-.drawer__body textarea { min-height: 120px; }
+#drw-notes { min-height: 120px; }
 .drawer__section { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-dim); margin: 4px 0 12px; }
 .drawer__section:not(:first-child) { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border); }
-.drawer__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
-.drawer__foot-right { display: flex; gap: 10px; }
+.drawer__foot { display: flex; align-items: center; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
+/* Empuja el grupo Guardar/Cancelar a la derecha aunque no haya botón de baja/eliminar. */
+.drawer__foot-right { display: flex; gap: 10px; margin-left: auto; }
 @media (max-width: 560px) { .drawer { max-width: 100%; } }
 
 /* Contactos dados de baja */

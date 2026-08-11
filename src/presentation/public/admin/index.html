@@ -243,10 +243,14 @@
             <button class="btn-ghost" id="tpl-new">+ Nueva plantilla</button>
           </div>
           <p class="admin-muted">Variables disponibles: <code>{nombre}</code>, <code>{empresa}</code>, <code>{sector}</code>, <code>{ubicacion}</code>, <code>{sitio}</code>. Se sustituyen por los datos del contacto al enviar.</p>
-          <div class="admin-split">
-            <aside class="admin__list" id="tpl-list"></aside>
-            <div>
-              <form class="admin__editor" id="tpl-editor" hidden>
+          <div class="admin__list" id="tpl-list"></div>
+          <div class="drawer-overlay" id="tpl-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="tpl-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="tpl-title">Plantilla</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="tpl-editor">
                 <input type="hidden" id="tpl-id" />
                 <div class="admin-field"><label for="tpl-name">Nombre *</label><input type="text" id="tpl-name" autocomplete="off" placeholder="Presentación inicial" /></div>
                 <div class="admin-grid-2">
@@ -284,14 +288,15 @@
                   </div>
                 </div>
                 <p class="admin-error" id="tpl-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="tpl-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="tpl-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="tpl-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="tpl-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">✉️</div><p>Selecciona una plantilla o crea una nueva.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="tpl-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="tpl-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="tpl-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -305,10 +310,14 @@
             </div>
           </div>
           <p class="admin-muted">Secuencias de correos que se envían solos con retrasos configurables y se detienen cuando el contacto responde. Un proceso las revisa periódicamente; también puedes forzarlo con "Procesar ahora".</p>
-          <div class="admin-split">
-            <aside class="admin__list" id="cad-list"></aside>
-            <div>
-              <form class="admin__editor" id="cad-editor" hidden>
+          <div class="admin__list" id="cad-list"></div>
+          <div class="drawer-overlay" id="cad-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="cad-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="cad-title">Cadencia</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="cad-editor">
                 <input type="hidden" id="cad-id" />
                 <div class="admin-field"><label for="cad-name">Nombre *</label><input type="text" id="cad-name" autocomplete="off" placeholder="Seguimiento MIPYMEs sin web" /></div>
                 <label class="admin-check"><input type="checkbox" id="cad-active" checked /> Cadencia activa</label>
@@ -319,14 +328,15 @@
                   <p class="admin-hint">Cada paso: días de espera (desde la inscripción o desde el paso anterior) y la plantilla a enviar.</p>
                 </div>
                 <p class="admin-error" id="cad-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="cad-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="cad-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="cad-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="cad-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">🔁</div><p>Selecciona una cadencia o crea una nueva.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="cad-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="cad-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="cad-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -336,10 +346,14 @@
             <h2 class="admin-sec__title">Blog</h2>
             <button class="btn-ghost" id="new-btn">+ Nuevo artículo</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="admin-list"></aside>
-            <div>
-              <form class="admin__editor" id="editor" hidden>
+          <div class="admin__list" id="admin-list"></div>
+          <div class="drawer-overlay" id="blog-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="blog-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="blog-title">Artículo</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="editor">
                 <input type="hidden" id="f-id" />
                 <div class="admin-field"><label for="f-title">Título *</label><input type="text" id="f-title" /></div>
                 <div class="admin-grid-2">
@@ -391,14 +405,15 @@
                   </div>
                 </div>
                 <p class="admin-error" id="editor-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="save-btn">Guardar</button>
-                  <button type="button" class="btn-ghost" id="cancel-btn">Cancelar</button>
-                  <button type="button" class="btn-danger" id="delete-btn" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="editor-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">📝</div><p>Selecciona un artículo o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="delete-btn" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="cancel-btn">Cancelar</button>
+                  <button type="button" class="btn-primary" id="save-btn">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -408,10 +423,14 @@
             <h2 class="admin-sec__title">Servicios</h2>
             <button class="btn-ghost" id="svc-new">+ Nuevo servicio</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="svc-list"></aside>
-            <div>
-              <form class="admin__editor" id="svc-editor" hidden>
+          <div class="admin__list" id="svc-list"></div>
+          <div class="drawer-overlay" id="svc-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="svc-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="svc-title">Servicio</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="svc-editor">
                 <input type="hidden" id="sv-id" />
                 <div class="admin-field"><label for="sv-title">Título *</label><input type="text" id="sv-title" /></div>
                 <div class="admin-grid-2">
@@ -423,14 +442,15 @@
                 <div class="admin-field"><label for="sv-tags">Tags <span class="admin-hint">(separados por coma)</span></label><input type="text" id="sv-tags" placeholder="React, Node.js, TypeScript" /></div>
                 <label class="admin-check"><input type="checkbox" id="sv-featured" /> Destacado</label>
                 <p class="admin-error" id="svc-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="svc-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="svc-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="svc-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">⚙️</div><p>Selecciona un servicio o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="svc-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="svc-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -440,10 +460,14 @@
             <h2 class="admin-sec__title">Planes</h2>
             <button class="btn-ghost" id="plan-new">+ Nuevo plan</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="plan-list"></aside>
-            <div>
-              <form class="admin__editor" id="plan-editor" hidden>
+          <div class="admin__list" id="plan-list"></div>
+          <div class="drawer-overlay" id="plan-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="plan-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="plan-title">Plan</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="plan-editor">
                 <input type="hidden" id="pl-id" />
                 <div class="admin-field"><label for="pl-name">Nombre *</label><input type="text" id="pl-name" /></div>
                 <div class="admin-field"><label for="pl-tagline">Descripción corta</label><input type="text" id="pl-tagline" /></div>
@@ -459,14 +483,15 @@
                 <div class="admin-field"><label for="pl-services">Cubre <span class="admin-hint">(una por línea: Web, Móvil…)</span></label><textarea id="pl-services" rows="3"></textarea></div>
                 <label class="admin-check"><input type="checkbox" id="pl-popular" /> Marcar como "Más popular"</label>
                 <p class="admin-error" id="plan-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="plan-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="plan-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="plan-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="plan-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">💳</div><p>Selecciona un plan o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="plan-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="plan-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="plan-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 

@@ -875,12 +875,20 @@
     toast(`Exportados ${rows.length} contacto(s)`);
   });
 
-  // ── Editor genérico (lista + formulario) ──────────────────
+  // ── Editor genérico (rejilla de tarjetas + drawer) ────────
   function makeCrud(cfg) {
-    // cfg: { path, listEl, editorEl, emptyEl, deleteBtn, idField, toForm, fromForm, renderItem, errorEl, entityName }
+    // cfg: { path, listEl, overlayEl, titleEl, firstField, deleteBtn, toForm, fromForm, renderItem, errorEl, entityName, blank }
     let currentId = null;
-    function open() { cfg.editorEl.hidden = false; cfg.emptyEl.hidden = true; }
-    function close() { cfg.editorEl.hidden = true; cfg.emptyEl.hidden = false; if (cfg.errorEl) cfg.errorEl.textContent = ''; currentId = null; mark(null); }
+    function open(title) {
+      if (cfg.titleEl && title) cfg.titleEl.textContent = title;
+      cfg.overlayEl.classList.add('is-open');
+      if (cfg.firstField) setTimeout(() => { const el = $(cfg.firstField); if (el) el.focus(); }, 60);
+    }
+    function close() {
+      cfg.overlayEl.classList.remove('is-open');
+      if (cfg.errorEl) cfg.errorEl.textContent = '';
+      currentId = null; mark(null);
+    }
     function mark(id) { $(cfg.listEl).querySelectorAll('.admin-item').forEach((it) => it.classList.toggle('is-active', Number(it.getAttribute('data-id')) === id)); }
     async function load() {
       const r = await api(cfg.path);
@@ -895,14 +903,14 @@
     async function edit(id) {
       const r = await api(`${cfg.path}/${id}`);
       if (!r.ok) return;
-      currentId = id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; open(); mark(id);
+      currentId = id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; open(`Editar ${cfg.entityName.toLowerCase()}`); mark(id);
     }
-    function create() { cfg.toForm(cfg.blank || {}); cfg.deleteBtn.hidden = true; currentId = null; open(); mark(null); }
+    function create() { cfg.toForm(cfg.blank || {}); cfg.deleteBtn.hidden = true; currentId = null; open(`Nuevo ${cfg.entityName.toLowerCase()}`); mark(null); }
     async function save() {
       if (cfg.errorEl) cfg.errorEl.textContent = '';
       const payload = cfg.fromForm();
       const r = await api(currentId ? `${cfg.path}/${currentId}` : cfg.path, { method: currentId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
-      if (r.ok) { await load(); currentId = r.body.data.id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; mark(currentId); toast(`${cfg.entityName} guardado`); }
+      if (r.ok) { await load(); toast(`${cfg.entityName} guardado`); close(); }
       else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; if (cfg.errorEl) cfg.errorEl.textContent = m; toast(m, 'error'); }
     }
     async function remove() {
@@ -912,6 +920,10 @@
       const r = await api(`${cfg.path}/${currentId}`, { method: 'DELETE' });
       if (r.ok) { close(); load(); toast(`${cfg.entityName} eliminado`); } else toast('No se pudo eliminar', 'error');
     }
+    // Cierre por scrim, botón ✕ del encabezado o Escape.
+    cfg.overlayEl.addEventListener('click', (e) => { if (e.target === cfg.overlayEl) close(); });
+    cfg.overlayEl.querySelectorAll('[data-drawer-close]').forEach((b) => b.addEventListener('click', close));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cfg.overlayEl.classList.contains('is-open')) close(); });
     return { load, create, save, remove, close };
   }
 
@@ -1050,7 +1062,7 @@
 
   // ── BLOG ──────────────────────────────────────────────────
   const blog = makeCrud({
-    path: '/api/admin/posts', listEl: 'admin-list', editorEl: $('editor'), emptyEl: $('editor-empty'),
+    path: '/api/admin/posts', listEl: 'admin-list', overlayEl: $('blog-overlay'), titleEl: $('blog-title'), firstField: 'f-title',
     deleteBtn: $('delete-btn'), errorEl: $('editor-error'), entityName: 'Artículo',
     blank: { status: 'draft', author: 'Juan José Jolón Granados' },
     renderItem: (p) => `<div class="admin-item" data-id="${p.id}"><div class="admin-item__title">${esc(p.title)}</div><div class="admin-item__meta"><span class="badge-status ${p.status}">${p.status === 'published' ? 'Publicado' : 'Borrador'}</span><span>${esc(p.category)}</span></div></div>`,
@@ -1065,7 +1077,7 @@
 
   // ── SERVICIOS ─────────────────────────────────────────────
   const svc = makeCrud({
-    path: '/api/admin/services', listEl: 'svc-list', editorEl: $('svc-editor'), emptyEl: $('svc-empty'),
+    path: '/api/admin/services', listEl: 'svc-list', overlayEl: $('svc-overlay'), titleEl: $('svc-title'), firstField: 'sv-title',
     deleteBtn: $('svc-delete'), errorEl: $('svc-error'), entityName: 'Servicio',
     blank: { icon: '⚙️', accentColor: '#8B5CF6' },
     renderItem: (s) => `<div class="admin-item" data-id="${s.id}"><div class="admin-item__title">${esc(s.icon)} ${esc(s.title)}</div><div class="admin-item__meta">${s.isFeatured ? '<span class="badge-status published">Destacado</span>' : ''}<span>${esc((s.tags || []).slice(0, 3).join(', '))}</span></div></div>`,
@@ -1080,7 +1092,7 @@
 
   // ── PLANES ────────────────────────────────────────────────
   const plans = makeCrud({
-    path: '/api/admin/plans', listEl: 'plan-list', editorEl: $('plan-editor'), emptyEl: $('plan-empty'),
+    path: '/api/admin/plans', listEl: 'plan-list', overlayEl: $('plan-overlay'), titleEl: $('plan-title'), firstField: 'pl-name',
     deleteBtn: $('plan-delete'), errorEl: $('plan-error'), entityName: 'Plan',
     blank: { currency: 'USD', accentColor: '#8B5CF6', ctaLabel: 'Elegir plan' },
     renderItem: (p) => `<div class="admin-item" data-id="${p.id}"><div class="admin-item__title">${esc(p.name)} ${p.isPopular ? '⭐' : ''}</div><div class="admin-item__meta"><span>$${fmtNum(p.priceMonthly)} / Q${fmtNum(p.priceMonthlyGtq)}</span></div></div>`,
@@ -1097,7 +1109,7 @@
   const TPL_SEGMENTS = { all: 'Todos', alta: 'Prioridad alta', media: 'Prioridad media', base: 'Prioridad base', 'sin-web': 'Sin sitio web' };
   const tplEditor = makeRichEditor($('rt-tpl-area'), $('rt-tpl-toolbar'));
   const tpl = makeCrud({
-    path: '/api/admin/templates', listEl: 'tpl-list', editorEl: $('tpl-editor'), emptyEl: $('tpl-empty'),
+    path: '/api/admin/templates', listEl: 'tpl-list', overlayEl: $('tpl-overlay'), titleEl: $('tpl-title'), firstField: 'tpl-name',
     deleteBtn: $('tpl-delete'), errorEl: $('tpl-error'), entityName: 'Plantilla',
     blank: { segment: 'all' },
     renderItem: (t) => `<div class="admin-item" data-id="${t.id}"><div class="admin-item__title">${esc(t.name)}</div><div class="admin-item__meta"><span class="badge-status published">${esc(TPL_SEGMENTS[t.segment] || t.segment)}</span><span>${esc(t.subject)}</span></div></div>`,
@@ -1145,7 +1157,7 @@
     $('cad-steps').appendChild(row);
   }
   const cad = makeCrud({
-    path: '/api/admin/cadences', listEl: 'cad-list', editorEl: $('cad-editor'), emptyEl: $('cad-empty'),
+    path: '/api/admin/cadences', listEl: 'cad-list', overlayEl: $('cad-overlay'), titleEl: $('cad-title'), firstField: 'cad-name',
     deleteBtn: $('cad-delete'), errorEl: $('cad-error'), entityName: 'Cadencia',
     blank: { isActive: true, steps: [] },
     renderItem: (c) => `<div class="admin-item" data-id="${c.id}"><div class="admin-item__title">${esc(c.name)}</div><div class="admin-item__meta"><span class="badge-status ${c.isActive ? 'published' : 'draft'}">${c.isActive ? 'Activa' : 'Inactiva'}</span><span>${(c.steps || []).length} paso(s)</span></div></div>`,
