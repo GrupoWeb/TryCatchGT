@@ -1497,99 +1497,186 @@
 
   let currentUserId = null; // id del usuario en sesión (para no auto-gestionarse)
   let currentUserRole = null; // rol en sesión (solo para el gate cosmético de la UI)
+  // ── USUARIOS (tabla + drawers) ────────────────────────────
+  let allUsers = [];
+  function userStatusMeta(u) {
+    if (u.deleted) return { label: 'Dado de baja', cls: 'draft' };
+    return (u.isActive && u.status === 'active') ? { label: 'Activo', cls: 'published' } : { label: 'Inactivo', cls: 'draft' };
+  }
   async function loadUsers() {
     const r = await api('/api/admin/users');
     if (!guard(r) || !r.ok) return;
-    $('users-list').innerHTML = r.body.data.map((u) => {
-      const self = u.id === currentUserId;
-      const name = esc(u.displayName || u.username);
-      const statusLabel = u.deleted ? 'Eliminado' : (u.isActive && u.status === 'active' ? 'Activo' : 'Inactivo');
-      const statusCls = u.deleted ? 'draft' : (u.isActive && u.status === 'active' ? 'published' : 'draft');
-      const actions = self
-        ? '<span class="admin-hint">(tú)</span>'
-        : u.deleted
-          ? `<button class="btn-ghost btn-sm" data-act="restore" data-id="${u.id}">Restaurar</button>`
-          : `<button class="btn-ghost btn-sm" data-act="edit" data-id="${u.id}">Editar</button>
-             <button class="btn-ghost btn-sm" data-act="reset" data-id="${u.id}">Resetear clave</button>
-             <button class="btn-ghost btn-sm" data-act="toggle" data-id="${u.id}" data-active="${u.isActive && u.status === 'active' ? '1' : '0'}">${u.isActive && u.status === 'active' ? 'Desactivar' : 'Activar'}</button>
-             <button class="btn-danger btn-sm" data-act="delete" data-id="${u.id}">Eliminar</button>`;
-      return `<div class="user-row">
-        <span>${name}${u.mfaEnabled ? ' 🔒' : ''} <span class="admin-hint">@${esc(u.username)}</span></span>
-        <span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span>
-        <span class="badge-status ${statusCls}">${statusLabel}</span>
-        <span class="user-row__actions">${actions}</span>
-      </div>`;
+    allUsers = r.body.data || [];
+    const tb = $('users-tbody');
+    if (!allUsers.length) { tb.innerHTML = '<tr><td colspan="5" class="admin-muted">Sin usuarios.</td></tr>'; return; }
+    tb.innerHTML = allUsers.map((u) => {
+      const st = userStatusMeta(u);
+      const you = u.id === currentUserId ? ' <span class="admin-hint">(tú)</span>' : '';
+      return `<tr data-id="${u.id}"${u.deleted ? ' class="is-deleted"' : ''}>
+        <td><div class="u-cell"><span>${esc(u.displayName || u.username)}${you}</span><small>@${esc(u.username)}</small></div></td>
+        <td>${u.email ? esc(u.email) : '<span class="admin-hint">—</span>'}</td>
+        <td><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></td>
+        <td><span class="badge-status ${st.cls}">${st.label}</span></td>
+        <td>${u.mfaEnabled ? '🔒 Sí' : '<span class="admin-hint">No</span>'}</td>
+      </tr>`;
     }).join('');
+    tb.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => {
+      const u = allUsers.find((x) => String(x.id) === tr.getAttribute('data-id'));
+      if (!u) return;
+      if (u.id === currentUserId) { toast('Gestiona tu propia cuenta desde Perfil'); return; }
+      openUserDrawer(u);
+    }));
   }
 
-  // Modal de edición de un usuario (terceros).
-  function editUserDialog(u) {
-    return new Promise((resolve) => {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Editar usuario">
-          <h3 class="modal__title">Editar: ${esc(u.username)}</h3>
-          <div class="admin-field"><label>Nombre para mostrar</label><input class="modal__input" id="eu-display" type="text" value="${esc(u.displayName || '')}" /></div>
-          <div class="admin-field"><label>Nombre(s)</label><input class="modal__input" id="eu-full" type="text" value="${esc(u.fullName || '')}" /></div>
-          <div class="admin-field"><label>Apellidos</label><input class="modal__input" id="eu-last" type="text" value="${esc(u.lastName || '')}" /></div>
-          <div class="admin-field"><label>Correo</label><input class="modal__input" id="eu-email" type="email" value="${esc(u.email || '')}" /></div>
-          <div class="admin-field"><label>Rol</label><select class="modal__input" id="eu-role"><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option></select></div>
-          <div class="modal__actions">
-            <button class="btn-ghost" data-act="cancel">Cancelar</button>
-            <button class="btn-primary" data-act="ok">Guardar</button>
+  // Monta un drawer al vuelo y devuelve utilidades comunes (mismo patrón del CRM).
+  function mountDrawer(html) {
+    const overlay = document.createElement('div');
+    overlay.className = 'drawer-overlay';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+    function close() { overlay.classList.remove('is-open'); document.removeEventListener('keydown', onKey); setTimeout(() => overlay.remove(), 240); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    return { overlay, close, q: (sel) => overlay.querySelector(sel) };
+  }
+
+  function openUserDrawer(u) {
+    const val = (v) => esc(v || '');
+    const active = u.isActive && u.status === 'active';
+    const { overlay, close, q } = mountDrawer(`
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Editar ${esc(u.username)}">
+        <header class="drawer__head">
+          <div class="drawer__id">
+            <div class="lead-card__avatar" style="--c:${leadColor(u.displayName || u.username)}">${esc(leadInitials(u.displayName || u.username))}</div>
+            <div class="drawer__idtext">
+              <div class="drawer__name">${esc(u.displayName || u.username)}${u.deleted ? '<span class="badge-archived">Dado de baja</span>' : ''}</div>
+              <span class="lead-card__email">@${esc(u.username)}</span>
+            </div>
           </div>
-        </div>`;
-      document.body.appendChild(overlay);
-      requestAnimationFrame(() => overlay.classList.add('is-open'));
-      function close(val) { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); resolve(val); }
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) return close(null);
-        const a = e.target.closest('[data-act]');
-        if (!a) return;
-        if (a.getAttribute('data-act') === 'ok') {
-          close({ displayName: overlay.querySelector('#eu-display').value, fullName: overlay.querySelector('#eu-full').value, lastName: overlay.querySelector('#eu-last').value, email: overlay.querySelector('#eu-email').value, role: overlay.querySelector('#eu-role').value });
-        } else close(null);
-      });
-    });
-  }
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="du-full">Nombre(s)</label><input type="text" id="du-full" value="${val(u.fullName)}" /></div>
+            <div class="admin-field"><label for="du-last">Apellidos</label><input type="text" id="du-last" value="${val(u.lastName)}" /></div>
+          </div>
+          <div class="admin-field"><label for="du-display">Nombre para mostrar</label><input type="text" id="du-display" value="${val(u.displayName)}" /></div>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="du-email">Correo</label><input type="email" id="du-email" value="${val(u.email)}" /></div>
+            <div class="admin-field"><label for="du-role">Rol</label><select id="du-role" class="crm-select"><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option></select></div>
+          </div>
+          <p class="drawer__section">Seguridad</p>
+          <div class="user-actions">
+            <button type="button" class="btn-ghost" data-act="reset-pass">🔑 Resetear contraseña</button>
+            <button type="button" class="btn-ghost" data-act="reset-mfa"${u.mfaEnabled ? '' : ' disabled'}>🔒 Reiniciar 2FA</button>
+            <button type="button" class="btn-ghost" data-act="toggle">${active ? '⏸ Desactivar' : '▶ Activar'}</button>
+          </div>
+        </div>
+        <footer class="drawer__foot">
+          ${u.deleted
+            ? '<button type="button" class="btn-ghost" data-act="restore">Restaurar</button>'
+            : '<button type="button" class="btn-danger" data-act="delete">Dar de baja</button>'}
+          <div class="drawer__foot-right">
+            <button type="button" class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button type="button" class="btn-primary" data-act="save">Guardar</button>
+          </div>
+        </footer>
+      </aside>`);
 
-  $('users-list').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-act]');
-    if (!btn) return;
-    const id = btn.getAttribute('data-id');
-    const act = btn.getAttribute('data-act');
-    if (act === 'edit') {
-      const r = await api(`/api/admin/users/${id}`);
-      if (!guard(r) || !r.ok) return;
-      const fields = await editUserDialog(r.body.data);
-      if (!fields) return;
-      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(fields) });
-      if (res.ok) { toast('Usuario actualizado'); loadUsers(); }
+    async function save() {
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'PUT', body: JSON.stringify({
+        displayName: q('#du-display').value, fullName: q('#du-full').value, lastName: q('#du-last').value,
+        email: q('#du-email').value, role: q('#du-role').value,
+      }) });
+      if (res.ok) { toast('Usuario actualizado'); close(); loadUsers(); }
       else toast((res.body && res.body.error) || 'No se pudo actualizar.', 'error');
-    } else if (act === 'toggle') {
-      const activate = btn.getAttribute('data-active') === '0';
-      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: activate, status: activate ? 'active' : 'disabled' }) });
-      if (res.ok) { toast(activate ? 'Usuario activado' : 'Usuario desactivado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
-    } else if (act === 'delete') {
-      const ok = await confirmDialog({ title: 'Eliminar usuario', message: 'Se marcará como eliminado y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Eliminar', danger: true });
-      if (!ok) return;
-      const res = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
-      if (res.ok) { toast('Usuario eliminado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo eliminar.', 'error');
-    } else if (act === 'restore') {
-      const res = await api(`/api/admin/users/${id}/restore`, { method: 'POST' });
-      if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
-    } else if (act === 'reset') {
+    }
+    async function resetPass() {
       const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 12). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
       if (!temp) return;
-      const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
-      if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
+      const res = await api(`/api/admin/users/${u.id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
+      if (res.ok) toast('Contraseña reseteada. El usuario debe cambiarla al entrar.');
       else toast((res.body && res.body.error) || 'No se pudo resetear.', 'error');
     }
-  });
+    async function resetMfa() {
+      const ok = await confirmDialog({ title: 'Reiniciar 2FA', message: `Se desactivará el 2FA de “${u.displayName || u.username}” y se cerrarán sus sesiones. Podrá volver a activarlo desde su perfil.`, confirmText: 'Reiniciar 2FA', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${u.id}/reset-mfa`, { method: 'POST' });
+      if (res.ok) { toast('2FA reiniciado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo reiniciar el 2FA.', 'error');
+    }
+    async function toggle() {
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ isActive: !active, status: active ? 'disabled' : 'active' }) });
+      if (res.ok) { toast(active ? 'Usuario desactivado' : 'Usuario activado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
+    }
+    async function del() {
+      const ok = await confirmDialog({ title: 'Dar de baja', message: 'Se marcará como dado de baja y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Dar de baja', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+      if (res.ok) { toast('Usuario dado de baja'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo completar.', 'error');
+    }
+    async function restore() {
+      const res = await api(`/api/admin/users/${u.id}/restore`, { method: 'POST' });
+      if (res.ok) { toast('Usuario restaurado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const act = a.getAttribute('data-act');
+      if (act === 'save') save();
+      else if (act === 'reset-pass') resetPass();
+      else if (act === 'reset-mfa') resetMfa();
+      else if (act === 'toggle') toggle();
+      else if (act === 'delete') del();
+      else if (act === 'restore') restore();
+      else close();
+    });
+    setTimeout(() => q('#du-display').focus(), 60);
+  }
+
+  function openNewUserDrawer() {
+    const { overlay, close, q } = mountDrawer(`
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Nuevo usuario">
+        <header class="drawer__head">
+          <div class="drawer__name">Nuevo usuario</div>
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <div class="admin-field"><label for="nu-name">Usuario *</label><input type="text" id="nu-name" autocomplete="off" placeholder="nombre.apellido" /></div>
+          <div class="admin-field"><label for="nu-role">Rol</label><select id="nu-role" class="crm-select"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
+          <div class="admin-field"><label for="nu-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="nu-pass" autocomplete="new-password" /></div>
+          <label class="admin-check"><input type="checkbox" id="nu-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
+          <p class="admin-error" id="nu-error"></p>
+        </div>
+        <footer class="drawer__foot">
+          <div class="drawer__foot-right">
+            <button type="button" class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button type="button" class="btn-primary" data-act="save">Crear usuario</button>
+          </div>
+        </footer>
+      </aside>`);
+    async function save() {
+      q('#nu-error').textContent = '';
+      const res = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({
+        username: q('#nu-name').value, password: q('#nu-pass').value, role: q('#nu-role').value, mustChangePassword: q('#nu-mustchange').checked,
+      }) });
+      if (res.ok) { toast('Usuario creado'); close(); loadUsers(); }
+      else { const m = (res.body && res.body.error) || 'No se pudo crear.'; q('#nu-error').textContent = m; toast(m, 'error'); }
+    }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      if (a.getAttribute('data-act') === 'save') save(); else close();
+    });
+    setTimeout(() => q('#nu-name').focus(), 60);
+  }
+
+  $('users-new').addEventListener('click', openNewUserDrawer);
 
   // Avatar
   $('avatar-btn').addEventListener('click', () => $('avatar-file').click());
@@ -1711,13 +1798,6 @@
     if (r.ok) { toast('Se cerraron las demás sesiones'); loadSessions(); }
     else toast((r.body && r.body.error) || 'No se pudo completar.', 'error');
   });
-  $('user-save').addEventListener('click', async () => {
-    $('user-error').textContent = '';
-    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value, mustChangePassword: $('u-mustchange').checked }) });
-    if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadUsers(); }
-    else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
-  });
-
   // Enlace de recuperación de contraseña: /admin/reset-password?token=...
   const bootToken = new URLSearchParams(location.search).get('token');
   if (location.pathname.endsWith('/reset-password') && bootToken) {

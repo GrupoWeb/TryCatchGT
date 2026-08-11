@@ -666,26 +666,18 @@
 
         <!-- USUARIOS (solo admin) -->
         <section class="admin-sec" id="sec-users" hidden>
-          <h2 class="admin-sec__title">Usuarios</h2>
-          <p class="admin-muted">Gestiona las cuentas del equipo: crea, edita, activa/desactiva, restablece contraseñas y restaura usuarios.</p>
-          <div class="panel-grid">
-            <div class="panel">
-              <h3 class="panel__title">Cuentas del equipo</h3>
-              <div class="users-list" id="users-list"></div>
-            </div>
-            <div class="panel">
-              <h3 class="panel__title">Invitar usuario</h3>
-              <form id="user-form">
-                <div class="admin-grid-2">
-                  <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
-                  <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
-                </div>
-                <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
-                <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
-                <p class="admin-error" id="user-error"></p>
-                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
-              </form>
-            </div>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Usuarios</h2>
+            <button class="btn-primary" id="users-new">+ Nuevo usuario</button>
+          </div>
+          <p class="admin-muted">Gestiona las cuentas del equipo. Haz clic en una fila para editar, activar/desactivar, resetear la contraseña, reiniciar el 2FA o dar de baja.</p>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>2FA</th></tr>
+              </thead>
+              <tbody id="users-tbody"><tr><td colspan="5" class="admin-muted">Cargando…</td></tr></tbody>
+            </table>
           </div>
         </section>
 
