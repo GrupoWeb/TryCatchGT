@@ -927,33 +927,57 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .crm-tier--media { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
 .crm-tier--base { background: var(--surface-2); color: var(--text-muted); }
 .lead-tag--warn { background: color-mix(in srgb, var(--success) 12%, transparent); color: var(--success); }
+.lead-tag--next { background: var(--primary-weak); color: var(--primary); border-color: transparent; font-weight: 600; }
 a.lead-tag { text-decoration: none; }
 a.lead-tag:hover { color: var(--text-strong); border-color: var(--primary); }
 
-/* Pie de la tarjeta: botón de correo + toggle de notas en una barra con borde. */
+/* Pie de la tarjeta: correo (izq.) + botón de seguimiento (der.). */
 .contact-card__foot {
   display: flex; align-items: center; flex-wrap: wrap; gap: 12px;
   margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
 }
-.crm-followup { margin-left: auto; }
-.crm-followup summary {
-  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-muted);
-  list-style: none; display: inline-flex; align-items: center; gap: 7px;
-  padding: 6px 10px; border-radius: 8px;
+.crm-followup-btn {
+  margin-left: auto;
+  font-family: var(--font); font-size: 13px; font-weight: 600; color: var(--text-muted);
+  background: transparent; border: 1px solid transparent; border-radius: 8px;
+  padding: 6px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
   transition: color 0.15s ease, background 0.15s ease;
 }
-.crm-followup summary::-webkit-details-marker { display: none; }
-.crm-followup summary::before { content: '📝'; }
-.crm-followup summary::after { content: '⌄'; display: inline-block; font-size: 14px; transition: transform 0.15s ease; }
-.crm-followup summary:hover { color: var(--text-strong); background: var(--surface-2); }
-/* Al abrirse ocupa el ancho completo del pie, debajo del botón. */
-.crm-followup[open] { flex: 1 1 100%; margin-left: 0; order: 3; }
-.crm-followup[open] summary { margin-bottom: 14px; }
-.crm-followup[open] summary::after { transform: rotate(180deg); }
-.crm-followup__row { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.crm-followup__row .admin-field { margin-bottom: 0; flex: 1 1 180px; }
-.crm-notes { width: 100%; }
+.crm-followup-btn:hover { color: var(--text-strong); background: var(--surface-2); }
+/* Punto que indica que el contacto ya tiene notas o próxima acción. */
+.crm-followup-btn.is-set { color: var(--primary); }
+.crm-followup-btn.is-set::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--primary); }
 .crm-card__actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------- Drawer lateral de seguimiento ---------- */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 120;
+  display: flex; justify-content: flex-end;
+  background: rgba(15, 18, 34, 0.5);
+  opacity: 0; transition: opacity 0.22s ease;
+}
+.drawer-overlay.is-open { opacity: 1; }
+.drawer {
+  width: 100%; max-width: 440px; height: 100%;
+  display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%); transition: transform 0.24s ease;
+}
+.drawer-overlay.is-open .drawer { transform: none; }
+.drawer__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--border); }
+.drawer__id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.drawer__idtext { min-width: 0; }
+.drawer__name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-weight: 700; font-size: 16px; color: var(--text-strong); }
+.drawer__close { width: 34px; height: 34px; flex-shrink: 0; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-muted); cursor: pointer; font-size: 14px; transition: color 0.15s ease, background 0.15s ease; }
+.drawer__close:hover { color: var(--text-strong); background: var(--surface-2); }
+.drawer__body { flex: 1; overflow-y: auto; padding: 22px; }
+.drawer__body .admin-field:last-child { margin-bottom: 0; }
+.drawer__body textarea { min-height: 150px; }
+.drawer__foot { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 22px; border-top: 1px solid var(--border); }
+@media (max-width: 560px) { .drawer { max-width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .drawer, .drawer-overlay { transition: none; } }
+
 .copy-row { display: flex; gap: 8px; align-items: center; }
 .copy-row input { flex: 1 1 auto; }
 .copy-row .btn-ghost { white-space: nowrap; }

@@ -615,7 +615,10 @@
     const webTag = (c.website && c.website.trim())
       ? `<a class="lead-tag" href="${esc(c.website)}" target="_blank" rel="noopener"><span aria-hidden="true">🔗</span> ${esc(c.website.replace(/^https?:\/\//, ''))}</a>`
       : '<span class="lead-tag lead-tag--warn"><span aria-hidden="true">🚫</span> Sin sitio</span>';
-    const nextVal = c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '';
+    const hasFollowup = !!((c.notes && c.notes.trim()) || c.nextActionAt);
+    const nextTag = c.nextActionAt
+      ? `<span class="lead-tag lead-tag--next"><span aria-hidden="true">🗓️</span> ${esc(fmtDate(c.nextActionAt))}</span>`
+      : '';
     return `
       <article class="lead-card contact-card" data-id="${c.id}">
         <div class="contact-card__head">
@@ -634,21 +637,91 @@
           ${c.sector ? `<span class="lead-tag"><span aria-hidden="true">🏷️</span> ${esc(c.sector)}</span>` : ''}
           ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
           ${webTag}
+          ${nextTag}
         </div>
         <div class="contact-card__foot">
           <button class="btn-ghost btn-sm crm-mail-btn" data-id="${c.id}"><span aria-hidden="true">✉️</span> Enviar correo</button>
-          <details class="crm-followup">
-            <summary>Notas y seguimiento</summary>
-            <div class="crm-followup__body">
-              <div class="admin-field"><label for="cn-notes-${c.id}">Notas</label><textarea id="cn-notes-${c.id}" class="crm-notes" rows="3">${esc(c.notes || '')}</textarea></div>
-              <div class="crm-followup__row">
-                <div class="admin-field"><label for="cn-next-${c.id}">Próxima acción</label><input type="date" id="cn-next-${c.id}" class="crm-next" value="${nextVal}" /></div>
-                <button class="btn-primary crm-save" data-id="${c.id}">Guardar</button>
-              </div>
-            </div>
-          </details>
+          <button class="crm-followup-btn${hasFollowup ? ' is-set' : ''}" data-id="${c.id}"><span aria-hidden="true">📝</span> Notas y seguimiento</button>
         </div>
       </article>`;
+  }
+
+  // Drawer lateral de seguimiento: notas amplias, próxima acción y etapa.
+  // Se construye al vuelo (mismo patrón de overlay que los diálogos) y al guardar
+  // re-renderiza la lista para reflejar el indicador y el tag de próxima acción.
+  function openCrmDrawer(contact) {
+    const stageOpts = Object.entries(CRM_STAGES)
+      .map(([k, v]) => `<option value="${k}" ${k === contact.stage ? 'selected' : ''}>${v}</option>`)
+      .join('');
+    const tierBadge = contact.tier ? `<span class="crm-tier crm-tier--${contact.tier}">${CRM_TIERS[contact.tier]}</span>` : '';
+    const nextVal = contact.nextActionAt ? String(contact.nextActionAt).slice(0, 10) : '';
+    const overlay = document.createElement('div');
+    overlay.className = 'drawer-overlay';
+    overlay.innerHTML = `
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Seguimiento de ${esc(contact.name)}">
+        <header class="drawer__head">
+          <div class="drawer__id">
+            <div class="lead-card__avatar" style="--c:${leadColor(contact.name)}">${esc(leadInitials(contact.name))}</div>
+            <div class="drawer__idtext">
+              <div class="drawer__name">${esc(contact.name)}${tierBadge}</div>
+              <a class="lead-card__email" href="mailto:${esc(contact.email)}"><span aria-hidden="true">✉</span> ${esc(contact.email)}</a>
+            </div>
+          </div>
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <div class="admin-field">
+            <label for="drw-stage">Etapa del pipeline</label>
+            <select id="drw-stage" class="crm-select">${stageOpts}</select>
+          </div>
+          <div class="admin-field">
+            <label for="drw-notes">Notas</label>
+            <textarea id="drw-notes" rows="9" placeholder="Contexto, acuerdos, historial de la conversación…">${esc(contact.notes || '')}</textarea>
+          </div>
+          <div class="admin-field">
+            <label for="drw-next">Próxima acción</label>
+            <input type="date" id="drw-next" value="${nextVal}" />
+          </div>
+        </div>
+        <footer class="drawer__foot">
+          <button class="btn-ghost" data-act="cancel">Cancelar</button>
+          <button class="btn-primary" data-act="save">Guardar</button>
+        </footer>
+      </aside>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+
+    const notesEl = overlay.querySelector('#drw-notes');
+    const nextEl = overlay.querySelector('#drw-next');
+    const stageEl = overlay.querySelector('#drw-stage');
+
+    function close() { overlay.classList.remove('is-open'); document.removeEventListener('keydown', onKey); setTimeout(() => overlay.remove(), 240); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    async function save() {
+      const notes = notesEl.value.trim();
+      const nextRaw = nextEl.value;
+      const stage = stageEl.value;
+      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify({ notes, nextActionAt: nextRaw || null }) });
+      if (!res.ok) { toast((res.body && res.body.error) || 'No se pudo guardar', 'error'); return; }
+      // La etapa vive en otro endpoint; solo se persiste si cambió.
+      if (stage !== contact.stage) {
+        const rs = await api(`/api/admin/contacts/${contact.id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+        if (rs.ok) contact.stage = stage;
+      }
+      contact.notes = notes;
+      contact.nextActionAt = nextRaw || null;
+      toast('Seguimiento guardado');
+      close();
+      renderContacts();
+    }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.getAttribute('data-act') === 'save') save(); else close();
+    });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => notesEl.focus(), 60);
   }
 
   function renderContacts() {
@@ -672,20 +745,10 @@
         } else toast('No se pudo actualizar la etapa', 'error');
       });
     });
-    cont.querySelectorAll('.crm-save').forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        const id = btn.getAttribute('data-id');
-        const notes = cont.querySelector(`#cn-notes-${id}`).value.trim();
-        const nextRaw = cont.querySelector(`#cn-next-${id}`).value;
-        const res = await api(`/api/admin/contacts/${id}`, {
-          method: 'PUT',
-          body: JSON.stringify({ notes, nextActionAt: nextRaw || null }),
-        });
-        if (res.ok) {
-          const c = allContacts.find((x) => String(x.id) === id);
-          if (c) { c.notes = notes; c.nextActionAt = nextRaw || null; }
-          toast('Contacto guardado');
-        } else toast((res.body && res.body.error) || 'No se pudo guardar', 'error');
+    cont.querySelectorAll('.crm-followup-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = allContacts.find((x) => String(x.id) === btn.getAttribute('data-id'));
+        if (c) openCrmDrawer(c);
       });
     });
     cont.querySelectorAll('.crm-mail-btn').forEach((btn) => {
