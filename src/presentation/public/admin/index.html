@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex" />
   <title>Panel · TryCatch GT</title>
   <meta name="admin-base" content="{{ADMIN_BASE}}" />
+  <script src="{{ADMIN_BASE}}/theme-init.js"></script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,9 +15,6 @@
   <link rel="stylesheet" href="{{ADMIN_BASE}}/admin.css" />
 </head>
 <body>
-  <div class="aura aura--violet"></div>
-  <div class="aura aura--blue"></div>
-
   <!-- LOGIN -->
   <section class="admin-login" id="login-view" hidden>
     <form class="admin-login__card" id="login-form">
@@ -94,36 +92,64 @@
 
   <!-- DASHBOARD -->
   <section class="admin" id="dashboard-view" hidden>
-    <header class="admin__topbar">
-      <div class="admin__logo">TryCatch<span>GT</span> · Panel</div>
-      <div class="admin__actions">
-        <a href="/" target="_blank" class="btn-ghost">Ver sitio ↗</a>
-        <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
-      </div>
-    </header>
+    <aside class="admin__sidebar" id="admin-nav">
+      <div class="admin__brand">TryCatch<span>GT</span></div>
+      <nav class="admin__nav">
+        <span class="admin__nav-label">General</span>
+        <button class="admin__nav-btn is-active" data-section="home"><span class="admin__nav-ico">🏠</span> Inicio</button>
+        <button class="admin__nav-btn" data-section="leads"><span class="admin__nav-ico">📥</span> Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
 
-    <div class="admin__shell">
-      <aside class="admin__nav" id="admin-nav">
-        <button class="admin__nav-btn is-active" data-section="home">🏠 Inicio</button>
-        <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
-        <button class="admin__nav-btn" data-section="crm">📇 Clientes</button>
-        <button class="admin__nav-btn" data-section="templates">✉️ Plantillas</button>
-        <button class="admin__nav-btn" data-section="cadences">🔁 Cadencias</button>
-        <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
-        <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
-        <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
-        <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
-        <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
-        <button class="admin__nav-btn" data-section="users">👥 Usuarios</button>
-        <button class="admin__nav-btn" data-section="legal">📄 Legal</button>
-        <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
-      </aside>
+        <span class="admin__nav-label">CRM</span>
+        <button class="admin__nav-btn" data-section="crm"><span class="admin__nav-ico">📇</span> Clientes</button>
+        <button class="admin__nav-btn" data-section="templates"><span class="admin__nav-ico">✉️</span> Plantillas</button>
+        <button class="admin__nav-btn" data-section="cadences"><span class="admin__nav-ico">🔁</span> Cadencias</button>
+
+        <span class="admin__nav-label">Contenido</span>
+        <button class="admin__nav-btn" data-section="blog"><span class="admin__nav-ico">📝</span> Blog</button>
+        <button class="admin__nav-btn" data-section="services"><span class="admin__nav-ico">⚙️</span> Servicios</button>
+        <button class="admin__nav-btn" data-section="plans"><span class="admin__nav-ico">💳</span> Planes</button>
+        <button class="admin__nav-btn" data-section="contact"><span class="admin__nav-ico">📞</span> Contacto</button>
+
+        <span class="admin__nav-label">Cuenta</span>
+        <button class="admin__nav-btn" data-section="account"><span class="admin__nav-ico">👤</span> Perfil</button>
+        <button class="admin__nav-btn" data-section="users"><span class="admin__nav-ico">👥</span> Usuarios</button>
+        <button class="admin__nav-btn" data-section="legal"><span class="admin__nav-ico">📄</span> Legal</button>
+        <button class="admin__nav-btn" data-section="audit"><span class="admin__nav-ico">🛡️</span> Auditoría</button>
+      </nav>
+    </aside>
+
+    <div class="admin__scrim" id="admin-scrim"></div>
+
+    <div class="admin__content">
+      <header class="admin__topbar">
+        <button class="admin__menu-btn" id="sidebar-toggle" aria-label="Menú">☰</button>
+        <div class="admin__page-title" id="admin-page-title">Inicio</div>
+        <div class="admin__actions">
+          <button class="theme-toggle" id="theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+          <a href="/" target="_blank" class="btn-ghost">Ver sitio ↗</a>
+          <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
+        </div>
+      </header>
 
       <main class="admin__main">
         <!-- INICIO -->
         <section class="admin-sec" id="sec-home">
-          <h2 class="admin-sec__title">Inicio</h2>
           <div class="stat-grid" id="stat-grid"></div>
+          <div class="dash-charts">
+            <div class="chart-card">
+              <div class="chart-card__head">
+                <span class="chart-card__title">Cotizaciones por mes</span>
+                <span class="chart-card__hint">Últimos 6 meses</span>
+              </div>
+              <div class="chart-card__canvas"><canvas id="chart-leads-month"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card__head">
+                <span class="chart-card__title">Cotizaciones por estado</span>
+              </div>
+              <div class="chart-card__canvas"><canvas id="chart-leads-status"></canvas></div>
+            </div>
+          </div>
         </section>
 
         <!-- COTIZACIONES -->
@@ -667,6 +693,7 @@
     </div>
   </div>
 
+  <script src="{{ADMIN_BASE}}/vendor/chart.umd.min.js"></script>
   <script src="{{ADMIN_BASE}}/admin.js"></script>
 </body>
 </html>

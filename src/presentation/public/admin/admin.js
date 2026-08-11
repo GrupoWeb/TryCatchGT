@@ -269,7 +269,20 @@
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
-    document.querySelectorAll('.admin__nav-btn').forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-section') === name));
+    let activeBtn = null;
+    document.querySelectorAll('.admin__nav-btn').forEach((b) => {
+      const on = b.getAttribute('data-section') === name;
+      b.classList.toggle('is-active', on);
+      if (on) activeBtn = b;
+    });
+    // Refleja la sección activa en el título de la barra superior (sin icono ni badge).
+    const title = $('admin-page-title');
+    if (title && activeBtn) {
+      const clone = activeBtn.cloneNode(true);
+      clone.querySelectorAll('.admin__nav-ico, .nav-badge').forEach((n) => n.remove());
+      title.textContent = clone.textContent.trim();
+    }
+    closeSidebar();
     if (loaders[name]) loaders[name]();
   }
   $('admin-nav').addEventListener('click', (e) => {
@@ -277,26 +290,138 @@
     if (btn) showSection(btn.getAttribute('data-section'));
   });
 
+  // ── Sidebar móvil ─────────────────────────────────────────
+  function openSidebar() { $('dashboard-view').classList.add('sidebar-open'); }
+  function closeSidebar() { $('dashboard-view').classList.remove('sidebar-open'); }
+  $('sidebar-toggle').addEventListener('click', () => $('dashboard-view').classList.toggle('sidebar-open'));
+  $('admin-scrim').addEventListener('click', closeSidebar);
+
+  // ── Tema claro / oscuro ───────────────────────────────────
+  const THEME_KEY = 'tc-admin-theme';
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  function applyThemeIcon() { const b = $('theme-toggle'); if (b) b.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; }
+  function setTheme(theme) {
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(THEME_KEY, theme); } catch (_) { /* modo privado */ }
+    applyThemeIcon();
+    renderOverviewCharts(); // repinta con los colores del nuevo tema
+  }
+  applyThemeIcon();
+  $('theme-toggle').addEventListener('click', () => setTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+
   // ── INICIO (overview) ─────────────────────────────────────
+  let lastOverview = null;      // último payload, para repintar al cambiar de tema
+  const charts = {};            // instancias de Chart.js activas por id de canvas
+
   async function loadOverview() {
     const { ok, body } = await api('/api/admin/overview');
     if (!guard({ status: ok ? 200 : 401 })) return;
     if (!ok) return;
     const d = body.data;
+    lastOverview = d;
     const badge = $('nav-leads');
     if (d.leadsPending > 0) { badge.hidden = false; badge.textContent = d.leadsPending; } else badge.hidden = true;
     const cards = [
-      { label: 'Cotizaciones pendientes', value: d.leadsPending, accent: '#EC4899', icon: '📥' },
-      { label: 'Cotizaciones totales', value: d.leadsTotal, accent: '#06B6D4', icon: '📊' },
-      { label: 'Artículos publicados', value: d.postsPublished, accent: '#4ade80', icon: '✅' },
-      { label: 'Borradores', value: d.postsDraft, accent: '#fbbf24', icon: '📝' },
+      { label: 'Cotizaciones pendientes', value: d.leadsPending, accent: '#6c5ffc', icon: '📥' },
+      { label: 'Cotizaciones totales', value: d.leadsTotal, accent: '#06b6d4', icon: '📊' },
+      { label: 'Artículos publicados', value: d.postsPublished, accent: '#0ab39c', icon: '✅' },
+      { label: 'Borradores', value: d.postsDraft, accent: '#f7b84b', icon: '📝' },
     ];
     $('stat-grid').innerHTML = cards.map((c) => `
       <div class="stat-card" style="--accent:${c.accent}">
         <div class="stat-card__icon">${c.icon}</div>
-        <div class="stat-card__value">${c.value}</div>
-        <div class="stat-card__label">${esc(c.label)}</div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">${c.value}</div>
+          <div class="stat-card__label">${esc(c.label)}</div>
+        </div>
       </div>`).join('');
+    renderOverviewCharts(d);
+  }
+
+  // Lee un token de color del tema activo (fallback por si el navegador aún no
+  // resolvió la variable CSS).
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+  const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function monthLabel(key) {
+    const m = Number(String(key).split('-')[1]);
+    return MONTHS_ES[(m - 1 + 12) % 12] || key;
+  }
+
+  // Dibuja (o repinta) las gráficas del dashboard con los colores del tema actual.
+  // Sin datos previos o sin Chart.js cargado, no hace nada.
+  function renderOverviewCharts(data) {
+    const d = data || lastOverview;
+    if (!d || typeof window.Chart === 'undefined') return;
+    Object.values(charts).forEach((c) => c && c.destroy());
+
+    const primary = cssVar('--primary', '#6c5ffc');
+    const grid = cssVar('--border', 'rgba(0,0,0,0.08)');
+    const tick = cssVar('--text-muted', '#767d92');
+    const surface = cssVar('--surface', '#ffffff');
+    window.Chart.defaults.font.family = cssVar('--font', 'Inter, sans-serif');
+    window.Chart.defaults.color = tick;
+
+    // Área: cotizaciones por mes.
+    const monthCanvas = $('chart-leads-month');
+    const series = Array.isArray(d.leadsByMonth) ? d.leadsByMonth : [];
+    if (monthCanvas && series.length) {
+      const ctx = monthCanvas.getContext('2d');
+      const fill = ctx.createLinearGradient(0, 0, 0, 260);
+      fill.addColorStop(0, 'rgba(108,95,252,0.28)');
+      fill.addColorStop(1, 'rgba(108,95,252,0.02)');
+      charts.month = new window.Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: series.map((s) => monthLabel(s.month)),
+          datasets: [{
+            data: series.map((s) => s.count),
+            borderColor: primary,
+            backgroundColor: fill,
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: surface,
+            pointBorderColor: primary,
+            pointBorderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: tick } },
+            y: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, precision: 0 } },
+          },
+        },
+      });
+    }
+
+    // Dona: cotizaciones por estado.
+    const statusCanvas = $('chart-leads-status');
+    const byStatus = d.leadsByStatus || {};
+    if (statusCanvas && (byStatus.pending || byStatus.reviewed || byStatus.contacted)) {
+      charts.status = new window.Chart(statusCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Pendiente', 'Revisado', 'Contactado'],
+          datasets: [{
+            data: [byStatus.pending || 0, byStatus.reviewed || 0, byStatus.contacted || 0],
+            backgroundColor: [cssVar('--warning', '#f7b84b'), cssVar('--info', '#4b9fd5'), cssVar('--success', '#0ab39c')],
+            borderColor: surface,
+            borderWidth: 3,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '62%',
+          plugins: { legend: { position: 'bottom', labels: { color: tick, usePointStyle: true, padding: 16 } } },
+        },
+      });
+    }
   }
 
   // ── AUDITORÍA ─────────────────────────────────────────────
