@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import path from 'node:path';
 import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
-import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts } from './routes/apiRoutes.js';
+import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { buildCspDirectives } from './csp.js';
 import { buildPostSeo, buildDefaultPostSeo, buildSitemap, buildRobots } from './seo.js';
@@ -154,6 +154,38 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ success: false, error: 'Ocurrió un error inesperado.' });
 });
 
+/**
+ * Scheduler en proceso de las cadencias de seguimiento (Fase 4). Cada intervalo
+ * procesa los pasos vencidos. Un guard evita que dos ejecuciones se solapen si una
+ * tarda más que el intervalo. Se puede desactivar con CADENCE_INTERVAL_MINUTES=0
+ * (el panel conserva el botón "Procesar ahora").
+ */
+function startCadenceScheduler(): void {
+  const minutes = env.cadence.intervalMinutes;
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    console.log('  ⏸️  Scheduler de cadencias desactivado (CADENCE_INTERVAL_MINUTES=0)');
+    return;
+  }
+  let running = false;
+  const tick = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    try {
+      const r = await processDueCadences.execute();
+      if (r.processed > 0) {
+        console.log(`  🔁 Cadencias: ${r.processed} evaluadas · ${r.sent} enviadas · ${r.completed} completadas · ${r.stopped} cortadas`);
+      }
+    } catch (error) {
+      console.error('⚠️  Scheduler de cadencias falló:', (error as Error).message);
+    } finally {
+      running = false;
+    }
+  };
+  const handle = setInterval(() => void tick(), minutes * 60 * 1000);
+  handle.unref?.(); // no impedir que el proceso termine por este timer
+  console.log(`  🔁 Scheduler de cadencias activo (cada ${minutes} min)`);
+}
+
 function listen(): void {
   app.listen(env.port, () => {
     console.log('');
@@ -181,6 +213,8 @@ async function bootstrap(): Promise<void> {
     } catch (error) {
       console.warn('⚠️  No se pudo sembrar el admin inicial:', (error as Error).message);
     }
+    // El scheduler solo arranca con la BD lista (necesita leer/escribir cadencias).
+    startCadenceScheduler();
   } catch (error) {
     // La BD no respondió: se arranca igual en modo degradado para servir la landing
     // y que /api/health devuelva 503 (el healthcheck del contenedor lo detecta). Las

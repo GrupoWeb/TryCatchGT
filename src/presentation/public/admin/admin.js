@@ -138,6 +138,12 @@
   const dashboardView = $('dashboard-view');
   const forceView = $('force-pass-view');
 
+  // Los drawers de las secciones (blog, servicios, planes, plantillas, cadencias)
+  // vienen estáticos dentro del contenido; se reubican al <body> para que el overlay
+  // fijo cubra toda la pantalla —incluida la barra superior— igual que los drawers
+  // dinámicos del CRM/usuarios. Anidados en el flujo, la barra sticky tapaba su encabezado.
+  document.querySelectorAll('#dashboard-view .drawer-overlay').forEach((ov) => document.body.appendChild(ov));
+
   function showLogin() { loginView.hidden = false; dashboardView.hidden = true; forceView.hidden = true; showLoginStep('password'); }
   function showDashboard() { loginView.hidden = true; dashboardView.hidden = false; forceView.hidden = true; applyRoleGate(currentUserRole); showSection('home'); loadOverview(); }
 
@@ -265,11 +271,24 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
-    document.querySelectorAll('.admin__nav-btn').forEach((b) => b.classList.toggle('is-active', b.getAttribute('data-section') === name));
+    let activeBtn = null;
+    document.querySelectorAll('.admin__nav-btn').forEach((b) => {
+      const on = b.getAttribute('data-section') === name;
+      b.classList.toggle('is-active', on);
+      if (on) activeBtn = b;
+    });
+    // Refleja la sección activa en el título de la barra superior (sin icono ni badge).
+    const title = $('admin-page-title');
+    if (title && activeBtn) {
+      const clone = activeBtn.cloneNode(true);
+      clone.querySelectorAll('.admin__nav-ico, .nav-badge').forEach((n) => n.remove());
+      title.textContent = clone.textContent.trim();
+    }
+    closeSidebar();
     if (loaders[name]) loaders[name]();
   }
   $('admin-nav').addEventListener('click', (e) => {
@@ -277,26 +296,138 @@
     if (btn) showSection(btn.getAttribute('data-section'));
   });
 
+  // ── Sidebar móvil ─────────────────────────────────────────
+  function openSidebar() { $('dashboard-view').classList.add('sidebar-open'); }
+  function closeSidebar() { $('dashboard-view').classList.remove('sidebar-open'); }
+  $('sidebar-toggle').addEventListener('click', () => $('dashboard-view').classList.toggle('sidebar-open'));
+  $('admin-scrim').addEventListener('click', closeSidebar);
+
+  // ── Tema claro / oscuro ───────────────────────────────────
+  const THEME_KEY = 'tc-admin-theme';
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  function applyThemeIcon() { const b = $('theme-toggle'); if (b) b.textContent = currentTheme() === 'dark' ? '☀️' : '🌙'; }
+  function setTheme(theme) {
+    if (theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(THEME_KEY, theme); } catch (_) { /* modo privado */ }
+    applyThemeIcon();
+    renderOverviewCharts(); // repinta con los colores del nuevo tema
+  }
+  applyThemeIcon();
+  $('theme-toggle').addEventListener('click', () => setTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
+
   // ── INICIO (overview) ─────────────────────────────────────
+  let lastOverview = null;      // último payload, para repintar al cambiar de tema
+  const charts = {};            // instancias de Chart.js activas por id de canvas
+
   async function loadOverview() {
     const { ok, body } = await api('/api/admin/overview');
     if (!guard({ status: ok ? 200 : 401 })) return;
     if (!ok) return;
     const d = body.data;
+    lastOverview = d;
     const badge = $('nav-leads');
     if (d.leadsPending > 0) { badge.hidden = false; badge.textContent = d.leadsPending; } else badge.hidden = true;
     const cards = [
-      { label: 'Cotizaciones pendientes', value: d.leadsPending, accent: '#EC4899', icon: '📥' },
-      { label: 'Cotizaciones totales', value: d.leadsTotal, accent: '#06B6D4', icon: '📊' },
-      { label: 'Artículos publicados', value: d.postsPublished, accent: '#4ade80', icon: '✅' },
-      { label: 'Borradores', value: d.postsDraft, accent: '#fbbf24', icon: '📝' },
+      { label: 'Cotizaciones pendientes', value: d.leadsPending, accent: '#6c5ffc', icon: '📥' },
+      { label: 'Cotizaciones totales', value: d.leadsTotal, accent: '#06b6d4', icon: '📊' },
+      { label: 'Artículos publicados', value: d.postsPublished, accent: '#0ab39c', icon: '✅' },
+      { label: 'Borradores', value: d.postsDraft, accent: '#f7b84b', icon: '📝' },
     ];
     $('stat-grid').innerHTML = cards.map((c) => `
       <div class="stat-card" style="--accent:${c.accent}">
         <div class="stat-card__icon">${c.icon}</div>
-        <div class="stat-card__value">${c.value}</div>
-        <div class="stat-card__label">${esc(c.label)}</div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">${c.value}</div>
+          <div class="stat-card__label">${esc(c.label)}</div>
+        </div>
       </div>`).join('');
+    renderOverviewCharts(d);
+  }
+
+  // Lee un token de color del tema activo (fallback por si el navegador aún no
+  // resolvió la variable CSS).
+  function cssVar(name, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }
+  const MONTHS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function monthLabel(key) {
+    const m = Number(String(key).split('-')[1]);
+    return MONTHS_ES[(m - 1 + 12) % 12] || key;
+  }
+
+  // Dibuja (o repinta) las gráficas del dashboard con los colores del tema actual.
+  // Sin datos previos o sin Chart.js cargado, no hace nada.
+  function renderOverviewCharts(data) {
+    const d = data || lastOverview;
+    if (!d || typeof window.Chart === 'undefined') return;
+    Object.values(charts).forEach((c) => c && c.destroy());
+
+    const primary = cssVar('--primary', '#6c5ffc');
+    const grid = cssVar('--border', 'rgba(0,0,0,0.08)');
+    const tick = cssVar('--text-muted', '#767d92');
+    const surface = cssVar('--surface', '#ffffff');
+    window.Chart.defaults.font.family = cssVar('--font', 'Inter, sans-serif');
+    window.Chart.defaults.color = tick;
+
+    // Área: cotizaciones por mes.
+    const monthCanvas = $('chart-leads-month');
+    const series = Array.isArray(d.leadsByMonth) ? d.leadsByMonth : [];
+    if (monthCanvas && series.length) {
+      const ctx = monthCanvas.getContext('2d');
+      const fill = ctx.createLinearGradient(0, 0, 0, 260);
+      fill.addColorStop(0, 'rgba(108,95,252,0.28)');
+      fill.addColorStop(1, 'rgba(108,95,252,0.02)');
+      charts.month = new window.Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: series.map((s) => monthLabel(s.month)),
+          datasets: [{
+            data: series.map((s) => s.count),
+            borderColor: primary,
+            backgroundColor: fill,
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 3,
+            pointBackgroundColor: surface,
+            pointBorderColor: primary,
+            pointBorderWidth: 2,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: tick } },
+            y: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, precision: 0 } },
+          },
+        },
+      });
+    }
+
+    // Dona: cotizaciones por estado.
+    const statusCanvas = $('chart-leads-status');
+    const byStatus = d.leadsByStatus || {};
+    if (statusCanvas && (byStatus.pending || byStatus.reviewed || byStatus.contacted)) {
+      charts.status = new window.Chart(statusCanvas.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Pendiente', 'Revisado', 'Contactado'],
+          datasets: [{
+            data: [byStatus.pending || 0, byStatus.reviewed || 0, byStatus.contacted || 0],
+            backgroundColor: [cssVar('--warning', '#f7b84b'), cssVar('--info', '#4b9fd5'), cssVar('--success', '#0ab39c')],
+            borderColor: surface,
+            borderWidth: 3,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '62%',
+          plugins: { legend: { position: 'bottom', labels: { color: tick, usePointStyle: true, padding: 16 } } },
+        },
+      });
+    }
   }
 
   // ── AUDITORÍA ─────────────────────────────────────────────
@@ -442,12 +573,328 @@
     toast(`Exportadas ${rows.length} cotización(es)`);
   }
 
-  // ── Editor genérico (lista + formulario) ──────────────────
+  // ── CLIENTES / CRM ────────────────────────────────────────
+  const CRM_STAGES = {
+    nuevo: 'Nuevo', contactado: 'Contactado', respondio: 'Respondió', reunion: 'Reunión',
+    propuesta: 'Propuesta', ganado: 'Ganado', perdido: 'Perdido', dormido: 'Dormido',
+  };
+  const CRM_TIERS = { alta: 'Alta', media: 'Media', base: 'Base' };
+  let allContacts = [];
+  let crmQuery = '', crmTier = 'all', crmWeb = 'all', crmStage = 'all', crmArchived = 'active', crmLimit = PAGE;
+
+  async function loadCrm() {
+    // Se traen también los dados de baja; el filtro por estado se aplica en cliente.
+    const r = await api('/api/admin/contacts?includeArchived=true');
+    if (!guard(r)) return;
+    if (!r.ok) { $('crm-list').innerHTML = '<p class="admin-muted">No se pudieron cargar los contactos.</p>'; return; }
+    allContacts = r.body.data || [];
+    crmLimit = PAGE;
+    renderContacts();
+  }
+
+  function filteredContacts() {
+    const q = crmQuery.trim().toLowerCase();
+    return allContacts.filter((c) => {
+      if (crmArchived === 'active' && c.archived) return false;
+      if (crmArchived === 'archived' && !c.archived) return false;
+      if (crmTier !== 'all' && c.tier !== crmTier) return false;
+      if (crmStage !== 'all' && c.stage !== crmStage) return false;
+      const hasWeb = !!(c.website && c.website.trim());
+      if (crmWeb === 'si' && !hasWeb) return false;
+      if (crmWeb === 'no' && hasWeb) return false;
+      if (!q) return true;
+      return [c.name, c.email, c.company, c.sector, c.location]
+        .some((f) => String(f || '').toLowerCase().includes(q));
+    });
+  }
+
+  // Color de la etapa del pipeline: da lectura inmediata del estado y evita que
+  // el selector se vea como un recuadro gris suelto.
+  const CRM_STAGE_COLORS = {
+    nuevo: '#4b9fd5', contactado: '#6c5ffc', respondio: '#06b6d4', reunion: '#f7b84b',
+    propuesta: '#ec4899', ganado: '#0ab39c', perdido: '#f1556c', dormido: '#98a0b3',
+  };
+  function crmStageColor(stage) { return CRM_STAGE_COLORS[stage] || '#98a0b3'; }
+
+  function contactCard(c) {
+    const stageOpts = Object.entries(CRM_STAGES)
+      .map(([k, v]) => `<option value="${k}" ${k === c.stage ? 'selected' : ''}>${v}</option>`)
+      .join('');
+    const tierBadge = c.tier ? `<span class="crm-tier crm-tier--${c.tier}">${CRM_TIERS[c.tier]}</span>` : '';
+    const webTag = (c.website && c.website.trim())
+      ? `<a class="lead-tag" href="${esc(c.website)}" target="_blank" rel="noopener"><span aria-hidden="true">🔗</span> ${esc(c.website.replace(/^https?:\/\//, ''))}</a>`
+      : '<span class="lead-tag lead-tag--warn"><span aria-hidden="true">🚫</span> Sin sitio</span>';
+    const hasFollowup = !!((c.notes && c.notes.trim()) || c.nextActionAt);
+    const nextTag = c.nextActionAt
+      ? `<span class="lead-tag lead-tag--next"><span aria-hidden="true">🗓️</span> ${esc(fmtDate(c.nextActionAt))}</span>`
+      : '';
+    return `
+      <article class="lead-card contact-card${c.archived ? ' is-archived' : ''}" data-id="${c.id}">
+        <div class="contact-card__head">
+          <div class="lead-card__avatar" style="--c:${leadColor(c.name)}">${esc(leadInitials(c.name))}</div>
+          <div class="contact-card__id">
+            <div class="contact-card__name-row">
+              <span class="lead-card__name">${esc(c.name)}</span>
+              ${c.archived ? '<span class="badge-archived">Dado de baja</span>' : ''}
+              ${tierBadge}
+              ${c.company ? `<span class="lead-card__company">${esc(c.company)}</span>` : ''}
+            </div>
+            <a class="lead-card__email" href="mailto:${esc(c.email)}"><span aria-hidden="true">✉</span> ${esc(c.email)}</a>
+          </div>
+          <select class="lead-card__status crm-stage" data-id="${c.id}" aria-label="Etapa del pipeline" style="--status-c:${crmStageColor(c.stage)}">${stageOpts}</select>
+        </div>
+        <div class="contact-card__meta">
+          ${c.sector ? `<span class="lead-tag"><span aria-hidden="true">🏷️</span> ${esc(c.sector)}</span>` : ''}
+          ${c.location ? `<span class="lead-tag"><span aria-hidden="true">📍</span> ${esc(c.location)}</span>` : ''}
+          ${webTag}
+          ${nextTag}
+        </div>
+        <div class="contact-card__foot">
+          <button class="btn-ghost btn-sm crm-mail-btn" data-id="${c.id}"><span aria-hidden="true">✉️</span> Enviar correo</button>
+          <button class="crm-followup-btn${hasFollowup ? ' is-set' : ''}" data-id="${c.id}"><span aria-hidden="true">📝</span> Notas y seguimiento</button>
+        </div>
+      </article>`;
+  }
+
+  // Drawer lateral: edición del contacto, seguimiento (notas / próxima acción /
+  // etapa) y baja lógica. Se construye al vuelo (mismo patrón de overlay que los
+  // diálogos) y al guardar re-renderiza la lista.
+  function openCrmDrawer(contact) {
+    const stageOpts = Object.entries(CRM_STAGES)
+      .map(([k, v]) => `<option value="${k}" ${k === contact.stage ? 'selected' : ''}>${v}</option>`)
+      .join('');
+    const tierOpts = ['<option value="">Sin prioridad</option>']
+      .concat(Object.entries(CRM_TIERS).map(([k, v]) => `<option value="${k}" ${k === contact.tier ? 'selected' : ''}>${v}</option>`))
+      .join('');
+    const nextVal = contact.nextActionAt ? String(contact.nextActionAt).slice(0, 10) : '';
+    const val = (v) => esc(v || '');
+    const overlay = document.createElement('div');
+    overlay.className = 'drawer-overlay';
+    overlay.innerHTML = `
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Editar ${esc(contact.name)}">
+        <header class="drawer__head">
+          <div class="drawer__id">
+            <div class="lead-card__avatar" style="--c:${leadColor(contact.name)}">${esc(leadInitials(contact.name))}</div>
+            <div class="drawer__idtext">
+              <div class="drawer__name">${esc(contact.name)}${contact.archived ? '<span class="badge-archived">Dado de baja</span>' : ''}</div>
+              <a class="lead-card__email" href="mailto:${esc(contact.email)}"><span aria-hidden="true">✉</span> ${esc(contact.email)}</a>
+            </div>
+          </div>
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <p class="drawer__section">Datos del contacto</p>
+          <div class="admin-field"><label for="drw-name">Nombre</label><input type="text" id="drw-name" value="${val(contact.name)}" /></div>
+          <div class="admin-field"><label for="drw-company">Empresa</label><input type="text" id="drw-company" value="${val(contact.company)}" /></div>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="drw-sector">Sector</label><input type="text" id="drw-sector" value="${val(contact.sector)}" /></div>
+            <div class="admin-field"><label for="drw-location">Ubicación</label><input type="text" id="drw-location" value="${val(contact.location)}" /></div>
+          </div>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="drw-phone">Teléfono</label><input type="text" id="drw-phone" value="${val(contact.phone)}" /></div>
+            <div class="admin-field"><label for="drw-tier">Prioridad</label><select id="drw-tier" class="crm-select">${tierOpts}</select></div>
+          </div>
+          <div class="admin-field"><label for="drw-website">Sitio web</label><input type="text" id="drw-website" value="${val(contact.website)}" placeholder="https://…" /></div>
+
+          <p class="drawer__section">Seguimiento</p>
+          <div class="admin-field"><label for="drw-stage">Etapa del pipeline</label><select id="drw-stage" class="crm-select">${stageOpts}</select></div>
+          <div class="admin-field"><label for="drw-notes">Notas</label><textarea id="drw-notes" rows="7" placeholder="Contexto, acuerdos, historial de la conversación…">${esc(contact.notes || '')}</textarea></div>
+          <div class="admin-field"><label for="drw-next">Próxima acción</label><input type="date" id="drw-next" value="${nextVal}" /></div>
+        </div>
+        <footer class="drawer__foot">
+          <button class="btn-danger" data-act="archive">${contact.archived ? 'Reactivar' : 'Dar de baja'}</button>
+          <div class="drawer__foot-right">
+            <button class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button class="btn-primary" data-act="save">Guardar</button>
+          </div>
+        </footer>
+      </aside>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+
+    const q = (sel) => overlay.querySelector(sel);
+    function close() { overlay.classList.remove('is-open'); document.removeEventListener('keydown', onKey); setTimeout(() => overlay.remove(), 240); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+
+    async function save() {
+      const stage = q('#drw-stage').value;
+      const payload = {
+        name: q('#drw-name').value.trim(),
+        company: q('#drw-company').value.trim(),
+        sector: q('#drw-sector').value.trim(),
+        location: q('#drw-location').value.trim(),
+        phone: q('#drw-phone').value.trim(),
+        website: q('#drw-website').value.trim(),
+        tier: q('#drw-tier').value || null,
+        notes: q('#drw-notes').value.trim(),
+        nextActionAt: q('#drw-next').value || null,
+      };
+      if (!payload.name) { toast('El nombre es obligatorio', 'error'); return; }
+      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify(payload) });
+      if (!res.ok) { toast((res.body && res.body.error) || 'No se pudo guardar', 'error'); return; }
+      // La etapa vive en otro endpoint; solo se persiste si cambió.
+      if (stage !== contact.stage) {
+        const rs = await api(`/api/admin/contacts/${contact.id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage }) });
+        if (rs.ok) contact.stage = stage;
+      }
+      Object.assign(contact, payload);
+      toast('Contacto guardado');
+      close();
+      renderContacts();
+    }
+
+    async function toggleArchive() {
+      const willArchive = !contact.archived;
+      if (willArchive) {
+        const ok = await confirmDialog({
+          title: 'Dar de baja el contacto',
+          message: `Se dará de baja a “${contact.name}”. Se conserva su historial y correos, pero saldrá del pipeline activo. Puedes reactivarlo después.`,
+          confirmText: 'Dar de baja', danger: true,
+        });
+        if (!ok) return;
+      }
+      const res = await api(`/api/admin/contacts/${contact.id}`, { method: 'PUT', body: JSON.stringify({ archived: willArchive }) });
+      if (!res.ok) { toast((res.body && res.body.error) || 'No se pudo completar', 'error'); return; }
+      contact.archived = willArchive;
+      toast(willArchive ? 'Contacto dado de baja' : 'Contacto reactivado');
+      close();
+      renderContacts();
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      const act = a.getAttribute('data-act');
+      if (act === 'save') save();
+      else if (act === 'archive') toggleArchive();
+      else close();
+    });
+    document.addEventListener('keydown', onKey);
+    setTimeout(() => q('#drw-name').focus(), 60);
+  }
+
+  function renderContacts() {
+    const cont = $('crm-list');
+    if (!allContacts.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay contactos.</p>'; $('crm-count').textContent = ''; $('crm-more').hidden = true; return; }
+    const all = filteredContacts();
+    $('crm-count').textContent = `${all.length} contacto(s)`;
+    if (!all.length) { cont.innerHTML = '<p class="admin-muted">Ninguno coincide con el filtro.</p>'; $('crm-more').hidden = true; return; }
+    cont.innerHTML = all.slice(0, crmLimit).map(contactCard).join('');
+    $('crm-more').hidden = all.length <= crmLimit;
+
+    cont.querySelectorAll('.crm-stage').forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        const id = sel.getAttribute('data-id');
+        sel.style.setProperty('--status-c', crmStageColor(sel.value));
+        const res = await api(`/api/admin/contacts/${id}/stage`, { method: 'PATCH', body: JSON.stringify({ stage: sel.value }) });
+        if (res.ok) {
+          const c = allContacts.find((x) => String(x.id) === id);
+          if (c) c.stage = sel.value;
+          toast('Etapa actualizada');
+        } else toast('No se pudo actualizar la etapa', 'error');
+      });
+    });
+    cont.querySelectorAll('.crm-followup-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = allContacts.find((x) => String(x.id) === btn.getAttribute('data-id'));
+        if (c) openCrmDrawer(c);
+      });
+    });
+    cont.querySelectorAll('.crm-mail-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = allContacts.find((x) => String(x.id) === btn.getAttribute('data-id'));
+        if (c) openMailComposer(c);
+      });
+    });
+  }
+
+  $('crm-search').addEventListener('input', (e) => { crmQuery = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-stage-filter').addEventListener('change', (e) => { crmStage = e.target.value; crmLimit = PAGE; renderContacts(); });
+  $('crm-tier-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmTier = chip.getAttribute('data-tier'); crmLimit = PAGE;
+    $('crm-tier-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-web-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmWeb = chip.getAttribute('data-web'); crmLimit = PAGE;
+    $('crm-web-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-archived-filter').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    crmArchived = chip.getAttribute('data-arch'); crmLimit = PAGE;
+    $('crm-archived-filter').querySelectorAll('.chip').forEach((c) => c.classList.toggle('is-active', c === chip));
+    renderContacts();
+  });
+  $('crm-more-btn').addEventListener('click', () => { crmLimit += PAGE; renderContacts(); });
+
+  // Nuevo contacto
+  $('crm-new-toggle').addEventListener('click', () => { const f = $('crm-new-form'); f.hidden = !f.hidden; if (!f.hidden) $('cn-name').focus(); });
+  $('crm-new-cancel').addEventListener('click', () => { $('crm-new-form').hidden = true; $('crm-new-form').reset(); });
+  $('crm-new-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const payload = {
+      name: $('cn-name').value.trim(),
+      email: $('cn-email').value.trim(),
+      company: $('cn-company').value.trim(),
+      phone: $('cn-phone').value.trim(),
+      sector: $('cn-sector').value.trim(),
+      location: $('cn-location').value.trim(),
+      website: $('cn-website').value.trim(),
+      tier: $('cn-tier').value || null,
+    };
+    if (!payload.name || !payload.email) { toast('Nombre y correo son obligatorios', 'error'); return; }
+    const res = await api('/api/admin/contacts', { method: 'POST', body: JSON.stringify(payload) });
+    if (res.ok) {
+      toast('Contacto creado');
+      $('crm-new-form').reset(); $('crm-new-form').hidden = true;
+      loadCrm();
+    } else toast((res.body && res.body.error) || 'No se pudo crear el contacto', 'error');
+  });
+
+  $('crm-export').addEventListener('click', () => {
+    const rows = filteredContacts();
+    if (!rows.length) { toast('No hay contactos para exportar', 'error'); return; }
+    const headers = ['ID', 'Nombre', 'Correo', 'Empresa', 'Sector', 'Ubicación', 'Sitio web', 'Prioridad', 'Etapa', 'Próxima acción', 'Notas'];
+    const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [headers.map(cell).join(',')];
+    for (const c of rows) {
+      lines.push([
+        c.id, c.name, c.email, c.company, c.sector, c.location, c.website,
+        CRM_TIERS[c.tier] || '', CRM_STAGES[c.stage] || c.stage,
+        c.nextActionAt ? String(c.nextActionAt).slice(0, 10) : '', c.notes,
+      ].map(cell).join(','));
+    }
+    const csv = '﻿' + lines.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Exportados ${rows.length} contacto(s)`);
+  });
+
+  // ── Editor genérico (rejilla de tarjetas + drawer) ────────
   function makeCrud(cfg) {
-    // cfg: { path, listEl, editorEl, emptyEl, deleteBtn, idField, toForm, fromForm, renderItem, errorEl, entityName }
+    // cfg: { path, listEl, overlayEl, titleEl, firstField, deleteBtn, toForm, fromForm, renderItem, errorEl, entityName, blank }
     let currentId = null;
-    function open() { cfg.editorEl.hidden = false; cfg.emptyEl.hidden = true; }
-    function close() { cfg.editorEl.hidden = true; cfg.emptyEl.hidden = false; if (cfg.errorEl) cfg.errorEl.textContent = ''; currentId = null; mark(null); }
+    function open(title) {
+      if (cfg.titleEl && title) cfg.titleEl.textContent = title;
+      cfg.overlayEl.classList.add('is-open');
+      if (cfg.firstField) setTimeout(() => { const el = $(cfg.firstField); if (el) el.focus(); }, 60);
+    }
+    function close() {
+      cfg.overlayEl.classList.remove('is-open');
+      if (cfg.errorEl) cfg.errorEl.textContent = '';
+      currentId = null; mark(null);
+    }
     function mark(id) { $(cfg.listEl).querySelectorAll('.admin-item').forEach((it) => it.classList.toggle('is-active', Number(it.getAttribute('data-id')) === id)); }
     async function load() {
       const r = await api(cfg.path);
@@ -462,14 +909,14 @@
     async function edit(id) {
       const r = await api(`${cfg.path}/${id}`);
       if (!r.ok) return;
-      currentId = id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; open(); mark(id);
+      currentId = id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; open(`Editar ${cfg.entityName.toLowerCase()}`); mark(id);
     }
-    function create() { cfg.toForm(cfg.blank || {}); cfg.deleteBtn.hidden = true; currentId = null; open(); mark(null); }
+    function create() { cfg.toForm(cfg.blank || {}); cfg.deleteBtn.hidden = true; currentId = null; open(`Nuevo ${cfg.entityName.toLowerCase()}`); mark(null); }
     async function save() {
       if (cfg.errorEl) cfg.errorEl.textContent = '';
       const payload = cfg.fromForm();
       const r = await api(currentId ? `${cfg.path}/${currentId}` : cfg.path, { method: currentId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
-      if (r.ok) { await load(); currentId = r.body.data.id; cfg.toForm(r.body.data); cfg.deleteBtn.hidden = false; mark(currentId); toast(`${cfg.entityName} guardado`); }
+      if (r.ok) { await load(); toast(`${cfg.entityName} guardado`); close(); }
       else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; if (cfg.errorEl) cfg.errorEl.textContent = m; toast(m, 'error'); }
     }
     async function remove() {
@@ -479,6 +926,10 @@
       const r = await api(`${cfg.path}/${currentId}`, { method: 'DELETE' });
       if (r.ok) { close(); load(); toast(`${cfg.entityName} eliminado`); } else toast('No se pudo eliminar', 'error');
     }
+    // Cierre por scrim, botón ✕ del encabezado o Escape.
+    cfg.overlayEl.addEventListener('click', (e) => { if (e.target === cfg.overlayEl) close(); });
+    cfg.overlayEl.querySelectorAll('[data-drawer-close]').forEach((b) => b.addEventListener('click', close));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cfg.overlayEl.classList.contains('is-open')) close(); });
     return { load, create, save, remove, close };
   }
 
@@ -617,7 +1068,7 @@
 
   // ── BLOG ──────────────────────────────────────────────────
   const blog = makeCrud({
-    path: '/api/admin/posts', listEl: 'admin-list', editorEl: $('editor'), emptyEl: $('editor-empty'),
+    path: '/api/admin/posts', listEl: 'admin-list', overlayEl: $('blog-overlay'), titleEl: $('blog-title'), firstField: 'f-title',
     deleteBtn: $('delete-btn'), errorEl: $('editor-error'), entityName: 'Artículo',
     blank: { status: 'draft', author: 'Juan José Jolón Granados' },
     renderItem: (p) => `<div class="admin-item" data-id="${p.id}"><div class="admin-item__title">${esc(p.title)}</div><div class="admin-item__meta"><span class="badge-status ${p.status}">${p.status === 'published' ? 'Publicado' : 'Borrador'}</span><span>${esc(p.category)}</span></div></div>`,
@@ -632,7 +1083,7 @@
 
   // ── SERVICIOS ─────────────────────────────────────────────
   const svc = makeCrud({
-    path: '/api/admin/services', listEl: 'svc-list', editorEl: $('svc-editor'), emptyEl: $('svc-empty'),
+    path: '/api/admin/services', listEl: 'svc-list', overlayEl: $('svc-overlay'), titleEl: $('svc-title'), firstField: 'sv-title',
     deleteBtn: $('svc-delete'), errorEl: $('svc-error'), entityName: 'Servicio',
     blank: { icon: '⚙️', accentColor: '#8B5CF6' },
     renderItem: (s) => `<div class="admin-item" data-id="${s.id}"><div class="admin-item__title">${esc(s.icon)} ${esc(s.title)}</div><div class="admin-item__meta">${s.isFeatured ? '<span class="badge-status published">Destacado</span>' : ''}<span>${esc((s.tags || []).slice(0, 3).join(', '))}</span></div></div>`,
@@ -647,7 +1098,7 @@
 
   // ── PLANES ────────────────────────────────────────────────
   const plans = makeCrud({
-    path: '/api/admin/plans', listEl: 'plan-list', editorEl: $('plan-editor'), emptyEl: $('plan-empty'),
+    path: '/api/admin/plans', listEl: 'plan-list', overlayEl: $('plan-overlay'), titleEl: $('plan-title'), firstField: 'pl-name',
     deleteBtn: $('plan-delete'), errorEl: $('plan-error'), entityName: 'Plan',
     blank: { currency: 'USD', accentColor: '#8B5CF6', ctaLabel: 'Elegir plan' },
     renderItem: (p) => `<div class="admin-item" data-id="${p.id}"><div class="admin-item__title">${esc(p.name)} ${p.isPopular ? '⭐' : ''}</div><div class="admin-item__meta"><span>$${fmtNum(p.priceMonthly)} / Q${fmtNum(p.priceMonthlyGtq)}</span></div></div>`,
@@ -659,6 +1110,258 @@
   $('plan-save').addEventListener('click', plans.save);
   $('plan-cancel').addEventListener('click', plans.close);
   $('plan-delete').addEventListener('click', plans.remove);
+
+  // ── PLANTILLAS DE CORREO ──────────────────────────────────
+  const TPL_SEGMENTS = { all: 'Todos', alta: 'Prioridad alta', media: 'Prioridad media', base: 'Prioridad base', 'sin-web': 'Sin sitio web' };
+  const tplEditor = makeRichEditor($('rt-tpl-area'), $('rt-tpl-toolbar'));
+  const tpl = makeCrud({
+    path: '/api/admin/templates', listEl: 'tpl-list', overlayEl: $('tpl-overlay'), titleEl: $('tpl-title'), firstField: 'tpl-name',
+    deleteBtn: $('tpl-delete'), errorEl: $('tpl-error'), entityName: 'Plantilla',
+    blank: { segment: 'all' },
+    renderItem: (t) => `<div class="admin-item" data-id="${t.id}"><div class="admin-item__title">${esc(t.name)}</div><div class="admin-item__meta"><span class="badge-status published">${esc(TPL_SEGMENTS[t.segment] || t.segment)}</span><span>${esc(t.subject)}</span></div></div>`,
+    toForm: (t) => { $('tpl-id').value = t.id || ''; $('tpl-name').value = t.name || ''; $('tpl-subject').value = t.subject || ''; $('tpl-segment').value = t.segment || 'all'; tplEditor.set(t.bodyHtml || ''); },
+    fromForm: () => ({ name: $('tpl-name').value.trim(), subject: $('tpl-subject').value.trim(), segment: $('tpl-segment').value, bodyHtml: tplEditor.get() }),
+  });
+  function loadTemplates() { tpl.load(); }
+  $('tpl-new').addEventListener('click', tpl.create);
+  $('tpl-save').addEventListener('click', tpl.save);
+  $('tpl-cancel').addEventListener('click', tpl.close);
+  $('tpl-delete').addEventListener('click', tpl.remove);
+  // Inserta la variable en el cuerpo (en el punto del cursor) o en el asunto.
+  $('tpl-vars').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-var]');
+    if (!btn) return;
+    const token = `{${btn.getAttribute('data-var')}}`;
+    $('rt-tpl-area').focus();
+    if (!document.execCommand('insertText', false, token)) {
+      $('rt-tpl-area').innerHTML += token; // fallback navegadores sin execCommand
+    }
+  });
+
+  // ── CADENCIAS DE SEGUIMIENTO ──────────────────────────────
+  let cadTemplates = [];
+  function tplSelectOptions(selectedId) {
+    const opts = ['<option value="">— Elige plantilla —</option>'];
+    let found = false;
+    for (const t of cadTemplates) {
+      const sel = String(t.id) === String(selectedId) ? ' selected' : '';
+      if (sel) found = true;
+      opts.push(`<option value="${t.id}"${sel}>${esc(t.name)}</option>`);
+    }
+    // Plantilla referenciada pero ya borrada: se conserva su id para no perderla.
+    if (selectedId && !found) opts.push(`<option value="${esc(selectedId)}" selected>#${esc(selectedId)} (borrada)</option>`);
+    return opts.join('');
+  }
+  function addStepRow(step) {
+    const row = document.createElement('div');
+    row.className = 'cad-step';
+    row.innerHTML = `
+      <label class="cad-step__delay">Espera <input type="number" min="0" class="cad-step-delay" value="${Number(step && step.delayDays) || 0}" /> día(s)</label>
+      <select class="cad-step-tpl">${tplSelectOptions(step && step.templateId)}</select>
+      <button type="button" class="btn-danger cad-step-del" title="Quitar paso">✕</button>`;
+    row.querySelector('.cad-step-del').addEventListener('click', () => row.remove());
+    $('cad-steps').appendChild(row);
+  }
+  const cad = makeCrud({
+    path: '/api/admin/cadences', listEl: 'cad-list', overlayEl: $('cad-overlay'), titleEl: $('cad-title'), firstField: 'cad-name',
+    deleteBtn: $('cad-delete'), errorEl: $('cad-error'), entityName: 'Cadencia',
+    blank: { isActive: true, steps: [] },
+    renderItem: (c) => `<div class="admin-item" data-id="${c.id}"><div class="admin-item__title">${esc(c.name)}</div><div class="admin-item__meta"><span class="badge-status ${c.isActive ? 'published' : 'draft'}">${c.isActive ? 'Activa' : 'Inactiva'}</span><span>${(c.steps || []).length} paso(s)</span></div></div>`,
+    toForm: (c) => {
+      $('cad-id').value = c.id || '';
+      $('cad-name').value = c.name || '';
+      $('cad-active').checked = c.isActive !== false;
+      $('cad-steps').innerHTML = '';
+      const steps = (c.steps && c.steps.length) ? c.steps : [{ delayDays: 0, templateId: '' }];
+      steps.forEach(addStepRow);
+    },
+    fromForm: () => ({
+      name: $('cad-name').value.trim(),
+      isActive: $('cad-active').checked,
+      steps: Array.from($('cad-steps').querySelectorAll('.cad-step')).map((row) => ({
+        delayDays: Number(row.querySelector('.cad-step-delay').value) || 0,
+        templateId: Number(row.querySelector('.cad-step-tpl').value) || 0,
+      })),
+    }),
+  });
+  async function loadCadences() {
+    // Las plantillas alimentan los selectores de cada paso.
+    const tr = await api('/api/admin/templates');
+    if (!guard(tr)) return;
+    cadTemplates = (tr.ok && tr.body.data) || [];
+    cad.load();
+  }
+  $('cad-new').addEventListener('click', cad.create);
+  $('cad-save').addEventListener('click', cad.save);
+  $('cad-cancel').addEventListener('click', cad.close);
+  $('cad-delete').addEventListener('click', cad.remove);
+  $('cad-add-step').addEventListener('click', () => addStepRow({ delayDays: 0, templateId: '' }));
+  $('cad-process').addEventListener('click', async () => {
+    const r = await api('/api/admin/cadences/process', { method: 'POST' });
+    if (!guard(r)) return;
+    if (r.ok) { const d = r.body.data; toast(`Procesadas ${d.processed} · ${d.sent} enviadas · ${d.completed} completadas`); }
+    else toast((r.body && r.body.error) || 'No se pudo procesar.', 'error');
+  });
+
+  // Cache de plantillas para el compositor de correo (se refresca al abrirlo).
+  let mailTemplates = [];
+
+  // Sustitución de variables en cliente (espejo de domain/services/renderTemplate),
+  // solo para la vista previa. El envío real lo renderiza el servidor.
+  function varVals(c) {
+    return { nombre: c.name || '', empresa: c.company || c.name || '', sector: c.sector || '', ubicacion: c.location || '', sitio: c.website || '' };
+  }
+  function fillSubject(text, c) {
+    const v = varVals(c);
+    return String(text || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
+  }
+  function fillBody(html, c) {
+    const v = varVals(c);
+    return String(html || '').replace(/\{(\w+)\}/g, (m, k) => (k in v ? esc(v[k]) : m));
+  }
+
+  const MSG_STATUS = { sent: 'Enviado', failed: 'Falló', received: 'Recibido', read: 'Leído' };
+
+  function messageItem(m) {
+    const when = m.createdAt ? new Date(m.createdAt).toLocaleString('es-GT') : '—';
+    const dirIcon = m.direction === 'out' ? '↑' : '↓';
+    const okStatus = m.status === 'sent' || m.status === 'received' || m.status === 'read';
+    return `
+      <details class="mail-msg mail-msg--${esc(m.direction)}">
+        <summary>
+          <span class="mail-msg__dir">${dirIcon}</span>
+          <span class="mail-msg__subject">${esc(m.subject)}</span>
+          <span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(MSG_STATUS[m.status] || m.status)}</span>
+          <span class="mail-msg__date">${esc(when)}</span>
+        </summary>
+        <div class="mail-msg__body">${m.bodyHtml || '<em>(sin contenido)</em>'}</div>
+      </details>`;
+  }
+
+  const RUN_STATUS = { active: 'En curso', completed: 'Completada', stopped: 'Detenida' };
+
+  // Compositor de correo + historial + cadencias de un contacto (modal).
+  async function openMailComposer(contact) {
+    const [tplRes, msgRes, cadRes, runRes] = await Promise.all([
+      api('/api/admin/templates'),
+      api(`/api/admin/contacts/${contact.id}/messages`),
+      api('/api/admin/cadences'),
+      api(`/api/admin/contacts/${contact.id}/cadences`),
+    ]);
+    if (!guard(tplRes) || !guard(msgRes)) return;
+    mailTemplates = (tplRes.ok && tplRes.body.data) || [];
+    const messages = (msgRes.ok && msgRes.body.data) || [];
+    const cadences = ((cadRes.ok && cadRes.body.data) || []).filter((c) => c.isActive);
+    let runs = (runRes.ok && runRes.body.data) || [];
+    const cadName = (id) => { const c = ((cadRes.ok && cadRes.body.data) || []).find((x) => String(x.id) === String(id)); return c ? c.name : `#${id}`; };
+    const renderRuns = (list) => list.length
+      ? list.map((r) => `<li>${esc(cadName(r.cadenceId))} — <span class="badge-status ${r.status === 'active' ? 'published' : 'draft'}">${esc(RUN_STATUS[r.status] || r.status)}</span> <span class="admin-hint">paso ${r.currentStep}</span></li>`).join('')
+      : '<li class="admin-muted">Sin cadencias.</li>';
+    const cadOptions = ['<option value="">— Elige cadencia —</option>']
+      .concat(cadences.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`)).join('');
+
+    const tplOptions = ['<option value="">— Escribir a mano —</option>']
+      .concat(mailTemplates.map((t) => `<option value="${t.id}">${esc(t.name)}</option>`))
+      .join('');
+    const advanceDefault = contact.stage === 'nuevo' ? 'checked' : '';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal modal--wide" role="dialog" aria-modal="true" aria-label="Enviar correo">
+        <h3 class="modal__title">Enviar correo a ${esc(contact.name)}</h3>
+        <p class="mail-to">Para: <strong>${esc(contact.email)}</strong></p>
+        <div class="admin-field"><label>Plantilla</label><select class="modal__input" id="mail-tpl">${tplOptions}</select></div>
+        <div class="admin-field"><label>Asunto *</label><input class="modal__input" id="mail-subject" type="text" placeholder="Asunto del correo" /></div>
+        <div class="admin-field"><label>Mensaje *</label><div class="mail-body" id="mail-body" contenteditable="true" data-placeholder="Escribe el mensaje…"></div></div>
+        <label class="mail-advance"><input type="checkbox" id="mail-advance" ${advanceDefault} /> Avanzar a "Contactado" al enviar</label>
+        <details class="mail-preview"><summary>Vista previa (con los datos del contacto)</summary><div class="mail-preview__box"><p class="mail-preview__subject" id="mail-prev-subject"></p><div id="mail-prev-body"></div></div></details>
+        <p class="admin-error" id="mail-error"></p>
+        <div class="modal__actions">
+          <button class="btn-ghost" data-act="cancel">Cerrar</button>
+          <button class="btn-primary" data-act="send">Enviar</button>
+        </div>
+        <h4 class="mail-history__title">Cadencias de seguimiento</h4>
+        <ul class="mail-runs" id="mail-runs">${renderRuns(runs)}</ul>
+        <div class="mail-enroll">
+          <select class="modal__input" id="mail-cadence">${cadOptions}</select>
+          <button class="btn-ghost" data-act="enroll"${cadences.length ? '' : ' disabled'}>Inscribir</button>
+        </div>
+        <h4 class="mail-history__title" id="mail-history-title">Historial (${messages.length})</h4>
+        <div class="mail-history" id="mail-history">${messages.length ? messages.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>'}</div>
+      </div>`;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+
+    const selEl = overlay.querySelector('#mail-tpl');
+    const subjEl = overlay.querySelector('#mail-subject');
+    const bodyEl = overlay.querySelector('#mail-body');
+    const errEl = overlay.querySelector('#mail-error');
+
+    function refreshPreview() {
+      overlay.querySelector('#mail-prev-subject').textContent = fillSubject(subjEl.value, contact) || '(sin asunto)';
+      overlay.querySelector('#mail-prev-body').innerHTML = fillBody(bodyEl.innerHTML, contact);
+    }
+    selEl.addEventListener('change', () => {
+      const t = mailTemplates.find((x) => String(x.id) === selEl.value);
+      if (t) { subjEl.value = t.subject; bodyEl.innerHTML = t.bodyHtml; }
+      refreshPreview();
+    });
+    subjEl.addEventListener('input', refreshPreview);
+    bodyEl.addEventListener('input', refreshPreview);
+
+    function close() { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); }
+    overlay.addEventListener('click', async (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]');
+      if (!a) return;
+      if (a.getAttribute('data-act') === 'cancel') return close();
+      if (a.getAttribute('data-act') === 'enroll') {
+        errEl.textContent = '';
+        const cadenceId = overlay.querySelector('#mail-cadence').value;
+        if (!cadenceId) { errEl.textContent = 'Elige una cadencia.'; return; }
+        a.disabled = true;
+        const er = await api(`/api/admin/contacts/${contact.id}/enroll`, { method: 'POST', body: JSON.stringify({ cadenceId: Number(cadenceId) }) });
+        a.disabled = false;
+        if (!er.ok) { errEl.textContent = (er.body && er.body.error) || 'No se pudo inscribir.'; return; }
+        toast('Contacto inscrito en la cadencia');
+        const fr = await api(`/api/admin/contacts/${contact.id}/cadences`);
+        runs = (fr.ok && fr.body.data) || [];
+        overlay.querySelector('#mail-runs').innerHTML = renderRuns(runs);
+        overlay.querySelector('#mail-cadence').value = '';
+        return;
+      }
+      // Enviar
+      errEl.textContent = '';
+      if (!subjEl.value.trim() || !bodyEl.innerHTML.trim()) { errEl.textContent = 'El asunto y el mensaje son obligatorios.'; return; }
+      a.disabled = true;
+      const res = await api(`/api/admin/contacts/${contact.id}/email`, {
+        method: 'POST',
+        body: JSON.stringify({
+          templateId: selEl.value || null,
+          subject: subjEl.value.trim(),
+          bodyHtml: bodyEl.innerHTML,
+          advanceStage: overlay.querySelector('#mail-advance').checked,
+        }),
+      });
+      a.disabled = false;
+      if (!res.ok) { errEl.textContent = (res.body && res.body.error) || 'No se pudo enviar.'; return; }
+      const sent = res.body && res.body.sent;
+      if (sent === false) toast('Registrado, pero SMTP no está configurado: el correo no salió.', 'error');
+      else toast('Correo enviado');
+      // Refresca el historial y, si se avanzó, la etapa local.
+      if (sent && overlay.querySelector('#mail-advance').checked && contact.stage === 'nuevo') {
+        contact.stage = 'contactado';
+        const card = document.querySelector(`.contact-card[data-id="${contact.id}"] .crm-stage`);
+        if (card) card.value = 'contactado';
+      }
+      const fresh = await api(`/api/admin/contacts/${contact.id}/messages`);
+      const list = (fresh.ok && fresh.body.data) || [];
+      overlay.querySelector('#mail-history').innerHTML = list.length ? list.map(messageItem).join('') : '<p class="admin-muted">Aún no hay correos con este contacto.</p>';
+      overlay.querySelector('#mail-history-title').textContent = `Historial (${list.length})`;
+      subjEl.value = ''; bodyEl.innerHTML = ''; selEl.value = ''; refreshPreview();
+    });
+  }
 
   // ── CONTACTO ──────────────────────────────────────────────
   async function loadContact() {
@@ -681,6 +1384,13 @@
     $('smtp-pass').placeholder = d.smtpConfigured ? '•••••••• (ya configurada)' : '';
     $('smtp-from').value = d.smtpFrom || '';
     $('smtp-secure').checked = !!d.smtpSecure;
+    $('mailhook-url').value = d.mailWebhookUrl || '';
+    $('mailhook-secret').value = '';
+    $('mailhook-secret').placeholder = d.mailWebhookConfigured ? '•••••••• (ya configurado)' : 'Genera una cadena larga y aleatoria';
+    $('mailhook-apitoken').value = '';
+    $('mailhook-apitoken').placeholder = d.mailApiConfigured ? '•••••••• (ya configurado)' : 'Bearer token del API';
+    $('mailhook-apibase').value = d.mailApiBaseUrl || '';
+    $('mailhook-apifolder').value = d.mailApiProcessedFolder || '';
   }
   $('smtp-save').addEventListener('click', async () => {
     $('smtp-error').textContent = '';
@@ -696,6 +1406,25 @@
     $('turnstile-error').textContent = '';
     const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify({ turnstileEnabled: $('ts-enabled').checked, turnstileSiteKey: $('ts-site').value.trim(), turnstileSecretKey: $('ts-secret').value.trim() }) });
     if (r.ok) toast('Protección actualizada'); else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('turnstile-error').textContent = m; toast(m, 'error'); }
+  });
+  $('mailhook-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('mailhook-url').value); toast('URL copiada'); }
+    catch (_) { $('mailhook-url').select(); toast('Selecciona y copia la URL', 'error'); }
+  });
+  $('mailhook-save').addEventListener('click', async () => {
+    $('mailhook-error').textContent = '';
+    const secret = $('mailhook-secret').value.trim();
+    const apiToken = $('mailhook-apitoken').value.trim();
+    // URL base y carpeta (no secretos) siempre se envían; los secretos, solo si se
+    // teclearon (vacío = "déjalo como está").
+    const payload = {
+      mailApiBaseUrl: $('mailhook-apibase').value.trim(),
+      mailApiProcessedFolder: $('mailhook-apifolder').value.trim(),
+    };
+    if (secret) payload.mailWebhookSecret = secret;
+    if (apiToken) payload.mailApiToken = apiToken;
+    const r = await api('/api/admin/config', { method: 'PUT', body: JSON.stringify(payload) });
+    if (r.ok) { toast('Correo entrante actualizado'); loadContact(); } else { const m = (r.body && r.body.error) || 'No se pudo guardar.'; $('mailhook-error').textContent = m; toast(m, 'error'); }
   });
 
   // ── PERFIL ────────────────────────────────────────────────
@@ -774,99 +1503,186 @@
 
   let currentUserId = null; // id del usuario en sesión (para no auto-gestionarse)
   let currentUserRole = null; // rol en sesión (solo para el gate cosmético de la UI)
+  // ── USUARIOS (tabla + drawers) ────────────────────────────
+  let allUsers = [];
+  function userStatusMeta(u) {
+    if (u.deleted) return { label: 'Dado de baja', cls: 'draft' };
+    return (u.isActive && u.status === 'active') ? { label: 'Activo', cls: 'published' } : { label: 'Inactivo', cls: 'draft' };
+  }
   async function loadUsers() {
     const r = await api('/api/admin/users');
     if (!guard(r) || !r.ok) return;
-    $('users-list').innerHTML = r.body.data.map((u) => {
-      const self = u.id === currentUserId;
-      const name = esc(u.displayName || u.username);
-      const statusLabel = u.deleted ? 'Eliminado' : (u.isActive && u.status === 'active' ? 'Activo' : 'Inactivo');
-      const statusCls = u.deleted ? 'draft' : (u.isActive && u.status === 'active' ? 'published' : 'draft');
-      const actions = self
-        ? '<span class="admin-hint">(tú)</span>'
-        : u.deleted
-          ? `<button class="btn-ghost btn-sm" data-act="restore" data-id="${u.id}">Restaurar</button>`
-          : `<button class="btn-ghost btn-sm" data-act="edit" data-id="${u.id}">Editar</button>
-             <button class="btn-ghost btn-sm" data-act="reset" data-id="${u.id}">Resetear clave</button>
-             <button class="btn-ghost btn-sm" data-act="toggle" data-id="${u.id}" data-active="${u.isActive && u.status === 'active' ? '1' : '0'}">${u.isActive && u.status === 'active' ? 'Desactivar' : 'Activar'}</button>
-             <button class="btn-danger btn-sm" data-act="delete" data-id="${u.id}">Eliminar</button>`;
-      return `<div class="user-row">
-        <span>${name}${u.mfaEnabled ? ' 🔒' : ''} <span class="admin-hint">@${esc(u.username)}</span></span>
-        <span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span>
-        <span class="badge-status ${statusCls}">${statusLabel}</span>
-        <span class="user-row__actions">${actions}</span>
-      </div>`;
+    allUsers = r.body.data || [];
+    const tb = $('users-tbody');
+    if (!allUsers.length) { tb.innerHTML = '<tr><td colspan="5" class="admin-muted">Sin usuarios.</td></tr>'; return; }
+    tb.innerHTML = allUsers.map((u) => {
+      const st = userStatusMeta(u);
+      const you = u.id === currentUserId ? ' <span class="admin-hint">(tú)</span>' : '';
+      return `<tr data-id="${u.id}"${u.deleted ? ' class="is-deleted"' : ''}>
+        <td><div class="u-cell"><span>${esc(u.displayName || u.username)}${you}</span><small>@${esc(u.username)}</small></div></td>
+        <td>${u.email ? esc(u.email) : '<span class="admin-hint">—</span>'}</td>
+        <td><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></td>
+        <td><span class="badge-status ${st.cls}">${st.label}</span></td>
+        <td>${u.mfaEnabled ? '🔒 Sí' : '<span class="admin-hint">No</span>'}</td>
+      </tr>`;
     }).join('');
+    tb.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => {
+      const u = allUsers.find((x) => String(x.id) === tr.getAttribute('data-id'));
+      if (!u) return;
+      if (u.id === currentUserId) { toast('Gestiona tu propia cuenta desde Perfil'); return; }
+      openUserDrawer(u);
+    }));
   }
 
-  // Modal de edición de un usuario (terceros).
-  function editUserDialog(u) {
-    return new Promise((resolve) => {
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal" role="dialog" aria-modal="true" aria-label="Editar usuario">
-          <h3 class="modal__title">Editar: ${esc(u.username)}</h3>
-          <div class="admin-field"><label>Nombre para mostrar</label><input class="modal__input" id="eu-display" type="text" value="${esc(u.displayName || '')}" /></div>
-          <div class="admin-field"><label>Nombre(s)</label><input class="modal__input" id="eu-full" type="text" value="${esc(u.fullName || '')}" /></div>
-          <div class="admin-field"><label>Apellidos</label><input class="modal__input" id="eu-last" type="text" value="${esc(u.lastName || '')}" /></div>
-          <div class="admin-field"><label>Correo</label><input class="modal__input" id="eu-email" type="email" value="${esc(u.email || '')}" /></div>
-          <div class="admin-field"><label>Rol</label><select class="modal__input" id="eu-role"><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option></select></div>
-          <div class="modal__actions">
-            <button class="btn-ghost" data-act="cancel">Cancelar</button>
-            <button class="btn-primary" data-act="ok">Guardar</button>
+  // Monta un drawer al vuelo y devuelve utilidades comunes (mismo patrón del CRM).
+  function mountDrawer(html) {
+    const overlay = document.createElement('div');
+    overlay.className = 'drawer-overlay';
+    overlay.innerHTML = html;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('is-open'));
+    function close() { overlay.classList.remove('is-open'); document.removeEventListener('keydown', onKey); setTimeout(() => overlay.remove(), 240); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    return { overlay, close, q: (sel) => overlay.querySelector(sel) };
+  }
+
+  function openUserDrawer(u) {
+    const val = (v) => esc(v || '');
+    const active = u.isActive && u.status === 'active';
+    const { overlay, close, q } = mountDrawer(`
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Editar ${esc(u.username)}">
+        <header class="drawer__head">
+          <div class="drawer__id">
+            <div class="lead-card__avatar" style="--c:${leadColor(u.displayName || u.username)}">${esc(leadInitials(u.displayName || u.username))}</div>
+            <div class="drawer__idtext">
+              <div class="drawer__name">${esc(u.displayName || u.username)}${u.deleted ? '<span class="badge-archived">Dado de baja</span>' : ''}</div>
+              <span class="lead-card__email">@${esc(u.username)}</span>
+            </div>
           </div>
-        </div>`;
-      document.body.appendChild(overlay);
-      requestAnimationFrame(() => overlay.classList.add('is-open'));
-      function close(val) { overlay.classList.remove('is-open'); setTimeout(() => overlay.remove(), 180); resolve(val); }
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) return close(null);
-        const a = e.target.closest('[data-act]');
-        if (!a) return;
-        if (a.getAttribute('data-act') === 'ok') {
-          close({ displayName: overlay.querySelector('#eu-display').value, fullName: overlay.querySelector('#eu-full').value, lastName: overlay.querySelector('#eu-last').value, email: overlay.querySelector('#eu-email').value, role: overlay.querySelector('#eu-role').value });
-        } else close(null);
-      });
-    });
-  }
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="du-full">Nombre(s)</label><input type="text" id="du-full" value="${val(u.fullName)}" /></div>
+            <div class="admin-field"><label for="du-last">Apellidos</label><input type="text" id="du-last" value="${val(u.lastName)}" /></div>
+          </div>
+          <div class="admin-field"><label for="du-display">Nombre para mostrar</label><input type="text" id="du-display" value="${val(u.displayName)}" /></div>
+          <div class="admin-grid-2">
+            <div class="admin-field"><label for="du-email">Correo</label><input type="email" id="du-email" value="${val(u.email)}" /></div>
+            <div class="admin-field"><label for="du-role">Rol</label><select id="du-role" class="crm-select"><option value="editor"${u.role === 'editor' ? ' selected' : ''}>Editor</option><option value="admin"${u.role === 'admin' ? ' selected' : ''}>Admin</option></select></div>
+          </div>
+          <p class="drawer__section">Seguridad</p>
+          <div class="user-actions">
+            <button type="button" class="btn-ghost" data-act="reset-pass">🔑 Resetear contraseña</button>
+            <button type="button" class="btn-ghost" data-act="reset-mfa"${u.mfaEnabled ? '' : ' disabled'}>🔒 Reiniciar 2FA</button>
+            <button type="button" class="btn-ghost" data-act="toggle">${active ? '⏸ Desactivar' : '▶ Activar'}</button>
+          </div>
+        </div>
+        <footer class="drawer__foot">
+          ${u.deleted
+            ? '<button type="button" class="btn-ghost" data-act="restore">Restaurar</button>'
+            : '<button type="button" class="btn-danger" data-act="delete">Dar de baja</button>'}
+          <div class="drawer__foot-right">
+            <button type="button" class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button type="button" class="btn-primary" data-act="save">Guardar</button>
+          </div>
+        </footer>
+      </aside>`);
 
-  $('users-list').addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-act]');
-    if (!btn) return;
-    const id = btn.getAttribute('data-id');
-    const act = btn.getAttribute('data-act');
-    if (act === 'edit') {
-      const r = await api(`/api/admin/users/${id}`);
-      if (!guard(r) || !r.ok) return;
-      const fields = await editUserDialog(r.body.data);
-      if (!fields) return;
-      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(fields) });
-      if (res.ok) { toast('Usuario actualizado'); loadUsers(); }
+    async function save() {
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'PUT', body: JSON.stringify({
+        displayName: q('#du-display').value, fullName: q('#du-full').value, lastName: q('#du-last').value,
+        email: q('#du-email').value, role: q('#du-role').value,
+      }) });
+      if (res.ok) { toast('Usuario actualizado'); close(); loadUsers(); }
       else toast((res.body && res.body.error) || 'No se pudo actualizar.', 'error');
-    } else if (act === 'toggle') {
-      const activate = btn.getAttribute('data-active') === '0';
-      const res = await api(`/api/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ isActive: activate, status: activate ? 'active' : 'disabled' }) });
-      if (res.ok) { toast(activate ? 'Usuario activado' : 'Usuario desactivado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
-    } else if (act === 'delete') {
-      const ok = await confirmDialog({ title: 'Eliminar usuario', message: 'Se marcará como eliminado y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Eliminar', danger: true });
-      if (!ok) return;
-      const res = await api(`/api/admin/users/${id}`, { method: 'DELETE' });
-      if (res.ok) { toast('Usuario eliminado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo eliminar.', 'error');
-    } else if (act === 'restore') {
-      const res = await api(`/api/admin/users/${id}/restore`, { method: 'POST' });
-      if (res.ok) { toast('Usuario restaurado'); loadUsers(); }
-      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
-    } else if (act === 'reset') {
+    }
+    async function resetPass() {
       const temp = await promptDialog({ title: 'Resetear contraseña', label: 'Contraseña temporal (mín. 12). El usuario deberá cambiarla al entrar.', placeholder: 'Contraseña temporal', confirmText: 'Resetear' });
       if (!temp) return;
-      const res = await api(`/api/admin/users/${id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
-      if (res.ok) { toast('Contraseña reseteada. El usuario debe cambiarla al entrar.'); }
+      const res = await api(`/api/admin/users/${u.id}/reset-password`, { method: 'POST', body: JSON.stringify({ newPassword: temp }) });
+      if (res.ok) toast('Contraseña reseteada. El usuario debe cambiarla al entrar.');
       else toast((res.body && res.body.error) || 'No se pudo resetear.', 'error');
     }
-  });
+    async function resetMfa() {
+      const ok = await confirmDialog({ title: 'Reiniciar 2FA', message: `Se desactivará el 2FA de “${u.displayName || u.username}” y se cerrarán sus sesiones. Podrá volver a activarlo desde su perfil.`, confirmText: 'Reiniciar 2FA', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${u.id}/reset-mfa`, { method: 'POST' });
+      if (res.ok) { toast('2FA reiniciado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo reiniciar el 2FA.', 'error');
+    }
+    async function toggle() {
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'PUT', body: JSON.stringify({ isActive: !active, status: active ? 'disabled' : 'active' }) });
+      if (res.ok) { toast(active ? 'Usuario desactivado' : 'Usuario activado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo cambiar el estado.', 'error');
+    }
+    async function del() {
+      const ok = await confirmDialog({ title: 'Dar de baja', message: 'Se marcará como dado de baja y se cerrarán sus sesiones. Podrás restaurarlo después.', confirmText: 'Dar de baja', danger: true });
+      if (!ok) return;
+      const res = await api(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+      if (res.ok) { toast('Usuario dado de baja'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo completar.', 'error');
+    }
+    async function restore() {
+      const res = await api(`/api/admin/users/${u.id}/restore`, { method: 'POST' });
+      if (res.ok) { toast('Usuario restaurado'); close(); loadUsers(); }
+      else toast((res.body && res.body.error) || 'No se pudo restaurar.', 'error');
+    }
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      const act = a.getAttribute('data-act');
+      if (act === 'save') save();
+      else if (act === 'reset-pass') resetPass();
+      else if (act === 'reset-mfa') resetMfa();
+      else if (act === 'toggle') toggle();
+      else if (act === 'delete') del();
+      else if (act === 'restore') restore();
+      else close();
+    });
+    setTimeout(() => q('#du-display').focus(), 60);
+  }
+
+  function openNewUserDrawer() {
+    const { overlay, close, q } = mountDrawer(`
+      <aside class="drawer" role="dialog" aria-modal="true" aria-label="Nuevo usuario">
+        <header class="drawer__head">
+          <div class="drawer__name">Nuevo usuario</div>
+          <button class="drawer__close" data-act="cancel" aria-label="Cerrar">✕</button>
+        </header>
+        <div class="drawer__body">
+          <div class="admin-field"><label for="nu-name">Usuario *</label><input type="text" id="nu-name" autocomplete="off" placeholder="nombre.apellido" /></div>
+          <div class="admin-field"><label for="nu-role">Rol</label><select id="nu-role" class="crm-select"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
+          <div class="admin-field"><label for="nu-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="nu-pass" autocomplete="new-password" /></div>
+          <label class="admin-check"><input type="checkbox" id="nu-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
+          <p class="admin-error" id="nu-error"></p>
+        </div>
+        <footer class="drawer__foot">
+          <div class="drawer__foot-right">
+            <button type="button" class="btn-ghost" data-act="cancel">Cancelar</button>
+            <button type="button" class="btn-primary" data-act="save">Crear usuario</button>
+          </div>
+        </footer>
+      </aside>`);
+    async function save() {
+      q('#nu-error').textContent = '';
+      const res = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({
+        username: q('#nu-name').value, password: q('#nu-pass').value, role: q('#nu-role').value, mustChangePassword: q('#nu-mustchange').checked,
+      }) });
+      if (res.ok) { toast('Usuario creado'); close(); loadUsers(); }
+      else { const m = (res.body && res.body.error) || 'No se pudo crear.'; q('#nu-error').textContent = m; toast(m, 'error'); }
+    }
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) return close();
+      const a = e.target.closest('[data-act]'); if (!a) return;
+      if (a.getAttribute('data-act') === 'save') save(); else close();
+    });
+    setTimeout(() => q('#nu-name').focus(), 60);
+  }
+
+  $('users-new').addEventListener('click', openNewUserDrawer);
 
   // Avatar
   $('avatar-btn').addEventListener('click', () => $('avatar-file').click());
@@ -988,13 +1804,6 @@
     if (r.ok) { toast('Se cerraron las demás sesiones'); loadSessions(); }
     else toast((r.body && r.body.error) || 'No se pudo completar.', 'error');
   });
-  $('user-save').addEventListener('click', async () => {
-    $('user-error').textContent = '';
-    const r = await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ username: $('u-name').value, password: $('u-pass').value, role: $('u-role').value, mustChangePassword: $('u-mustchange').checked }) });
-    if (r.ok) { $('u-name').value = ''; $('u-pass').value = ''; toast('Usuario creado'); loadUsers(); }
-    else { const m = (r.body && r.body.error) || 'No se pudo crear.'; $('user-error').textContent = m; toast(m, 'error'); }
-  });
-
   // Enlace de recuperación de contraseña: /admin/reset-password?token=...
   const bootToken = new URLSearchParams(location.search).get('token');
   if (location.pathname.endsWith('/reset-password') && bootToken) {

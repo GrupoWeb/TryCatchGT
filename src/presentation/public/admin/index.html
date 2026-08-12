@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex" />
   <title>Panel · TryCatch GT</title>
   <meta name="admin-base" content="{{ADMIN_BASE}}" />
+  <script src="{{ADMIN_BASE}}/theme-init.js"></script>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,9 +15,6 @@
   <link rel="stylesheet" href="{{ADMIN_BASE}}/admin.css" />
 </head>
 <body>
-  <div class="aura aura--violet"></div>
-  <div class="aura aura--blue"></div>
-
   <!-- LOGIN -->
   <section class="admin-login" id="login-view" hidden>
     <form class="admin-login__card" id="login-form">
@@ -94,33 +92,64 @@
 
   <!-- DASHBOARD -->
   <section class="admin" id="dashboard-view" hidden>
-    <header class="admin__topbar">
-      <div class="admin__logo">TryCatch<span>GT</span> · Panel</div>
-      <div class="admin__actions">
-        <a href="/" target="_blank" class="btn-ghost">Ver sitio ↗</a>
-        <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
-      </div>
-    </header>
+    <aside class="admin__sidebar" id="admin-nav">
+      <div class="admin__brand">TryCatch<span>GT</span></div>
+      <nav class="admin__nav">
+        <span class="admin__nav-label">General</span>
+        <button class="admin__nav-btn is-active" data-section="home"><span class="admin__nav-ico">🏠</span> Inicio</button>
+        <button class="admin__nav-btn" data-section="leads"><span class="admin__nav-ico">📥</span> Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
 
-    <div class="admin__shell">
-      <aside class="admin__nav" id="admin-nav">
-        <button class="admin__nav-btn is-active" data-section="home">🏠 Inicio</button>
-        <button class="admin__nav-btn" data-section="leads">📥 Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
-        <button class="admin__nav-btn" data-section="blog">📝 Blog</button>
-        <button class="admin__nav-btn" data-section="services">⚙️ Servicios</button>
-        <button class="admin__nav-btn" data-section="plans">💳 Planes</button>
-        <button class="admin__nav-btn" data-section="contact">📞 Contacto</button>
-        <button class="admin__nav-btn" data-section="account">👤 Perfil</button>
-        <button class="admin__nav-btn" data-section="users">👥 Usuarios</button>
-        <button class="admin__nav-btn" data-section="legal">📄 Legal</button>
-        <button class="admin__nav-btn" data-section="audit">🛡️ Auditoría</button>
-      </aside>
+        <span class="admin__nav-label">CRM</span>
+        <button class="admin__nav-btn" data-section="crm"><span class="admin__nav-ico">📇</span> Clientes</button>
+        <button class="admin__nav-btn" data-section="templates"><span class="admin__nav-ico">✉️</span> Plantillas</button>
+        <button class="admin__nav-btn" data-section="cadences"><span class="admin__nav-ico">🔁</span> Cadencias</button>
+
+        <span class="admin__nav-label">Contenido</span>
+        <button class="admin__nav-btn" data-section="blog"><span class="admin__nav-ico">📝</span> Blog</button>
+        <button class="admin__nav-btn" data-section="services"><span class="admin__nav-ico">⚙️</span> Servicios</button>
+        <button class="admin__nav-btn" data-section="plans"><span class="admin__nav-ico">💳</span> Planes</button>
+        <button class="admin__nav-btn" data-section="contact"><span class="admin__nav-ico">📞</span> Contacto</button>
+
+        <span class="admin__nav-label">Cuenta</span>
+        <button class="admin__nav-btn" data-section="account"><span class="admin__nav-ico">👤</span> Perfil</button>
+        <button class="admin__nav-btn" data-section="users"><span class="admin__nav-ico">👥</span> Usuarios</button>
+        <button class="admin__nav-btn" data-section="legal"><span class="admin__nav-ico">📄</span> Legal</button>
+        <button class="admin__nav-btn" data-section="audit"><span class="admin__nav-ico">🛡️</span> Auditoría</button>
+      </nav>
+    </aside>
+
+    <div class="admin__scrim" id="admin-scrim"></div>
+
+    <div class="admin__content">
+      <header class="admin__topbar">
+        <button class="admin__menu-btn" id="sidebar-toggle" aria-label="Menú">☰</button>
+        <div class="admin__page-title" id="admin-page-title">Inicio</div>
+        <div class="admin__actions">
+          <button class="theme-toggle" id="theme-toggle" title="Cambiar tema" aria-label="Cambiar tema">🌙</button>
+          <a href="/" target="_blank" class="btn-ghost">Ver sitio ↗</a>
+          <button class="btn-ghost" id="logout-btn">Cerrar sesión</button>
+        </div>
+      </header>
 
       <main class="admin__main">
         <!-- INICIO -->
         <section class="admin-sec" id="sec-home">
-          <h2 class="admin-sec__title">Inicio</h2>
           <div class="stat-grid" id="stat-grid"></div>
+          <div class="dash-charts">
+            <div class="chart-card">
+              <div class="chart-card__head">
+                <span class="chart-card__title">Cotizaciones por mes</span>
+                <span class="chart-card__hint">Últimos 6 meses</span>
+              </div>
+              <div class="chart-card__canvas"><canvas id="chart-leads-month"></canvas></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card__head">
+                <span class="chart-card__title">Cotizaciones por estado</span>
+              </div>
+              <div class="chart-card__canvas"><canvas id="chart-leads-status"></canvas></div>
+            </div>
+          </div>
         </section>
 
         <!-- COTIZACIONES -->
@@ -143,16 +172,188 @@
           <div class="leads-more" id="leads-more" hidden><button class="btn-ghost" id="leads-more-btn">Ver más</button></div>
         </section>
 
+        <!-- CLIENTES / CRM -->
+        <section class="admin-sec" id="sec-crm" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Clientes</h2>
+            <div class="crm-head-actions">
+              <button class="btn-ghost" id="crm-new-toggle">+ Nuevo contacto</button>
+              <button class="btn-ghost" id="crm-export">⬇ Exportar CSV</button>
+            </div>
+          </div>
+
+          <form class="crm-new-form" id="crm-new-form" hidden>
+            <div class="admin-field"><label for="cn-name">Nombre *</label><input type="text" id="cn-name" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-email">Correo *</label><input type="email" id="cn-email" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-company">Empresa</label><input type="text" id="cn-company" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-phone">Teléfono</label><input type="text" id="cn-phone" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-sector">Sector</label><input type="text" id="cn-sector" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-location">Ubicación</label><input type="text" id="cn-location" autocomplete="off" /></div>
+            <div class="admin-field"><label for="cn-website">Sitio web</label><input type="text" id="cn-website" autocomplete="off" /></div>
+            <div class="admin-field">
+              <label for="cn-tier">Prioridad</label>
+              <select id="cn-tier"><option value="">— Sin prioridad —</option><option value="alta">Alta</option><option value="media">Media</option><option value="base">Base</option></select>
+            </div>
+            <div class="crm-new-form__actions">
+              <button type="submit" class="btn-primary">Guardar contacto</button>
+              <button type="button" class="btn-ghost" id="crm-new-cancel">Cancelar</button>
+            </div>
+          </form>
+
+          <div class="leads-toolbar">
+            <input type="text" id="crm-search" class="leads-search" placeholder="Buscar por nombre, correo, empresa, sector…" autocomplete="off" />
+            <select id="crm-stage-filter" class="crm-select" aria-label="Filtrar por etapa">
+              <option value="all">Toda etapa</option>
+              <option value="nuevo">Nuevo</option>
+              <option value="contactado">Contactado</option>
+              <option value="respondio">Respondió</option>
+              <option value="reunion">Reunión</option>
+              <option value="propuesta">Propuesta</option>
+              <option value="ganado">Ganado</option>
+              <option value="perdido">Perdido</option>
+              <option value="dormido">Dormido</option>
+            </select>
+          </div>
+          <div class="leads-toolbar">
+            <div class="leads-filter" id="crm-tier-filter">
+              <button class="chip is-active" data-tier="all">Toda prioridad</button>
+              <button class="chip" data-tier="alta">Alta</button>
+              <button class="chip" data-tier="media">Media</button>
+              <button class="chip" data-tier="base">Base</button>
+            </div>
+            <div class="leads-filter" id="crm-web-filter">
+              <button class="chip is-active" data-web="all">Web: todas</button>
+              <button class="chip" data-web="no">Sin sitio</button>
+              <button class="chip" data-web="si">Con sitio</button>
+            </div>
+            <div class="leads-filter" id="crm-archived-filter">
+              <button class="chip is-active" data-arch="active">Activos</button>
+              <button class="chip" data-arch="archived">Dados de baja</button>
+            </div>
+          </div>
+          <p class="admin-muted" id="crm-count"></p>
+          <div class="leads-list" id="crm-list"><p class="admin-muted">Cargando…</p></div>
+          <div class="leads-more" id="crm-more" hidden><button class="btn-ghost" id="crm-more-btn">Ver más</button></div>
+        </section>
+
+        <!-- PLANTILLAS DE CORREO -->
+        <section class="admin-sec" id="sec-templates" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Plantillas de correo</h2>
+            <button class="btn-ghost" id="tpl-new">+ Nueva plantilla</button>
+          </div>
+          <p class="admin-muted">Variables disponibles: <code>{nombre}</code>, <code>{empresa}</code>, <code>{sector}</code>, <code>{ubicacion}</code>, <code>{sitio}</code>. Se sustituyen por los datos del contacto al enviar.</p>
+          <div class="admin__list" id="tpl-list"></div>
+          <div class="drawer-overlay" id="tpl-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="tpl-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="tpl-title">Plantilla</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="tpl-editor">
+                <input type="hidden" id="tpl-id" />
+                <div class="admin-field"><label for="tpl-name">Nombre *</label><input type="text" id="tpl-name" autocomplete="off" placeholder="Presentación inicial" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="tpl-subject">Asunto *</label><input type="text" id="tpl-subject" autocomplete="off" placeholder="Hola {nombre}, una idea para {empresa}" /></div>
+                  <div class="admin-field"><label for="tpl-segment">Segmento</label><select id="tpl-segment"><option value="all">Todos</option><option value="alta">Prioridad alta</option><option value="media">Prioridad media</option><option value="base">Prioridad base</option><option value="sin-web">Sin sitio web</option></select></div>
+                </div>
+                <div class="admin-field">
+                  <label>Cuerpo *</label>
+                  <div class="rt">
+                    <div class="rt__toolbar" id="rt-tpl-toolbar">
+                      <button type="button" class="rt__btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+                      <button type="button" class="rt__btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+                      <button type="button" class="rt__btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h2" title="Título">H2</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="h3" title="Subtítulo">H3</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="p" title="Párrafo">¶</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+                      <button type="button" class="rt__btn" data-cmd="formatBlock" data-value="blockquote" title="Cita">❝</button>
+                      <span class="rt__sep"></span>
+                      <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+                      <button type="button" class="rt__btn" data-cmd="removeFormat" title="Limpiar formato">✕</button>
+                    </div>
+                    <div class="rt__area" id="rt-tpl-area" contenteditable="true" data-placeholder="Escribe el mensaje…"></div>
+                  </div>
+                  <div class="tpl-vars" id="tpl-vars">
+                    <span class="admin-hint">Insertar variable:</span>
+                    <button type="button" class="chip" data-var="nombre">{nombre}</button>
+                    <button type="button" class="chip" data-var="empresa">{empresa}</button>
+                    <button type="button" class="chip" data-var="sector">{sector}</button>
+                    <button type="button" class="chip" data-var="ubicacion">{ubicacion}</button>
+                    <button type="button" class="chip" data-var="sitio">{sitio}</button>
+                  </div>
+                </div>
+                <p class="admin-error" id="tpl-error"></p>
+              </form>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="tpl-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="tpl-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="tpl-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
+          </div>
+        </section>
+
+        <!-- CADENCIAS DE SEGUIMIENTO -->
+        <section class="admin-sec" id="sec-cadences" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Cadencias de seguimiento</h2>
+            <div class="crm-head-actions">
+              <button class="btn-ghost" id="cad-process">▶ Procesar ahora</button>
+              <button class="btn-ghost" id="cad-new">+ Nueva cadencia</button>
+            </div>
+          </div>
+          <p class="admin-muted">Secuencias de correos que se envían solos con retrasos configurables y se detienen cuando el contacto responde. Un proceso las revisa periódicamente; también puedes forzarlo con "Procesar ahora".</p>
+          <div class="admin__list" id="cad-list"></div>
+          <div class="drawer-overlay" id="cad-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="cad-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="cad-title">Cadencia</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="cad-editor">
+                <input type="hidden" id="cad-id" />
+                <div class="admin-field"><label for="cad-name">Nombre *</label><input type="text" id="cad-name" autocomplete="off" placeholder="Seguimiento MIPYMEs sin web" /></div>
+                <label class="admin-check"><input type="checkbox" id="cad-active" checked /> Cadencia activa</label>
+                <div class="admin-field">
+                  <label>Pasos</label>
+                  <div id="cad-steps"></div>
+                  <button type="button" class="btn-ghost" id="cad-add-step">+ Añadir paso</button>
+                  <p class="admin-hint">Cada paso: días de espera (desde la inscripción o desde el paso anterior) y la plantilla a enviar.</p>
+                </div>
+                <p class="admin-error" id="cad-error"></p>
+              </form>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="cad-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="cad-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="cad-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
+          </div>
+        </section>
+
         <!-- BLOG -->
         <section class="admin-sec" id="sec-blog" hidden>
           <div class="admin-sec__head">
             <h2 class="admin-sec__title">Blog</h2>
             <button class="btn-ghost" id="new-btn">+ Nuevo artículo</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="admin-list"></aside>
-            <div>
-              <form class="admin__editor" id="editor" hidden>
+          <div class="admin__list" id="admin-list"></div>
+          <div class="drawer-overlay" id="blog-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="blog-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="blog-title">Artículo</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="editor">
                 <input type="hidden" id="f-id" />
                 <div class="admin-field"><label for="f-title">Título *</label><input type="text" id="f-title" /></div>
                 <div class="admin-grid-2">
@@ -204,14 +405,15 @@
                   </div>
                 </div>
                 <p class="admin-error" id="editor-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="save-btn">Guardar</button>
-                  <button type="button" class="btn-ghost" id="cancel-btn">Cancelar</button>
-                  <button type="button" class="btn-danger" id="delete-btn" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="editor-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">📝</div><p>Selecciona un artículo o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="delete-btn" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="cancel-btn">Cancelar</button>
+                  <button type="button" class="btn-primary" id="save-btn">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -221,10 +423,14 @@
             <h2 class="admin-sec__title">Servicios</h2>
             <button class="btn-ghost" id="svc-new">+ Nuevo servicio</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="svc-list"></aside>
-            <div>
-              <form class="admin__editor" id="svc-editor" hidden>
+          <div class="admin__list" id="svc-list"></div>
+          <div class="drawer-overlay" id="svc-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="svc-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="svc-title">Servicio</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="svc-editor">
                 <input type="hidden" id="sv-id" />
                 <div class="admin-field"><label for="sv-title">Título *</label><input type="text" id="sv-title" /></div>
                 <div class="admin-grid-2">
@@ -236,14 +442,15 @@
                 <div class="admin-field"><label for="sv-tags">Tags <span class="admin-hint">(separados por coma)</span></label><input type="text" id="sv-tags" placeholder="React, Node.js, TypeScript" /></div>
                 <label class="admin-check"><input type="checkbox" id="sv-featured" /> Destacado</label>
                 <p class="admin-error" id="svc-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="svc-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="svc-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="svc-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">⚙️</div><p>Selecciona un servicio o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="svc-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="svc-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
@@ -253,10 +460,14 @@
             <h2 class="admin-sec__title">Planes</h2>
             <button class="btn-ghost" id="plan-new">+ Nuevo plan</button>
           </div>
-          <div class="admin-split">
-            <aside class="admin__list" id="plan-list"></aside>
-            <div>
-              <form class="admin__editor" id="plan-editor" hidden>
+          <div class="admin__list" id="plan-list"></div>
+          <div class="drawer-overlay" id="plan-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="plan-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="plan-title">Plan</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="plan-editor">
                 <input type="hidden" id="pl-id" />
                 <div class="admin-field"><label for="pl-name">Nombre *</label><input type="text" id="pl-name" /></div>
                 <div class="admin-field"><label for="pl-tagline">Descripción corta</label><input type="text" id="pl-tagline" /></div>
@@ -272,53 +483,84 @@
                 <div class="admin-field"><label for="pl-services">Cubre <span class="admin-hint">(una por línea: Web, Móvil…)</span></label><textarea id="pl-services" rows="3"></textarea></div>
                 <label class="admin-check"><input type="checkbox" id="pl-popular" /> Marcar como "Más popular"</label>
                 <p class="admin-error" id="plan-error"></p>
-                <div class="admin__editor-actions">
-                  <button type="button" class="btn-primary" id="plan-save">Guardar</button>
-                  <button type="button" class="btn-ghost" id="plan-cancel">Cancelar</button>
-                  <button type="button" class="btn-danger" id="plan-delete" hidden>Eliminar</button>
-                </div>
               </form>
-              <div class="admin__empty" id="plan-empty"><div class="admin__empty-inner"><div class="admin__empty-icon">💳</div><p>Selecciona un plan o crea uno nuevo.</p></div></div>
-            </div>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="plan-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="plan-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="plan-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
           </div>
         </section>
 
         <!-- CONTACTO -->
         <section class="admin-sec" id="sec-contact" hidden>
           <h2 class="admin-sec__title">Contacto del sitio</h2>
-          <p class="admin-muted">Estos datos aparecen en el footer y el botón de WhatsApp de todo el sitio.</p>
-          <form class="admin__editor admin__editor--narrow" id="contact-form">
-            <div class="admin-field"><label for="c-email">Correo de contacto</label><input type="email" id="c-email" /></div>
-            <div class="admin-field"><label for="c-wa">WhatsApp <span class="admin-hint">(solo dígitos, con código de país)</span></label><input type="text" id="c-wa" placeholder="50255555555" /></div>
-            <div class="admin-field"><label for="c-msg">Mensaje predefinido de WhatsApp</label><textarea id="c-msg" rows="2"></textarea></div>
-            <p class="admin-error" id="contact-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Protección de formularios (Cloudflare Turnstile)</h3>
-          <p class="admin-muted">Anti-bots para el formulario de cotización y el login. Crea un widget en el panel de Cloudflare Turnstile y pega aquí las llaves.</p>
-          <form class="admin__editor admin__editor--narrow" id="turnstile-form">
-            <label class="admin-check"><input type="checkbox" id="ts-enabled" /> Activar protección Turnstile</label>
-            <div class="admin-field"><label for="ts-site">Site key (pública)</label><input type="text" id="ts-site" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
-            <div class="admin-field"><label for="ts-secret">Secret key <span class="admin-hint">(privada, se guarda en el servidor)</span></label><input type="password" id="ts-secret" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
-            <p class="admin-error" id="turnstile-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Correo saliente (SMTP)</h3>
-          <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
-          <form class="admin__editor admin__editor--narrow" id="smtp-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
-              <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+          <p class="admin-muted">Ajustes globales del sitio y de la mensajería. Cada panel se guarda por separado.</p>
+          <div class="panel-grid">
+            <div class="panel">
+              <h3 class="panel__title">Datos de contacto</h3>
+              <p class="admin-muted">Aparecen en el footer y el botón de WhatsApp de todo el sitio.</p>
+              <form id="contact-form">
+                <div class="admin-field"><label for="c-email">Correo de contacto</label><input type="email" id="c-email" /></div>
+                <div class="admin-field"><label for="c-wa">WhatsApp <span class="admin-hint">(solo dígitos, con código de país)</span></label><input type="text" id="c-wa" placeholder="50255555555" /></div>
+                <div class="admin-field"><label for="c-msg">Mensaje predefinido de WhatsApp</label><textarea id="c-msg" rows="2"></textarea></div>
+                <p class="admin-error" id="contact-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="contact-save">Guardar</button></div>
+              </form>
             </div>
-            <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
-            <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
-            <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
-            <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
-            <p class="admin-error" id="smtp-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
-          </form>
+
+            <div class="panel">
+              <h3 class="panel__title">Protección de formularios (Cloudflare Turnstile)</h3>
+              <p class="admin-muted">Anti-bots para el formulario de cotización y el login. Crea un widget en el panel de Cloudflare Turnstile y pega aquí las llaves.</p>
+              <form id="turnstile-form">
+                <label class="admin-check"><input type="checkbox" id="ts-enabled" /> Activar protección Turnstile</label>
+                <div class="admin-field"><label for="ts-site">Site key (pública)</label><input type="text" id="ts-site" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+                <div class="admin-field"><label for="ts-secret">Secret key <span class="admin-hint">(privada, se guarda en el servidor)</span></label><input type="password" id="ts-secret" placeholder="0x4AAAAAAA..." autocomplete="off" /></div>
+                <p class="admin-error" id="turnstile-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="turnstile-save">Guardar</button></div>
+              </form>
+            </div>
+
+            <div class="panel">
+              <h3 class="panel__title">Correo saliente (SMTP)</h3>
+              <p class="admin-muted">Servidor para enviar verificación de correo y recuperación de contraseña. Si lo dejas vacío, los enlaces se registran en el log del servidor (modo desarrollo).</p>
+              <form id="smtp-form">
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="smtp-host">Host</label><input type="text" id="smtp-host" placeholder="smtp.hostinger.com" autocomplete="off" /></div>
+                  <div class="admin-field"><label for="smtp-port">Puerto</label><input type="text" id="smtp-port" placeholder="587" inputmode="numeric" /></div>
+                </div>
+                <div class="admin-field"><label for="smtp-user">Usuario</label><input type="text" id="smtp-user" placeholder="no-reply@tudominio.com" autocomplete="off" /></div>
+                <div class="admin-field"><label for="smtp-pass">Contraseña</label><input type="password" id="smtp-pass" autocomplete="off" /></div>
+                <div class="admin-field"><label for="smtp-from">Remitente (From)</label><input type="text" id="smtp-from" placeholder="TryCatch GT <no-reply@tudominio.com>" /></div>
+                <label class="admin-check"><input type="checkbox" id="smtp-secure" /> Conexión segura (SSL/TLS, puerto 465)</label>
+                <p class="admin-error" id="smtp-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="smtp-save">Guardar</button></div>
+              </form>
+            </div>
+
+            <div class="panel">
+              <h3 class="panel__title">Correo entrante (CRM)</h3>
+              <p class="admin-muted">Recibe respuestas de los clientes en el timeline del CRM vía el webhook de Hostinger Agentic Mail. Registra en hPanel el webhook <code>message.received</code> apuntando a la URL de abajo y define un secreto compartido aquí.</p>
+              <form id="mailhook-form">
+                <div class="admin-field">
+                  <label for="mailhook-url">URL del webhook <span class="admin-hint">(pégala en hPanel)</span></label>
+                  <div class="copy-row"><input type="text" id="mailhook-url" readonly /><button type="button" class="btn-ghost" id="mailhook-copy">Copiar</button></div>
+                </div>
+                <div class="admin-field"><label for="mailhook-secret">Secreto compartido <span class="admin-hint">(privado, se guarda en el servidor)</span></label><input type="password" id="mailhook-secret" placeholder="Genera una cadena larga y aleatoria" autocomplete="off" /></div>
+                <p class="admin-hint">Hostinger debe enviarlo en el header <code>X-Webhook-Secret</code> o como <code>?token=</code> en la URL.</p>
+                <div class="admin-field"><label for="mailhook-apitoken">Token del API de Agentic Mail <span class="admin-hint">(opcional; marca el correo como leído tras procesarlo)</span></label><input type="password" id="mailhook-apitoken" placeholder="Bearer token del API" autocomplete="off" /></div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="mailhook-apibase">URL base del API <span class="admin-hint">(ajusta si el proveedor cambia el endpoint)</span></label><input type="text" id="mailhook-apibase" placeholder="https://api.mail.hostinger.com" autocomplete="off" /></div>
+                  <div class="admin-field"><label for="mailhook-apifolder">Carpeta de procesados <span class="admin-hint">(vacío = solo marcar leído)</span></label><input type="text" id="mailhook-apifolder" placeholder="Procesados" autocomplete="off" /></div>
+                </div>
+                <p class="admin-error" id="mailhook-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mailhook-save">Guardar</button></div>
+              </form>
+            </div>
+          </div>
         </section>
 
         <!-- PERFIL -->
@@ -338,41 +580,50 @@
             </div>
           </div>
 
-          <form class="admin__editor admin__editor--narrow" id="profile-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
-              <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
+          <div class="panel-grid">
+            <div class="panel">
+              <h3 class="panel__title">Datos del perfil</h3>
+              <form id="profile-form">
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-fullname">Nombre(s)</label><input type="text" id="p-fullname" placeholder="Juan José" /></div>
+                  <div class="admin-field"><label for="p-lastname">Apellidos</label><input type="text" id="p-lastname" placeholder="Jolón Granados" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
+                  <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+                </div>
+                <div class="admin-grid-2">
+                  <div class="admin-field"><label for="p-role">Rol <span class="admin-hint">(lo asigna un administrador)</span></label><input type="text" id="p-role" readonly /></div>
+                  <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
+                </div>
+                <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
+                <p class="admin-error" id="profile-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
+              </form>
             </div>
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-displayname">Nombre para mostrar</label><input type="text" id="p-displayname" placeholder="Cómo aparece en el panel" /></div>
-              <div class="admin-field"><label for="p-email">Correo</label><input type="email" id="p-email" placeholder="tu@correo.com" /></div>
+
+            <div class="panel">
+              <h3 class="panel__title">Contraseña</h3>
+              <form id="pass-form">
+                <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
+                <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
+                <p class="admin-error" id="pass-error"></p>
+                <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
+              </form>
             </div>
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="p-role">Rol <span class="admin-hint">(lo asigna un administrador)</span></label><input type="text" id="p-role" readonly /></div>
-              <div class="admin-field"><label>Último acceso</label><input type="text" id="p-lastlogin" readonly /></div>
+
+            <div class="panel">
+              <h3 class="panel__title">Sesiones activas</h3>
+              <div id="sessions-panel">
+                <p class="admin-muted">Dispositivos donde tu cuenta tiene sesión abierta.</p>
+                <div class="users-list" id="sessions-list"></div>
+                <div class="admin__editor-actions" style="margin-top:12px"><button type="button" class="btn-ghost" id="sessions-revoke-btn">Cerrar las demás sesiones</button></div>
+              </div>
             </div>
-            <p class="admin-muted" id="email-verify-row">Estado del correo: <strong id="p-email-status">—</strong> <button type="button" class="btn-ghost btn-sm" id="email-verify-btn" hidden>Verificar correo</button></p>
-            <p class="admin-error" id="profile-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="profile-save">Guardar perfil</button></div>
-          </form>
 
-          <h3 class="admin-sec__subtitle">Contraseña</h3>
-          <form class="admin__editor admin__editor--narrow" id="pass-form">
-            <div class="admin-field"><label for="a-current">Contraseña actual</label><input type="password" id="a-current" autocomplete="current-password" /></div>
-            <div class="admin-field"><label for="a-new">Nueva contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="a-new" autocomplete="new-password" /></div>
-            <p class="admin-error" id="pass-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="pass-save">Cambiar contraseña</button></div>
-          </form>
-
-          <h3 class="admin-sec__subtitle">Sesiones activas</h3>
-          <div class="admin__editor admin__editor--narrow" id="sessions-panel">
-            <p class="admin-muted">Dispositivos donde tu cuenta tiene sesión abierta.</p>
-            <div class="users-list" id="sessions-list"></div>
-            <div class="admin__editor-actions" style="margin-top:12px"><button type="button" class="btn-ghost" id="sessions-revoke-btn">Cerrar las demás sesiones</button></div>
-          </div>
-
-          <h3 class="admin-sec__subtitle">Autenticación en dos pasos (2FA)</h3>
-          <div class="admin__editor admin__editor--narrow" id="mfa-panel">
+            <div class="panel">
+              <h3 class="panel__title">Autenticación en dos pasos (2FA)</h3>
+              <div id="mfa-panel">
             <div id="mfa-off" hidden>
               <p class="admin-muted">Añade una capa extra de seguridad. Necesitarás una app como Google Authenticator, Authy o 1Password.</p>
               <div class="admin__editor-actions"><button type="button" class="btn-primary" id="mfa-setup-btn">Activar 2FA</button></div>
@@ -408,25 +659,26 @@
                 <button type="button" class="btn-primary" id="mfa-backup-done">Ya los guardé</button>
               </div>
             </div>
+              </div>
+            </div>
           </div>
-
         </section>
 
         <!-- USUARIOS (solo admin) -->
         <section class="admin-sec" id="sec-users" hidden>
-          <h2 class="admin-sec__title">Usuarios</h2>
-          <p class="admin-muted">Gestiona las cuentas del equipo: crea, edita, activa/desactiva, restablece contraseñas y restaura usuarios.</p>
-          <div class="users-list" id="users-list"></div>
-          <form class="admin__editor admin__editor--narrow" id="user-form">
-            <div class="admin-grid-2">
-              <div class="admin-field"><label for="u-name">Nuevo usuario</label><input type="text" id="u-name" autocomplete="off" /></div>
-              <div class="admin-field"><label for="u-role">Rol</label><select id="u-role"><option value="editor">Editor</option><option value="admin">Admin</option></select></div>
-            </div>
-            <div class="admin-field"><label for="u-pass">Contraseña <span class="admin-hint">(mín. 12)</span></label><input type="password" id="u-pass" autocomplete="new-password" /></div>
-            <label class="admin-check"><input type="checkbox" id="u-mustchange" checked /> Requerir cambio de contraseña en el primer acceso</label>
-            <p class="admin-error" id="user-error"></p>
-            <div class="admin__editor-actions"><button type="button" class="btn-primary" id="user-save">+ Invitar usuario</button></div>
-          </form>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Usuarios</h2>
+            <button class="btn-primary" id="users-new">+ Nuevo usuario</button>
+          </div>
+          <p class="admin-muted">Gestiona las cuentas del equipo. Haz clic en una fila para editar, activar/desactivar, resetear la contraseña, reiniciar el 2FA o dar de baja.</p>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th><th>2FA</th></tr>
+              </thead>
+              <tbody id="users-tbody"><tr><td colspan="5" class="admin-muted">Cargando…</td></tr></tbody>
+            </table>
+          </div>
         </section>
 
         <!-- LEGAL (solo admin) -->
@@ -492,6 +744,7 @@
     </div>
   </div>
 
+  <script src="{{ADMIN_BASE}}/vendor/chart.umd.min.js"></script>
   <script src="{{ADMIN_BASE}}/admin.js"></script>
 </body>
 </html>

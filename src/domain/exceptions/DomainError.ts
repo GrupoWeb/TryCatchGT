@@ -18,3 +18,31 @@ export class InvalidProjectRequestError extends DomainError {
     this.name = 'InvalidProjectRequestError';
   }
 }
+
+export class InvalidContactError extends DomainError {
+  constructor(reason: string) {
+    super(`Contacto inválido: ${reason}`);
+    this.name = 'InvalidContactError';
+  }
+}
+
+export class InvalidEmailTemplateError extends DomainError {
+  constructor(reason: string) {
+    super(`Plantilla inválida: ${reason}`);
+    this.name = 'InvalidEmailTemplateError';
+  }
+}
+
+export class InvalidCrmMessageError extends DomainError {
+  constructor(reason: string) {
+    super(`Mensaje inválido: ${reason}`);
+    this.name = 'InvalidCrmMessageError';
+  }
+}
+
+export class InvalidCadenceError extends DomainError {
+  constructor(reason: string) {
+    super(`Cadencia inválida: ${reason}`);
+    this.name = 'InvalidCadenceError';
+  }
+}
