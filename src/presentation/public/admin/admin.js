@@ -441,9 +441,15 @@
     if (!v) return '';
     return new Date(v).toLocaleString('es-GT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   }
-  function inboxItem(m) {
+  let inboxItems = [];
+  function inboxSnippet(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    return (tmp.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90);
+  }
+  function inboxRow(m) {
     const initials = esc(leadInitials(m.contactName || m.contactEmail || '?'));
-    return `<button class="inbox-item${m.unread ? ' is-unread' : ''}" data-id="${m.contactId}">
+    return `<button class="inbox-item${m.unread ? ' is-unread' : ''}" data-id="${m.id}">
       <span class="inbox-item__avatar" style="--c:${leadColor(m.contactName || m.contactEmail || '?')}">${initials}</span>
       <span class="inbox-item__body">
         <span class="inbox-item__top">
@@ -451,20 +457,50 @@
           <span class="inbox-item__date">${esc(fmtDateTime(m.receivedAt || m.createdAt))}</span>
         </span>
         <span class="inbox-item__subject">${m.unread ? '<span class="inbox-dot" aria-label="No leído"></span>' : ''}${esc(m.subject || '(sin asunto)')}</span>
+        <span class="inbox-item__snippet">${esc(inboxSnippet(m.bodyHtml))}</span>
       </span>
     </button>`;
+  }
+  // Panel de lectura (columna derecha). El cuerpo ya viene sanitizado del servidor.
+  function renderInboxRead(m) {
+    const read = $('inbox-read');
+    if (!m) { read.innerHTML = '<div class="inbox-read__empty"><span class="inbox-read__empty-ico">📬</span><p>Selecciona un correo para leerlo.</p></div>'; return; }
+    read.innerHTML = `
+      <div class="inbox-read__head">
+        <div class="inbox-read__from">
+          <span class="inbox-item__avatar" style="--c:${leadColor(m.contactName || m.contactEmail || '?')}">${esc(leadInitials(m.contactName || m.contactEmail || '?'))}</span>
+          <div class="inbox-read__who">
+            <div class="inbox-read__name">${esc(m.contactName || m.contactEmail)}</div>
+            <a class="lead-card__email" href="mailto:${esc(m.contactEmail)}">${esc(m.contactEmail)}</a>
+          </div>
+          <span class="inbox-read__date">${esc(fmtDateTime(m.receivedAt || m.createdAt))}</span>
+        </div>
+        <h3 class="inbox-read__subject">${esc(m.subject || '(sin asunto)')}</h3>
+      </div>
+      <div class="inbox-read__body">${m.bodyHtml || '<em class="admin-muted">(sin contenido)</em>'}</div>
+      <div class="inbox-read__actions">
+        <button class="btn-primary" id="inbox-reply">↩ Responder</button>
+      </div>`;
+    read.querySelector('#inbox-reply').addEventListener('click', async () => {
+      const cr = await api(`/api/admin/contacts/${m.contactId}`);
+      if (cr.ok && cr.body.data) openMailComposer(cr.body.data);
+    });
   }
   async function loadInbox() {
     const cont = $('inbox-list');
     const r = await api('/api/admin/inbox');
     if (!guard(r) || !r.ok) { cont.innerHTML = '<p class="admin-muted">No se pudo cargar la bandeja.</p>'; return; }
-    const items = (r.body.data && r.body.data.items) || [];
-    if (!items.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay correos entrantes.</p>'; }
+    inboxItems = (r.body.data && r.body.data.items) || [];
+    renderInboxRead(null);
+    if (!inboxItems.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay correos entrantes.</p>'; }
     else {
-      cont.innerHTML = items.map(inboxItem).join('');
-      cont.querySelectorAll('.inbox-item').forEach((el) => el.addEventListener('click', async () => {
-        const cr = await api(`/api/admin/contacts/${el.getAttribute('data-id')}`);
-        if (cr.ok && cr.body.data) openMailComposer(cr.body.data);
+      cont.innerHTML = inboxItems.map(inboxRow).join('');
+      cont.querySelectorAll('.inbox-item').forEach((el) => el.addEventListener('click', () => {
+        const m = inboxItems.find((x) => String(x.id) === el.getAttribute('data-id'));
+        cont.querySelectorAll('.inbox-item').forEach((x) => x.classList.remove('is-active'));
+        el.classList.add('is-active');
+        el.classList.remove('is-unread');
+        renderInboxRead(m);
       }));
     }
     // Al abrir la bandeja se marcan como leídos y el badge se limpia.
@@ -1002,6 +1038,12 @@
         if (url) document.execCommand('createLink', false, url);
       } else if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, btn.getAttribute('data-value'));
+      } else if (cmd === 'foreColor') {
+        // styleWithCSS produce <span style="color:…"> (lo que el sanitizador permite),
+        // en vez del <font color> heredado que se descartaría.
+        document.execCommand('styleWithCSS', false, true);
+        document.execCommand('foreColor', false, btn.getAttribute('data-value'));
+        document.execCommand('styleWithCSS', false, false);
       } else {
         document.execCommand(cmd, false, null);
       }
@@ -1318,7 +1360,29 @@
         <p class="mail-to">Para: <strong>${esc(contact.email)}</strong></p>
         <div class="admin-field"><label>Plantilla</label><select class="modal__input" id="mail-tpl">${tplOptions}</select></div>
         <div class="admin-field"><label>Asunto *</label><input class="modal__input" id="mail-subject" type="text" placeholder="Asunto del correo" /></div>
-        <div class="admin-field"><label>Mensaje *</label><div class="mail-body" id="mail-body" contenteditable="true" data-placeholder="Escribe el mensaje…"></div></div>
+        <div class="admin-field"><label>Mensaje *</label>
+          <div class="rt">
+            <div class="rt__toolbar" id="mail-rt-toolbar">
+              <button type="button" class="rt__btn" data-cmd="bold" title="Negrita"><b>B</b></button>
+              <button type="button" class="rt__btn" data-cmd="italic" title="Cursiva"><i>I</i></button>
+              <button type="button" class="rt__btn" data-cmd="underline" title="Subrayado"><u>U</u></button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
+              <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
+              <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#111827" title="Negro" style="--sw:#111827"></button>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#6c5ffc" title="Violeta" style="--sw:#6c5ffc"></button>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#2563eb" title="Azul" style="--sw:#2563eb"></button>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#0ab39c" title="Verde" style="--sw:#0ab39c"></button>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#f59e0b" title="Ámbar" style="--sw:#f59e0b"></button>
+              <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#e11d48" title="Rojo" style="--sw:#e11d48"></button>
+              <span class="rt__sep"></span>
+              <button type="button" class="rt__btn" data-cmd="removeFormat" title="Quitar formato">✕</button>
+            </div>
+            <div class="rt__area mail-body" id="mail-body" contenteditable="true" data-placeholder="Escribe el mensaje…"></div>
+          </div>
+        </div>
         <label class="mail-advance"><input type="checkbox" id="mail-advance" ${advanceDefault} /> Avanzar a "Contactado" al enviar</label>
         <details class="mail-preview"><summary>Vista previa (con los datos del contacto)</summary><div class="mail-preview__box"><p class="mail-preview__subject" id="mail-prev-subject"></p><div id="mail-prev-body"></div></div></details>
         <p class="admin-error" id="mail-error"></p>
@@ -1342,6 +1406,8 @@
     const subjEl = overlay.querySelector('#mail-subject');
     const bodyEl = overlay.querySelector('#mail-body');
     const errEl = overlay.querySelector('#mail-error');
+    // Barra de formato (negrita, listas, enlace, color) sobre el cuerpo del correo.
+    makeRichEditor(bodyEl, overlay.querySelector('#mail-rt-toolbar'));
 
     function refreshPreview() {
       overlay.querySelector('#mail-prev-subject').textContent = fillSubject(subjEl.value, contact) || '(sin asunto)';
