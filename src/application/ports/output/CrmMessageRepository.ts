@@ -7,6 +7,7 @@ export interface InboxItem {
   contactName: string;
   contactEmail: string;
   subject: string;
+  bodyHtml: string;
   receivedAt: Date | null;
   createdAt: Date;
   unread: boolean;

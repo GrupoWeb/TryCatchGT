@@ -64,6 +64,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       .select('m.id', 'id')
       .addSelect('m.contactId', 'contactId')
       .addSelect('m.subject', 'subject')
+      .addSelect('m.bodyHtml', 'bodyHtml')
       .addSelect('m.status', 'status')
       .addSelect('m.receivedAt', 'receivedAt')
       .addSelect('m.createdAt', 'createdAt')
@@ -73,7 +74,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       .orderBy('m.createdAt', 'DESC')
       .limit(limit)
       .getRawMany<{
-        id: number; contactId: number; subject: string; status: string;
+        id: number; contactId: number; subject: string; bodyHtml: string | null; status: string;
         receivedAt: Date | null; createdAt: Date; contactName: string; contactEmail: string;
       }>();
     return rows.map((r) => ({
@@ -82,6 +83,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       contactName: r.contactName,
       contactEmail: r.contactEmail,
       subject: r.subject,
+      bodyHtml: r.bodyHtml ?? '',
       receivedAt: r.receivedAt ? new Date(r.receivedAt) : null,
       createdAt: new Date(r.createdAt),
       unread: r.status === 'received',
