@@ -64,7 +64,11 @@ export function parseInboundPayload(body: unknown): InboundEmail | null {
     fromEmail: from.email,
     fromName: from.name,
     subject: firstString(msg.subject),
-    bodyHtml: firstString(msg.html, msg.body_html, msg.bodyHtml, msg.body, msg.text),
+    // Hostinger Agentic Mail envía el cuerpo en plainHtml/plainBody (recortados a
+    // ~200 caracteres; el cuerpo completo está en bodyUrl, descarga con TTL). Se
+    // prefiere el HTML y, si viene vacío, el texto plano. Se mantienen los alias
+    // genéricos por si el contrato cambia.
+    bodyHtml: firstString(msg.plainHtml, msg.html, msg.body_html, msg.bodyHtml, msg.body, msg.plainBody, msg.text),
     messageId: firstString(msg.message_id, msg.messageId, msg.id) ?? null,
     inReplyTo: firstString(msg.in_reply_to, msg.inReplyTo) ?? null,
     threadId: threadId ?? null,
