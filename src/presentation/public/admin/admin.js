@@ -154,7 +154,7 @@
     const isAdmin = role === 'admin';
     // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
     // navegación a los editores. El control real es requireRole en las rutas.
-    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
+    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 

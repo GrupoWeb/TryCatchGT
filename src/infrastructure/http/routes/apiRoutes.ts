@@ -248,8 +248,8 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
-apiRouter.get('/admin/inbox', requireAuth, crmInboxController.list);
-apiRouter.post('/admin/inbox/seen', requireAuth, crmInboxController.markSeen);
+apiRouter.get('/admin/inbox', requireAuth, requireAdmin, crmInboxController.list);
+apiRouter.post('/admin/inbox/seen', requireAuth, requireAdmin, crmInboxController.markSeen);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
 // Páginas legales (Términos, Privacidad, Cookies) — edición solo admin.
