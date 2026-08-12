@@ -97,6 +97,7 @@
       <nav class="admin__nav">
         <span class="admin__nav-label">General</span>
         <button class="admin__nav-btn is-active" data-section="home"><span class="admin__nav-ico">🏠</span> Inicio</button>
+        <button class="admin__nav-btn" data-section="inbox"><span class="admin__nav-ico">📬</span> Bandeja <span class="nav-badge" id="nav-inbox" hidden>0</span></button>
         <button class="admin__nav-btn" data-section="leads"><span class="admin__nav-ico">📥</span> Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
 
         <span class="admin__nav-label">CRM</span>
@@ -150,6 +151,16 @@
               <div class="chart-card__canvas"><canvas id="chart-leads-status"></canvas></div>
             </div>
           </div>
+        </section>
+
+        <!-- BANDEJA (correos entrantes del CRM) -->
+        <section class="admin-sec" id="sec-inbox" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Bandeja</h2>
+            <button class="btn-ghost" id="inbox-refresh">↻ Actualizar</button>
+          </div>
+          <p class="admin-muted">Respuestas y correos entrantes de todos los contactos, más recientes arriba. Haz clic en uno para abrir la conversación del contacto.</p>
+          <div class="inbox-list" id="inbox-list"><p class="admin-muted">Cargando…</p></div>
         </section>
 
         <!-- COTIZACIONES -->
