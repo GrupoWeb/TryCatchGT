@@ -328,6 +328,25 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 
 /* Acciones de seguridad dentro del drawer de usuario. */
 .user-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- Bandeja (correos entrantes del CRM) ---------- */
+.inbox-list { display: flex; flex-direction: column; gap: 8px; max-width: 860px; }
+.inbox-item {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%; text-align: left;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); box-shadow: var(--shadow-sm); cursor: pointer; font-family: var(--font);
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.inbox-item:hover { transform: translateY(-1px); border-color: var(--border-strong); box-shadow: var(--shadow); }
+.inbox-item.is-unread { border-left: 3px solid var(--primary); background: color-mix(in srgb, var(--primary) 5%, var(--surface)); }
+.inbox-item__avatar { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; color: #fff; background: linear-gradient(135deg, var(--c, var(--primary)), color-mix(in srgb, var(--c, var(--primary)) 55%, #000)); }
+.inbox-item__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.inbox-item__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.inbox-item__name { font-weight: 700; font-size: 14px; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-item__date { flex-shrink: 0; font-size: 12px; color: var(--text-dim); }
+.inbox-item__subject { font-size: 13.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 7px; }
+.inbox-item.is-unread .inbox-item__subject { color: var(--text-strong); font-weight: 600; }
+.inbox-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
 /* Listas de entidades (blog, servicios, planes, plantillas, cadencias) como
    rejilla de tarjetas; la edición ocurre en un drawer lateral. */
 .admin__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }

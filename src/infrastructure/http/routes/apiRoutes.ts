@@ -19,6 +19,7 @@ import { PlanAdminController } from '../controllers/PlanAdminController.js';
 import { SiteConfigController } from '../controllers/SiteConfigController.js';
 import { AccountAdminController } from '../controllers/AccountAdminController.js';
 import { OverviewController } from '../controllers/OverviewController.js';
+import { CrmInboxController } from '../controllers/CrmInboxController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { LegalController } from '../controllers/LegalController.js';
 import { createRequireAuth, AuthedRequest } from '../middleware/requireAuth.js';
@@ -181,7 +182,8 @@ const cadenceAdminController = new CadenceAdminController(
 const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
-const overviewController = new OverviewController(blogRepository, projectRequestRepository);
+const overviewController = new OverviewController(blogRepository, projectRequestRepository, crmMessageRepository);
+const crmInboxController = new CrmInboxController(crmMessageRepository);
 const auditController = new AuditController(auditRepository, userRepository);
 const legalController = new LegalController(siteConfigRepository, htmlSanitizer);
 
@@ -246,6 +248,8 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 
 // ── Admin (protegido) ───────────────────────────────────────────────────────
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
+apiRouter.get('/admin/inbox', requireAuth, requireAdmin, crmInboxController.list);
+apiRouter.post('/admin/inbox/seen', requireAuth, requireAdmin, crmInboxController.markSeen);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 
 // Páginas legales (Términos, Privacidad, Cookies) — edición solo admin.

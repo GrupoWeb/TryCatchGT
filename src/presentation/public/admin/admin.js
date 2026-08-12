@@ -154,7 +154,7 @@
     const isAdmin = role === 'admin';
     // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
     // navegación a los editores. El control real es requireRole en las rutas.
-    document.querySelectorAll('.admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
+    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
@@ -271,7 +271,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, inbox: loadInbox, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -328,6 +328,7 @@
     lastOverview = d;
     const badge = $('nav-leads');
     if (d.leadsPending > 0) { badge.hidden = false; badge.textContent = d.leadsPending; } else badge.hidden = true;
+    setInboxBadge(d.inboxUnread || 0);
     const cards = [
       { label: 'Cotizaciones pendientes', value: d.leadsPending, accent: '#6c5ffc', icon: '📥' },
       { label: 'Cotizaciones totales', value: d.leadsTotal, accent: '#06b6d4', icon: '📊' },
@@ -429,6 +430,50 @@
       });
     }
   }
+
+  // ── BANDEJA (correos entrantes del CRM) ───────────────────
+  function setInboxBadge(n) {
+    const b = $('nav-inbox');
+    if (!b) return;
+    if (n > 0) { b.hidden = false; b.textContent = n; } else b.hidden = true;
+  }
+  function fmtDateTime(v) {
+    if (!v) return '';
+    return new Date(v).toLocaleString('es-GT', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  }
+  function inboxItem(m) {
+    const initials = esc(leadInitials(m.contactName || m.contactEmail || '?'));
+    return `<button class="inbox-item${m.unread ? ' is-unread' : ''}" data-id="${m.contactId}">
+      <span class="inbox-item__avatar" style="--c:${leadColor(m.contactName || m.contactEmail || '?')}">${initials}</span>
+      <span class="inbox-item__body">
+        <span class="inbox-item__top">
+          <span class="inbox-item__name">${esc(m.contactName || m.contactEmail)}</span>
+          <span class="inbox-item__date">${esc(fmtDateTime(m.receivedAt || m.createdAt))}</span>
+        </span>
+        <span class="inbox-item__subject">${m.unread ? '<span class="inbox-dot" aria-label="No leído"></span>' : ''}${esc(m.subject || '(sin asunto)')}</span>
+      </span>
+    </button>`;
+  }
+  async function loadInbox() {
+    const cont = $('inbox-list');
+    const r = await api('/api/admin/inbox');
+    if (!guard(r) || !r.ok) { cont.innerHTML = '<p class="admin-muted">No se pudo cargar la bandeja.</p>'; return; }
+    const items = (r.body.data && r.body.data.items) || [];
+    if (!items.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay correos entrantes.</p>'; }
+    else {
+      cont.innerHTML = items.map(inboxItem).join('');
+      cont.querySelectorAll('.inbox-item').forEach((el) => el.addEventListener('click', async () => {
+        const cr = await api(`/api/admin/contacts/${el.getAttribute('data-id')}`);
+        if (cr.ok && cr.body.data) openMailComposer(cr.body.data);
+      }));
+    }
+    // Al abrir la bandeja se marcan como leídos y el badge se limpia.
+    if ((r.body.data && r.body.data.unread) > 0) {
+      await api('/api/admin/inbox/seen', { method: 'POST' });
+    }
+    setInboxBadge(0);
+  }
+  $('inbox-refresh').addEventListener('click', loadInbox);
 
   // ── AUDITORÍA ─────────────────────────────────────────────
   async function loadAudit() {
