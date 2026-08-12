@@ -58,6 +58,38 @@ describe('parseInboundPayload', () => {
     expect(p!.messageId).toBe('<rfc@x>');
   });
 
+  it('parsea el payload real de Hostinger Agentic Mail (data.* con plainBody/plainHtml)', () => {
+    const p = parseInboundPayload({
+      id: '019d5234-a855-7596-a794-3a691958b970',
+      event: 'message.received',
+      timestamp: '2026-04-03T12:00:00Z',
+      data: {
+        mailboxAddress: 'test@hostinger.com',
+        messageId: '<a@b.com>',
+        subject: 'test email',
+        from: 'Foo <foo@hostinger.com>',
+        to: ['Admin <test@hostinger.com>'],
+        date: 'Fri,  3 Apr 2026 06:21:33 +0000 (UTC)',
+        plainBody: 'abc 123',
+        plainHtml: '',
+        bodyUrl: 'https://download-url',
+      },
+    });
+    expect(p).not.toBeNull();
+    expect(p!.fromEmail).toBe('foo@hostinger.com');
+    expect(p!.fromName).toBe('Foo');
+    expect(p!.subject).toBe('test email');
+    // plainHtml viene vacío, así que cae al texto plano (antes quedaba vacío).
+    expect(p!.bodyHtml).toBe('abc 123');
+    expect(p!.messageId).toBe('<a@b.com>');
+    expect(p!.receivedAt).toBeInstanceOf(Date);
+  });
+
+  it('prefiere plainHtml cuando trae contenido', () => {
+    const p = parseInboundPayload({ data: { from: 'a@x.com', plainHtml: '<b>hola</b>', plainBody: 'hola' } });
+    expect(p!.bodyHtml).toBe('<b>hola</b>');
+  });
+
   it('devuelve null si no hay remitente', () => {
     expect(parseInboundPayload({ data: { message: { subject: 'x' } } })).toBeNull();
     expect(parseInboundPayload(null)).toBeNull();
