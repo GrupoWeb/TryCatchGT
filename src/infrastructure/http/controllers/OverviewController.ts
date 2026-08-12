@@ -1,15 +1,21 @@
 import { Request, Response } from 'express';
 import { BlogPostRepository } from '../../../application/ports/output/BlogPostRepository.js';
 import { ProjectRequestRepository } from '../../../application/ports/output/ProjectRequestRepository.js';
+import { CrmMessageRepository } from '../../../application/ports/output/CrmMessageRepository.js';
 
 export class OverviewController {
   constructor(
     private readonly blogRepo: BlogPostRepository,
     private readonly leadRepo: ProjectRequestRepository,
+    private readonly messageRepo: CrmMessageRepository,
   ) {}
 
   public stats = async (_req: Request, res: Response): Promise<void> => {
-    const [posts, leads] = await Promise.all([this.blogRepo.findAll(), this.leadRepo.findAll()]);
+    const [posts, leads, inboxUnread] = await Promise.all([
+      this.blogRepo.findAll(),
+      this.leadRepo.findAll(),
+      this.messageRepo.countUnreadInbound(),
+    ]);
     res.status(200).json({
       success: true,
       data: {
@@ -17,6 +23,8 @@ export class OverviewController {
         postsDraft: posts.filter((p) => p.status === 'draft').length,
         leadsTotal: leads.length,
         leadsPending: leads.filter((l) => l.status === 'pending').length,
+        // Correos entrantes sin revisar: alimenta el badge de la Bandeja.
+        inboxUnread,
         // Distribución por estado: alimenta la dona del dashboard.
         leadsByStatus: {
           pending: leads.filter((l) => l.status === 'pending').length,
