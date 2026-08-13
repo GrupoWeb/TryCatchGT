@@ -561,6 +561,16 @@
                   </div>
                 </div>
                 <div class="admin-field">
+                  <label>Imágenes
+                    <span class="admin-hint">(súbelas y pega la URL en tu HTML; el vídeo va por URL o embed externo)</span>
+                  </label>
+                  <div class="admin-inline">
+                    <input type="file" id="landing-img-file" accept="image/*" hidden />
+                    <button type="button" class="btn-ghost" id="landing-img-upload">Subir imagen</button>
+                  </div>
+                  <div id="landing-assets" class="landing-assets"></div>
+                </div>
+                <div class="admin-field">
                   <label for="landing-html">HTML del landing *
                     <span class="admin-hint">(pega el código o súbelo desde un archivo)</span>
                   </label>
