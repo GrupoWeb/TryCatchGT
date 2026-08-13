@@ -6,6 +6,8 @@ import {
   detectBrowser,
   externalReferrerHost,
   visitorHash,
+  normalizeIp,
+  countryFromIp,
 } from '../../src/infrastructure/http/middleware/trackVisit.js';
 
 const HTML = 'text/html,application/xhtml+xml';
@@ -32,6 +34,33 @@ describe('trackVisit · shouldTrack', () => {
     expect(shouldTrack('GET', '/admin/posts', HTML, '/admin')).toBe(false);
     // Panel movido a ruta secreta: se excluye por esa ruta, no por "/admin".
     expect(shouldTrack('GET', '/panel-x7', HTML, '/panel-x7')).toBe(false);
+  });
+
+  it('descarta sondeos de escáner (wp-admin, .php, phpmyadmin)', () => {
+    expect(shouldTrack('GET', '/wp-admin/install.php', HTML, '/admin')).toBe(false);
+    expect(shouldTrack('GET', '/wp-login.php', HTML, '/admin')).toBe(false);
+    expect(shouldTrack('GET', '/xmlrpc.php', HTML, '/admin')).toBe(false);
+    expect(shouldTrack('GET', '/phpmyadmin/', HTML, '/admin')).toBe(false);
+    expect(shouldTrack('GET', '/.env', HTML, '/admin')).toBe(false);
+  });
+});
+
+describe('trackVisit · país por GeoIP local', () => {
+  it('normaliza IPv4 mapeada a IPv6', () => {
+    expect(normalizeIp('::ffff:8.8.8.8')).toBe('8.8.8.8');
+    expect(normalizeIp('8.8.8.8')).toBe('8.8.8.8');
+  });
+
+  it('resuelve el país (ISO 2 letras) de una IP pública', () => {
+    const c = countryFromIp('8.8.8.8');
+    expect(c).toMatch(/^[A-Z]{2}$/);
+  });
+
+  it('devuelve null para IP local/privada o ausente', () => {
+    expect(countryFromIp('127.0.0.1')).toBeNull();
+    expect(countryFromIp('::1')).toBeNull();
+    expect(countryFromIp('')).toBeNull();
+    expect(countryFromIp(null)).toBeNull();
   });
 });
 
