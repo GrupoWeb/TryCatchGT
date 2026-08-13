@@ -10,6 +10,7 @@ import { EmailSender } from '../ports/output/EmailSender.js';
 import { HtmlSanitizer } from '../ports/output/HtmlSanitizer.js';
 import { CrmMessage } from '../../domain/entities/CrmMessage.js';
 import { renderTemplate } from '../../domain/services/renderTemplate.js';
+import { wrapCrmEmail, htmlToPlainText } from '../../domain/services/crmEmailShell.js';
 import {
   InvalidContactError,
   InvalidCrmMessageError,
@@ -64,10 +65,14 @@ export class SendContactEmail implements SendContactEmailUseCase {
     const cleanBody = this.sanitizer.sanitize(bodyHtml);
     const rendered = renderTemplate(subject, cleanBody, contact);
 
+    // Se guarda el cuerpo "pelado" en el timeline (así se ve en la bandeja), pero
+    // el correo sale envuelto en la carcasa con la marca TryCatch GT para que no
+    // llegue como texto suelto al buzón del contacto.
     const { sent, messageId } = await this.emailSender.send({
       to: contact.email.getValue(),
       subject: rendered.subject,
-      html: rendered.bodyHtml,
+      html: wrapCrmEmail(rendered.bodyHtml, rendered.subject),
+      text: htmlToPlainText(rendered.bodyHtml),
     });
 
     const message = await this.messages.save(
