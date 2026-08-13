@@ -112,6 +112,8 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
 .admin-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
 .admin-field label { font-size: 13px; font-weight: 600; color: var(--text-strong); }
 .admin-hint { font-weight: 400; color: var(--text-dim); }
+.admin-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-inline input[type="text"] { flex: 1; min-width: 0; }
 .admin-field input,
 .admin-field select,
 .admin-field textarea {
