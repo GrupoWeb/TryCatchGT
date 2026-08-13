@@ -86,6 +86,12 @@ describe('SendContactEmail', () => {
 
     expect(res.sent).toBe(true);
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ to: 'ana@x.com', subject: 'Hola Ana' }));
+    // El correo sale envuelto en la carcasa con la marca, con el cuerpo dentro y
+    // un fallback en texto plano; pero en el timeline se guarda el cuerpo pelado.
+    const outgoing = send.mock.calls[0][0] as { html: string; text?: string };
+    expect(outgoing.html).toContain('TryCatch');
+    expect(outgoing.html).toContain('<p>ACME</p>');
+    expect(outgoing.text).toBe('ACME');
     const saved = saveMsg.mock.calls[0][0] as CrmMessage;
     expect(saved.status).toBe('sent');
     expect(saved.bodyHtml).toBe('<p>ACME</p>');

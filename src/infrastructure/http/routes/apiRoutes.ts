@@ -21,10 +21,12 @@ import { AccountAdminController } from '../controllers/AccountAdminController.js
 import { OverviewController } from '../controllers/OverviewController.js';
 import { CrmInboxController } from '../controllers/CrmInboxController.js';
 import { AuditController } from '../controllers/AuditController.js';
+import { AnalyticsController } from '../controllers/AnalyticsController.js';
 import { LegalController } from '../controllers/LegalController.js';
 import { createRequireAuth, AuthedRequest } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
+import { createTrackVisit } from '../middleware/trackVisit.js';
 import { createTurnstileGuard } from '../middleware/turnstile.js';
 import { uploadImage, sniffImageMime } from '../upload.js';
 import { authLimiter, formLimiter, uploadLimiter, healthLimiter } from '../rateLimit.js';
@@ -74,6 +76,7 @@ import { TypeOrmAuditLogRepository } from '../../database/typeorm/TypeOrmAuditLo
 import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTokenRepository.js';
 import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { TypeOrmMediaRepository } from '../../database/typeorm/TypeOrmMediaRepository.js';
+import { TypeOrmPageViewRepository } from '../../database/typeorm/TypeOrmPageViewRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
@@ -96,6 +99,7 @@ const auditRepository = new TypeOrmAuditLogRepository();
 const userTokenRepository = new TypeOrmUserTokenRepository();
 const userSessionRepository = new TypeOrmUserSessionRepository();
 const mediaRepository = new TypeOrmMediaRepository();
+const pageViewRepository = new TypeOrmPageViewRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
@@ -112,6 +116,9 @@ const requireAdmin = requireRole('admin');
 const auditLog = createAuditLog(auditRepository);
 // Protección anti-bots (Cloudflare Turnstile) para formularios; se configura en el panel.
 const turnstileGuard = createTurnstileGuard(siteConfigRepository);
+// Analítica first-party: registra las visitas a páginas públicas. Se monta a nivel de
+// app en server.ts (no bajo /api), donde ve las navegaciones a las páginas del sitio.
+export const trackVisit = createTrackVisit(pageViewRepository);
 
 // Público
 const serviceController = new ServiceController(new GetServices(serviceRepository));
@@ -185,6 +192,7 @@ const accountAdminController = new AccountAdminController(userRepository, passwo
 const overviewController = new OverviewController(blogRepository, projectRequestRepository, crmMessageRepository);
 const crmInboxController = new CrmInboxController(crmMessageRepository);
 const auditController = new AuditController(auditRepository, userRepository);
+const analyticsController = new AnalyticsController(pageViewRepository);
 const legalController = new LegalController(siteConfigRepository, htmlSanitizer);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
@@ -251,6 +259,7 @@ apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/inbox', requireAuth, requireAdmin, crmInboxController.list);
 apiRouter.post('/admin/inbox/seen', requireAuth, requireAdmin, crmInboxController.markSeen);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
+apiRouter.get('/admin/analytics', requireAuth, requireAdmin, analyticsController.summary);
 
 // Páginas legales (Términos, Privacidad, Cookies) — edición solo admin.
 apiRouter.get('/admin/legal', requireAuth, requireAdmin, legalController.getAllAdmin);
