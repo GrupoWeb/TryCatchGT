@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import path from 'node:path';
 import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
-import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences, trackVisit } from './routes/apiRoutes.js';
+import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences, trackVisit, landingHandler } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { buildCspDirectives } from './csp.js';
 import { globalLimiter } from './rateLimit.js';
@@ -150,6 +150,9 @@ app.get('/blog/:slug', async (req, res) => {
   }
 });
 app.get([env.adminPath, `${env.adminPath}/*`], (_req, res) => sendAdminHtml(res));
+// Muestras de landing: sirve el HTML aislado con CSP sandbox (ver landing.ts). Va
+// antes del fallback SPA para que /muestras/<slug> no caiga a la landing genérica.
+app.get('/muestras/:slug', landingHandler);
 app.get('/privacidad', (_req, res) => sendHtml(res, 'legal/privacidad.html'));
 app.get('/terminos', (_req, res) => sendHtml(res, 'legal/terminos.html'));
 app.get('/cookies', (_req, res) => sendHtml(res, 'legal/cookies.html'));
