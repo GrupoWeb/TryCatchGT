@@ -812,7 +812,22 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .rt__area li { margin-bottom: 4px; }
 .rt__area a { color: var(--primary); }
 .rt__area blockquote { margin: 0 0 12px; padding: 6px 16px; border-left: 3px solid var(--primary); color: var(--text-muted); }
-.rt__area img { max-width: 100%; border-radius: 8px; }
+.rt__area img { max-width: 100%; border-radius: 8px; cursor: pointer; }
+
+/* Barra flotante de imagen (alinear / redimensionar / eliminar) */
+.rt-imgbar {
+  position: fixed; z-index: 4000; display: none; gap: 2px; align-items: center;
+  padding: 4px; border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.rt-imgbar button {
+  width: 30px; height: 30px; padding: 0; border: none; border-radius: 7px;
+  background: transparent; color: var(--text); cursor: pointer;
+  font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.rt-imgbar button:hover { background: var(--primary-weak); color: var(--text-strong); }
+.rt-imgbar__sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 
 /* ---------- Subida de portada ---------- */
 .cover { display: flex; gap: 16px; align-items: stretch; flex-wrap: wrap; }
