@@ -1134,6 +1134,70 @@
   // ── Editor de texto enriquecido (contenteditable + execCommand) ──
   // Fábrica de editor: cada instancia gestiona su propia área, toolbar y rango.
   // Se usa en el blog y en las páginas legales.
+  // ── Barra flotante de imagen (alinear / redimensionar / eliminar) ─────────
+  // Singleton compartido por todos los editores enriquecidos. Aparece al hacer clic
+  // en una imagen del área editable y actúa sobre esa imagen.
+  let imgBar = null, imgBarTarget = null, imgBarChanged = null;
+  function hideImgBar() { if (imgBar) imgBar.style.display = 'none'; imgBarTarget = null; imgBarChanged = null; }
+  function positionImgBar() {
+    if (!imgBar || !imgBarTarget) return;
+    const r = imgBarTarget.getBoundingClientRect();
+    imgBar.style.top = `${Math.max(6, r.top - 42)}px`;
+    imgBar.style.left = `${Math.max(6, r.left)}px`;
+  }
+  // Redimensiona por el atributo width (px), lo email-safe. El CSS max-width:100%
+  // evita que se desborde del editor aunque el ancho lógico sea mayor.
+  function resizeImg(img, factor) {
+    const cur = parseInt(img.getAttribute('width'), 10) || img.clientWidth || img.naturalWidth || 300;
+    img.setAttribute('width', String(Math.max(40, Math.min(Math.round(cur * factor), 1000))));
+  }
+  // Alinea envolviendo la imagen en su propio párrafo con text-align (email-safe).
+  function alignImg(img, dir) {
+    let block = img.parentElement;
+    if (!block || block.classList.contains('rt__area') || block.textContent.trim() !== '') {
+      const p = document.createElement('p');
+      img.replaceWith(p); p.appendChild(img);
+      block = p;
+    }
+    block.style.textAlign = dir;
+  }
+  function buildImgBar() {
+    imgBar = document.createElement('div');
+    imgBar.className = 'rt-imgbar';
+    imgBar.innerHTML =
+      '<button type="button" data-a="left" title="Alinear a la izquierda">⯇</button>' +
+      '<button type="button" data-a="center" title="Centrar">▤</button>' +
+      '<button type="button" data-a="right" title="Alinear a la derecha">⯈</button>' +
+      '<span class="rt-imgbar__sep"></span>' +
+      '<button type="button" data-a="smaller" title="Reducir tamaño">−</button>' +
+      '<button type="button" data-a="bigger" title="Aumentar tamaño">+</button>' +
+      '<span class="rt-imgbar__sep"></span>' +
+      '<button type="button" data-a="delete" title="Eliminar imagen">🗑</button>';
+    imgBar.addEventListener('mousedown', (e) => e.preventDefault()); // no perder la imagen seleccionada
+    imgBar.addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b || !imgBarTarget) return;
+      const a = b.getAttribute('data-a');
+      if (a === 'delete') { imgBarTarget.remove(); if (imgBarChanged) imgBarChanged(); hideImgBar(); return; }
+      if (a === 'bigger') resizeImg(imgBarTarget, 1.15);
+      else if (a === 'smaller') resizeImg(imgBarTarget, 0.85);
+      else alignImg(imgBarTarget, a);
+      if (imgBarChanged) imgBarChanged();
+      positionImgBar();
+    });
+    document.body.appendChild(imgBar);
+    // Al hacer scroll o cambiar el tamaño, la posición fija dejaría de coincidir: se oculta.
+    window.addEventListener('scroll', hideImgBar, true);
+    window.addEventListener('resize', hideImgBar);
+  }
+  function showImgBar(img, onChange) {
+    if (!imgBar) buildImgBar();
+    imgBarTarget = img;
+    imgBarChanged = onChange;
+    imgBar.style.display = 'flex';
+    positionImgBar();
+  }
+
   function makeRichEditor(rtArea, rtToolbar) {
     let savedRange = null;
     function saveRange() { const s = window.getSelection(); if (s && s.rangeCount && rtArea.contains(s.anchorNode)) savedRange = s.getRangeAt(0).cloneRange(); }
@@ -1142,6 +1206,14 @@
     rtArea.addEventListener('keyup', saveRange);
     rtArea.addEventListener('mouseup', saveRange);
     rtArea.addEventListener('input', togglePlaceholder);
+    // Clic sobre una imagen: abre la barra flotante (alinear / redimensionar / borrar).
+    rtArea.addEventListener('click', (e) => {
+      if (e.target && e.target.tagName === 'IMG') {
+        showImgBar(e.target, () => rtArea.dispatchEvent(new Event('input', { bubbles: true })));
+      } else {
+        hideImgBar();
+      }
+    });
     rtToolbar.addEventListener('mousedown', async (e) => {
       const btn = e.target.closest('.rt__btn');
       if (!btn) return;
@@ -1199,24 +1271,48 @@
         try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
       } catch (_) { toast('No se pudo subir la imagen.', 'error'); return; }
       if (!res.ok || !body || !body.success) { toast((body && body.error) || 'No se pudo subir la imagen.', 'error'); return; }
-      insertImageUrl(new URL(body.data.url, location.origin).href);
-      toast('Imagen insertada');
-    }
-    function insertImageUrl(url) {
-      const place = (attr) => {
-        rtArea.focus(); restoreRange();
-        document.execCommand('insertHTML', false, `<img src="${url}" alt=""${attr}>`);
-        saveRange(); togglePlaceholder();
-      };
+      const url = new URL(body.data.url, location.origin).href;
       // Precarga para conocer el tamaño real y no ampliar imágenes pequeñas.
       const probe = new Image();
-      probe.onload = () => place(` width="${Math.min(probe.naturalWidth || 600, 600)}"`);
-      probe.onerror = () => place('');
+      probe.onload = () => { insertImageUrl(url, Math.min(probe.naturalWidth || 600, 600)); toast('Imagen insertada'); };
+      probe.onerror = () => { insertImageUrl(url, 0); toast('Imagen insertada'); };
       probe.src = url;
+    }
+    // Garantiza un punto de inserción dentro del área editable: si el foco se perdió
+    // al abrir el selector de archivos, coloca el caret al final.
+    function ensureCaretInEditor() {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount && rtArea.contains(sel.anchorNode)) return sel;
+      const r = document.createRange();
+      r.selectNodeContents(rtArea);
+      r.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return sel;
+    }
+    // Inserta la imagen por DOM (más fiable que execCommand) y avisa del cambio para
+    // repintar la vista previa. Luego se alinea/redimensiona con la barra flotante.
+    function insertImageUrl(url, width) {
+      rtArea.focus();
+      restoreRange();
+      const sel = ensureCaretInEditor();
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = '';
+      if (width) img.setAttribute('width', String(width));
+      range.insertNode(img);
+      range.setStartAfter(img);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      saveRange();
+      rtArea.dispatchEvent(new Event('input', { bubbles: true }));
     }
 
     return {
-      set(html) { rtArea.innerHTML = html || ''; togglePlaceholder(); },
+      set(html) { hideImgBar(); rtArea.innerHTML = html || ''; togglePlaceholder(); },
       get() { return rtArea.innerHTML.trim(); },
     };
   }
