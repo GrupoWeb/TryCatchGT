@@ -62,7 +62,14 @@ export class LandingSampleController {
         res.status(400).json({ success: false, error: 'El título es obligatorio.' });
         return;
       }
-      const html = String(b.html ?? '');
+      // El HTML se recibe en base64 (`htmlBase64`) para que el payload no contenga
+      // marcado `<script>`/eventos que un WAF (p. ej. ModSecurity de Hostinger)
+      // bloquearía como intento de inyección. Se mantiene el campo `html` en crudo
+      // como respaldo/compatibilidad. El contenido NO se sanea: el aislamiento es el
+      // sandbox al servir, no reescribir el HTML.
+      const html = typeof b.htmlBase64 === 'string' && b.htmlBase64.length
+        ? Buffer.from(b.htmlBase64, 'base64').toString('utf8')
+        : String(b.html ?? '');
       if (!html.trim()) {
         res.status(400).json({ success: false, error: 'El HTML de la muestra no puede estar vacío.' });
         return;
