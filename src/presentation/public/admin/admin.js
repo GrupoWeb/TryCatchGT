@@ -1489,6 +1489,7 @@
       $('landing-html').value = m.html || '';
       // Reinicia la previsualización; se recarga bajo demanda con "Previsualizar".
       const frame = $('landing-frame'); frame.hidden = true; frame.removeAttribute('src');
+      $('landing-assets').innerHTML = ''; // lista de imágenes subidas (por sesión de edición)
       landingSyncUrl();
     },
     // El HTML se envía en base64 (no en crudo): así el payload no lleva `<script>`
@@ -1528,6 +1529,36 @@
     const frame = $('landing-frame');
     frame.src = `${location.origin}/muestras/${slug}`;
     frame.hidden = false;
+  });
+  // Subir una imagen a la BD (mismo endpoint que las portadas) y obtener su URL
+  // pública (/api/media/<id>) para pegarla en el HTML. El vídeo va por URL/embed externo.
+  function addLandingAsset(url) {
+    const row = document.createElement('div');
+    row.className = 'landing-asset';
+    row.innerHTML = `<img src="${esc(url)}" alt="" /><input type="text" readonly value="${esc(url)}" /><button type="button" class="btn-ghost">Copiar</button>`;
+    row.querySelector('button').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(url); toast('URL copiada'); }
+      catch { row.querySelector('input').select(); toast('Selecciona y copia (Ctrl+C)', 'error'); }
+    });
+    $('landing-assets').prepend(row);
+  }
+  $('landing-img-upload').addEventListener('click', () => $('landing-img-file').click());
+  $('landing-img-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // permite volver a subir la misma imagen
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('image', file);
+    let res, body = null;
+    try {
+      res = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
+      try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
+    } catch (_) { toast('No se pudo subir la imagen.', 'error'); return; }
+    if (!res.ok || !body || !body.success) { toast((body && body.error) || 'No se pudo subir la imagen.', 'error'); return; }
+    const url = new URL(body.data.url, location.origin).href;
+    addLandingAsset(url);
+    try { await navigator.clipboard.writeText(url); toast('Imagen subida · URL copiada'); }
+    catch { toast('Imagen subida'); }
   });
 
   // ── PLANTILLAS DE CORREO ──────────────────────────────────
