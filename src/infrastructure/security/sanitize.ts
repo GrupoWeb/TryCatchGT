@@ -9,7 +9,7 @@ export function sanitizeBlogHtml(dirty: string): string {
     allowedTags: ['p', 'br', 'h2', 'h3', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'span'],
     allowedAttributes: {
       a: ['href', 'target', 'rel'],
-      img: ['src', 'alt'],
+      img: ['src', 'alt', 'width'],
       // Solo color de texto (para dar formato a los correos). El valor se valida
       // con allowedStyles: cualquier otra propiedad o valor no permitido se descarta.
       span: ['style'],

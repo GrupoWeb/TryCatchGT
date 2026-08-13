@@ -29,3 +29,19 @@ describe('sanitizeBlogHtml — color de texto', () => {
     expect(out).not.toContain('<script');
   });
 });
+
+describe('sanitizeBlogHtml — imágenes', () => {
+  it('conserva <img> con src http/https, alt y width', () => {
+    const out = sanitizeBlogHtml('<img src="https://trycatchgt.org/api/media/7" alt="logo" width="600">');
+    expect(out).toMatch(/<img/);
+    expect(out).toMatch(/src="https:\/\/trycatchgt\.org\/api\/media\/7"/);
+    expect(out).toMatch(/width="600"/);
+  });
+
+  it('descarta imágenes con esquema peligroso o handlers', () => {
+    const js = sanitizeBlogHtml('<img src="javascript:alert(1)" alt="x">');
+    expect(js).not.toMatch(/javascript:/i);
+    const on = sanitizeBlogHtml('<img src="https://x/y.png" onerror="alert(1)">');
+    expect(on).not.toMatch(/onerror/i);
+  });
+});
