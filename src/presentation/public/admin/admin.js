@@ -1153,6 +1153,10 @@
         const url = await promptDialog({ title: 'Insertar enlace', label: 'URL del enlace', placeholder: 'https://…' });
         rtArea.focus(); restoreRange();
         if (url) document.execCommand('createLink', false, url);
+      } else if (cmd === 'image') {
+        saveRange();
+        pickAndInsertImage();
+        return;
       } else if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, btn.getAttribute('data-value'));
       } else if (cmd === 'foreColor') {
@@ -1167,6 +1171,50 @@
       saveRange();
       togglePlaceholder();
     });
+    // ── Inserción de imágenes ─────────────────────────────────
+    // Sube el archivo a /api/media (se guarda en la BD) y lo inserta con URL
+    // ABSOLUTA (para que se vea en el correo, no solo en el panel) y un ancho tope
+    // de 600px (email-safe). El saneador permite <img src alt width> con http/https.
+    let fileInput = null;
+    function pickAndInsertImage() {
+      if (!fileInput) {
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.hidden = true;
+        fileInput.addEventListener('change', uploadPicked);
+        document.body.appendChild(fileInput);
+      }
+      fileInput.value = '';
+      fileInput.click();
+    }
+    async function uploadPicked() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('image', file);
+      let res, body = null;
+      try {
+        res = await withLoader(fetch('/api/admin/uploads', { method: 'POST', credentials: 'same-origin', headers: csrfHeader(), body: fd }));
+        try { body = await res.json(); } catch (_) { /* sin cuerpo */ }
+      } catch (_) { toast('No se pudo subir la imagen.', 'error'); return; }
+      if (!res.ok || !body || !body.success) { toast((body && body.error) || 'No se pudo subir la imagen.', 'error'); return; }
+      insertImageUrl(new URL(body.data.url, location.origin).href);
+      toast('Imagen insertada');
+    }
+    function insertImageUrl(url) {
+      const place = (attr) => {
+        rtArea.focus(); restoreRange();
+        document.execCommand('insertHTML', false, `<img src="${url}" alt=""${attr}>`);
+        saveRange(); togglePlaceholder();
+      };
+      // Precarga para conocer el tamaño real y no ampliar imágenes pequeñas.
+      const probe = new Image();
+      probe.onload = () => place(` width="${Math.min(probe.naturalWidth || 600, 600)}"`);
+      probe.onerror = () => place('');
+      probe.src = url;
+    }
+
     return {
       set(html) { rtArea.innerHTML = html || ''; togglePlaceholder(); },
       get() { return rtArea.innerHTML.trim(); },
@@ -1487,6 +1535,7 @@
               <button type="button" class="rt__btn" data-cmd="insertUnorderedList" title="Lista con viñetas">• Lista</button>
               <button type="button" class="rt__btn" data-cmd="insertOrderedList" title="Lista numerada">1. Lista</button>
               <button type="button" class="rt__btn" data-cmd="createLink" title="Insertar enlace">🔗</button>
+              <button type="button" class="rt__btn" data-cmd="image" title="Insertar imagen">🖼️</button>
               <span class="rt__sep"></span>
               <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#111827" title="Negro" style="--sw:#111827"></button>
               <button type="button" class="rt__btn rt__color" data-cmd="foreColor" data-value="#6c5ffc" title="Violeta" style="--sw:#6c5ffc"></button>
