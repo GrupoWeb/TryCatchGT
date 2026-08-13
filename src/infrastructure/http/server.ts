@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import path from 'node:path';
 import fs from 'node:fs';
 import { env, assertSecureSecrets } from '../../config/env.js';
-import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences } from './routes/apiRoutes.js';
+import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences, trackVisit } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { buildCspDirectives } from './csp.js';
 import { buildPostSeo, buildDefaultPostSeo, buildSitemap, buildRobots } from './seo.js';
@@ -41,6 +41,11 @@ app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: true, limit: '200kb' }));
 
 app.use('/api', apiRouter);
+
+// Analítica first-party: cuenta las navegaciones a páginas públicas (filtra API,
+// assets y el panel dentro del propio middleware). Va tras montar /api para no
+// interferir con esas rutas, y antes de servir el HTML/estáticos.
+app.use(trackVisit);
 
 // Live reload solo en desarrollo: refresca el navegador al guardar el frontend.
 const liveReload = env.isProduction ? null : createLiveReload(publicDir);
