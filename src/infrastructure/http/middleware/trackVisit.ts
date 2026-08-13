@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction, RequestHandler } from 'express';
 import { createHash } from 'node:crypto';
+import geoip from 'geoip-lite';
 import { PageViewRepository } from '../../../application/ports/output/PageViewRepository.js';
+import { isScannerPath } from '../scannerPaths.js';
 import { env } from '../../../config/env.js';
 
 // Rutas que nunca cuentan como "visita a una página": API, assets servidos en la
@@ -44,6 +46,8 @@ export function shouldTrack(method: string, pathName: string, accept: string, ad
   if (pathName === adminPath || pathName.startsWith(`${adminPath}/`)) return false;
   if (EXCLUDED_PREFIXES.some((p) => pathName.startsWith(p))) return false;
   if (ASSET_EXT.test(pathName)) return false;
+  // Sondeos de escáner (wp-admin, .php, phpmyadmin…): no son páginas reales del sitio.
+  if (isScannerPath(pathName)) return false;
   return true;
 }
 
@@ -54,6 +58,26 @@ export function externalReferrerHost(referer: string | undefined, host: string |
     const url = new URL(referer);
     if (host && url.host === host) return null; // navegación interna: no es una fuente
     return url.host.replace(/^www\./, '').slice(0, 255);
+  } catch {
+    return null;
+  }
+}
+
+/** Quita el prefijo IPv4-mapeado (::ffff:) para poder geolocalizar la IP. */
+export function normalizeIp(ip: string): string {
+  return ip.replace(/^::ffff:/, '');
+}
+
+/**
+ * Resuelve el país (ISO de 2 letras) desde la IP con la base GeoIP local (offline,
+ * sin llamadas externas ni API key). Devuelve null para IPs privadas/locales o
+ * desconocidas. Se usa como respaldo cuando no hay cabecera CF-IPCountry.
+ */
+export function countryFromIp(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  try {
+    const geo = geoip.lookup(normalizeIp(ip));
+    return geo && geo.country ? geo.country.toUpperCase() : null;
   } catch {
     return null;
   }
@@ -90,12 +114,15 @@ export function createTrackVisit(pageViews: PageViewRepository): RequestHandler 
     res.on('finish', () => {
       if (res.statusCode >= 400) return;
       const ip = (req.ip || req.socket?.remoteAddress || '') as string;
-      const country = String(req.headers['cf-ipcountry'] || '').slice(0, 2).toUpperCase() || null;
+      // País: primero la cabecera de Cloudflare (si algún día se usa el proxy) y, si
+      // no, la base GeoIP local a partir de la IP. 'XX' es "desconocido" de Cloudflare.
+      const cfCountry = String(req.headers['cf-ipcountry'] || '').slice(0, 2).toUpperCase();
+      const country = (cfCountry && cfCountry !== 'XX' ? cfCountry : null) ?? countryFromIp(ip);
       void pageViews
         .record({
           path: req.path,
           referrer: externalReferrerHost(req.headers['referer'] as string | undefined, req.headers['host']),
-          country: country && country !== 'XX' ? country : null,
+          country,
           device: classifyDevice(ua),
           browser: detectBrowser(ua),
           visitorHash: visitorHash(ip, ua, todayKey(), salt),

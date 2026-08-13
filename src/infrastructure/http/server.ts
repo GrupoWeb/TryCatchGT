@@ -8,6 +8,8 @@ import { env, assertSecureSecrets } from '../../config/env.js';
 import { apiRouter, ensureAdminUser, seoGetPost, seoListPosts, processDueCadences, trackVisit } from './routes/apiRoutes.js';
 import { createLiveReload } from './devLiveReload.js';
 import { buildCspDirectives } from './csp.js';
+import { globalLimiter } from './rateLimit.js';
+import { isScannerPath } from './scannerPaths.js';
 import { buildPostSeo, buildDefaultPostSeo, buildSitemap, buildRobots } from './seo.js';
 import { AppDataSource } from '../database/typeorm/data-source.js';
 
@@ -39,6 +41,11 @@ if (env.security.corsOrigins.length) {
 
 app.use(express.json({ limit: '200kb' }));
 app.use(express.urlencoded({ extended: true, limit: '200kb' }));
+
+// Límite global suave por IP (páginas + API), exento de assets y del healthcheck.
+// Acota floods de bots sin estorbar la navegación normal; los endpoints sensibles
+// conservan además su propio limitador dentro de apiRouter.
+app.use(globalLimiter);
 
 app.use('/api', apiRouter);
 
@@ -147,8 +154,13 @@ app.get('/privacidad', (_req, res) => sendHtml(res, 'legal/privacidad.html'));
 app.get('/terminos', (_req, res) => sendHtml(res, 'legal/terminos.html'));
 app.get('/cookies', (_req, res) => sendHtml(res, 'legal/cookies.html'));
 
-// Fallback SPA: cualquier otra ruta no-API devuelve la landing.
-app.get('*', (_req, res) => sendHtml(res, 'index.html'));
+// Fallback SPA: cualquier otra ruta no-API devuelve la landing. Excepción: los
+// sondeos de escáner (wp-admin, .php, phpmyadmin…) reciben 404 en vez de la landing,
+// para no generar "soft 404s" ante bots (esta app no tiene WordPress ni PHP).
+app.get('*', (req, res) => {
+  if (isScannerPath(req.path)) { res.status(404).type('text/plain').send('Not found'); return; }
+  sendHtml(res, 'index.html');
+});
 
 // Manejador central de errores: registra en servidor, responde genérico al cliente
 // (sin exponer stack traces ni mensajes internos).
