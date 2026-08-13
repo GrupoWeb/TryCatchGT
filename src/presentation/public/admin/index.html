@@ -110,6 +110,7 @@
         <button class="admin__nav-btn" data-section="blog"><span class="admin__nav-ico">📝</span> Blog</button>
         <button class="admin__nav-btn" data-section="services"><span class="admin__nav-ico">⚙️</span> Servicios</button>
         <button class="admin__nav-btn" data-section="plans"><span class="admin__nav-ico">💳</span> Planes</button>
+        <button class="admin__nav-btn" data-section="landings"><span class="admin__nav-ico">🎨</span> Muestras</button>
         <button class="admin__nav-btn" data-section="contact"><span class="admin__nav-ico">📞</span> Contacto</button>
 
         <span class="admin__nav-label">Cuenta</span>
@@ -527,6 +528,58 @@
                 <div class="drawer__foot-right">
                   <button type="button" class="btn-ghost" id="svc-cancel">Cancelar</button>
                   <button type="button" class="btn-primary" id="svc-save">Guardar</button>
+                </div>
+              </footer>
+            </aside>
+          </div>
+        </section>
+
+        <!-- MUESTRAS (LANDINGS) -->
+        <section class="admin-sec" id="sec-landings" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Muestras</h2>
+            <button class="btn-ghost" id="landing-new">+ Nueva muestra</button>
+          </div>
+          <p class="admin-muted">Aloja un landing HTML y compártelo en <code>/muestras/&lt;slug&gt;</code> para enseñarle una demo al prospecto. El HTML se sirve aislado (CSP sandbox).</p>
+          <div class="admin__list" id="landing-list"></div>
+          <div class="drawer-overlay" id="landing-overlay">
+            <aside class="drawer drawer--wide" role="dialog" aria-modal="true" aria-labelledby="landing-title">
+              <header class="drawer__head">
+                <div class="drawer__name" id="landing-title">Muestra</div>
+                <button type="button" class="drawer__close" data-drawer-close aria-label="Cerrar">✕</button>
+              </header>
+              <form class="drawer__body" id="landing-editor">
+                <input type="hidden" id="landing-id" />
+                <div class="admin-field"><label for="landing-title-in">Título *</label><input type="text" id="landing-title-in" placeholder="Demo Ferretería El Tornillo" /></div>
+                <div class="admin-field"><label for="landing-slug">Slug (opcional)</label><input type="text" id="landing-slug" placeholder="ferreteria-el-tornillo" /></div>
+                <div class="admin-field" id="landing-url-row" hidden>
+                  <label>URL pública</label>
+                  <div class="admin-inline">
+                    <input type="text" id="landing-url" readonly />
+                    <button type="button" class="btn-ghost" id="landing-copy">Copiar</button>
+                    <button type="button" class="btn-ghost" id="landing-open">Abrir ↗</button>
+                  </div>
+                </div>
+                <div class="admin-field">
+                  <label for="landing-html">HTML del landing *
+                    <span class="admin-hint">(pega el código o súbelo desde un archivo)</span>
+                  </label>
+                  <div class="admin-inline">
+                    <input type="file" id="landing-file" accept=".html,.htm,text/html" hidden />
+                    <button type="button" class="btn-ghost" id="landing-upload">Subir .html</button>
+                    <button type="button" class="btn-ghost" id="landing-preview-btn">Previsualizar</button>
+                  </div>
+                  <textarea id="landing-html" rows="16" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre;overflow-wrap:normal;"></textarea>
+                </div>
+                <iframe id="landing-frame" title="Previsualización de la muestra" sandbox="allow-scripts allow-popups allow-forms" hidden style="width:100%;height:420px;border:1px solid var(--admin-border,#334);border-radius:8px;background:#fff;"></iframe>
+                <p class="admin-hint">Ojo: el HTML no puede superar ~200&nbsp;KB. Si tu landing lleva imágenes en base64, referencialas por URL o súbelas con el gestor de medios.</p>
+                <p class="admin-error" id="landing-error"></p>
+              </form>
+              <footer class="drawer__foot">
+                <button type="button" class="btn-danger" id="landing-delete" hidden>Eliminar</button>
+                <div class="drawer__foot-right">
+                  <button type="button" class="btn-ghost" id="landing-cancel">Cancelar</button>
+                  <button type="button" class="btn-primary" id="landing-save">Guardar</button>
                 </div>
               </footer>
             </aside>

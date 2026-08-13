@@ -23,6 +23,7 @@ import { CrmInboxController } from '../controllers/CrmInboxController.js';
 import { AuditController } from '../controllers/AuditController.js';
 import { AnalyticsController } from '../controllers/AnalyticsController.js';
 import { LegalController } from '../controllers/LegalController.js';
+import { LandingSampleController } from '../controllers/LandingSampleController.js';
 import { createRequireAuth, AuthedRequest } from '../middleware/requireAuth.js';
 import { requireRole } from '../middleware/requireRole.js';
 import { createAuditLog } from '../middleware/auditLog.js';
@@ -33,6 +34,7 @@ import { authLimiter, formLimiter, uploadLimiter, healthLimiter } from '../rateL
 import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
 import { createHealthCheck } from '../health.js';
 import { createMediaHandler } from '../media.js';
+import { createLandingHandler } from '../landing.js';
 import { AppDataSource } from '../../database/typeorm/data-source.js';
 
 // Use cases
@@ -77,6 +79,7 @@ import { TypeOrmUserTokenRepository } from '../../database/typeorm/TypeOrmUserTo
 import { TypeOrmUserSessionRepository } from '../../database/typeorm/TypeOrmUserSessionRepository.js';
 import { TypeOrmMediaRepository } from '../../database/typeorm/TypeOrmMediaRepository.js';
 import { TypeOrmPageViewRepository } from '../../database/typeorm/TypeOrmPageViewRepository.js';
+import { TypeOrmLandingSampleRepository } from '../../database/typeorm/TypeOrmLandingSampleRepository.js';
 import { BcryptPasswordHasher } from '../../security/BcryptPasswordHasher.js';
 import { BlogHtmlSanitizer } from '../../security/BlogHtmlSanitizer.js';
 import { TokenService } from '../../security/TokenService.js';
@@ -100,6 +103,7 @@ const userTokenRepository = new TypeOrmUserTokenRepository();
 const userSessionRepository = new TypeOrmUserSessionRepository();
 const mediaRepository = new TypeOrmMediaRepository();
 const pageViewRepository = new TypeOrmPageViewRepository();
+const landingSampleRepository = new TypeOrmLandingSampleRepository();
 const passwordHasher = new BcryptPasswordHasher();
 const htmlSanitizer = new BlogHtmlSanitizer();
 const tokenService = new TokenService(userTokenRepository);
@@ -194,6 +198,11 @@ const crmInboxController = new CrmInboxController(crmMessageRepository);
 const auditController = new AuditController(auditRepository, userRepository);
 const analyticsController = new AnalyticsController(pageViewRepository);
 const legalController = new LegalController(siteConfigRepository, htmlSanitizer);
+const landingSampleController = new LandingSampleController(landingSampleRepository);
+
+// Handler público del servido de muestras en /muestras/:slug; se monta a nivel de
+// app en server.ts (fuera de /api), junto a las rutas de páginas "bonitas".
+export const landingHandler = createLandingHandler(landingSampleRepository);
 
 // Bootstrap del admin inicial: lo invoca el servidor al arrancar.
 export const ensureAdminUser = new EnsureAdminUser(userRepository, passwordHasher, {
@@ -340,6 +349,14 @@ apiRouter.get('/admin/plans/:id', requireAuth, planAdminController.getById);
 apiRouter.post('/admin/plans', requireAuth, planAdminController.create);
 apiRouter.put('/admin/plans/:id', requireAuth, planAdminController.update);
 apiRouter.delete('/admin/plans/:id', requireAuth, planAdminController.remove);
+
+// Muestras de landing (páginas HTML servidas en /muestras/<slug>). Solo admin:
+// subir HTML arbitrario bajo la marca sería phishing si lo hiciera un no-admin.
+apiRouter.get('/admin/landings', requireAuth, requireAdmin, landingSampleController.list);
+apiRouter.get('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.getById);
+apiRouter.post('/admin/landings', requireAuth, requireAdmin, landingSampleController.create);
+apiRouter.put('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.update);
+apiRouter.delete('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.remove);
 
 // Configuración del sitio (incluye credenciales SMTP/Turnstile → solo admin)
 apiRouter.get('/admin/config', requireAuth, requireAdmin, siteConfigController.adminGet);

@@ -154,7 +154,7 @@
     const isAdmin = role === 'admin';
     // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
     // navegación a los editores. El control real es requireRole en las rutas.
-    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="analytics"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
+    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="analytics"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"], .admin__nav-btn[data-section="landings"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
@@ -271,7 +271,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, analytics: loadAnalytics, inbox: loadInbox, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, analytics: loadAnalytics, inbox: loadInbox, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, landings: loadLandings, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -1458,6 +1458,67 @@
   $('plan-save').addEventListener('click', plans.save);
   $('plan-cancel').addEventListener('click', plans.close);
   $('plan-delete').addEventListener('click', plans.remove);
+
+  // ── MUESTRAS (LANDINGS) ───────────────────────────────────
+  // Refleja la URL pública y el iframe según el slug actual del formulario.
+  function landingSyncUrl() {
+    const slug = ($('landing-slug').value.trim() || '').toLowerCase();
+    const row = $('landing-url-row');
+    if (!slug) { row.hidden = true; return; }
+    const url = `${location.origin}/muestras/${slug}`;
+    $('landing-url').value = url;
+    row.hidden = false;
+  }
+  const landing = makeCrud({
+    path: '/api/admin/landings', listEl: 'landing-list', overlayEl: $('landing-overlay'), titleEl: $('landing-title'), firstField: 'landing-title-in',
+    deleteBtn: $('landing-delete'), errorEl: $('landing-error'), entityName: 'Muestra',
+    blank: {},
+    renderItem: (m) => `<div class="admin-item" data-id="${m.id}"><div class="admin-item__title">🎨 ${esc(m.title)}</div><div class="admin-item__meta"><span>/muestras/${esc(m.slug)}</span></div></div>`,
+    toForm: (m) => {
+      $('landing-id').value = m.id || '';
+      $('landing-title-in').value = m.title || '';
+      $('landing-slug').value = m.slug || '';
+      $('landing-html').value = m.html || '';
+      // Reinicia la previsualización; se recarga bajo demanda con "Previsualizar".
+      const frame = $('landing-frame'); frame.hidden = true; frame.removeAttribute('src');
+      landingSyncUrl();
+    },
+    fromForm: () => ({ slug: $('landing-slug').value.trim() || undefined, title: $('landing-title-in').value.trim(), html: $('landing-html').value }),
+  });
+  function loadLandings() { landing.load(); }
+  $('landing-new').addEventListener('click', landing.create);
+  $('landing-save').addEventListener('click', landing.save);
+  $('landing-cancel').addEventListener('click', landing.close);
+  $('landing-delete').addEventListener('click', landing.remove);
+  $('landing-slug').addEventListener('input', landingSyncUrl);
+  // Copiar / abrir la URL pública.
+  $('landing-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('landing-url').value); toast('URL copiada'); }
+    catch { $('landing-url').select(); toast('Selecciona y copia (Ctrl+C)', 'error'); }
+  });
+  $('landing-open').addEventListener('click', () => { const u = $('landing-url').value; if (u) window.open(u, '_blank', 'noopener'); });
+  // Subir un archivo .html a la textarea (lectura local, no toca el servidor).
+  $('landing-upload').addEventListener('click', () => $('landing-file').click());
+  $('landing-file').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { $('landing-html').value = String(reader.result || ''); toast('HTML cargado del archivo'); };
+    reader.onerror = () => toast('No se pudo leer el archivo', 'error');
+    reader.readAsText(file);
+    e.target.value = ''; // permite volver a subir el mismo archivo
+  });
+  // Previsualiza apuntando el iframe a la URL pública real (/muestras/<slug>): así se
+  // ve exactamente lo que sirve producción (con su CSP sandbox). Requiere haber
+  // guardado antes; la CSP del panel (frame-src 'self') no permitiría un srcdoc.
+  $('landing-preview-btn').addEventListener('click', () => {
+    if (!$('landing-id').value) { toast('Guarda la muestra para previsualizarla', 'error'); return; }
+    const slug = ($('landing-slug').value.trim() || '').toLowerCase();
+    if (!slug) return;
+    const frame = $('landing-frame');
+    frame.src = `${location.origin}/muestras/${slug}`;
+    frame.hidden = false;
+  });
 
   // ── PLANTILLAS DE CORREO ──────────────────────────────────
   const TPL_SEGMENTS = { all: 'Todos', alta: 'Prioridad alta', media: 'Prioridad media', base: 'Prioridad base', 'sin-web': 'Sin sitio web' };
