@@ -99,6 +99,7 @@
         <button class="admin__nav-btn is-active" data-section="home"><span class="admin__nav-ico">🏠</span> Inicio</button>
         <button class="admin__nav-btn" data-section="inbox"><span class="admin__nav-ico">📬</span> Bandeja <span class="nav-badge" id="nav-inbox" hidden>0</span></button>
         <button class="admin__nav-btn" data-section="leads"><span class="admin__nav-ico">📥</span> Cotizaciones <span class="nav-badge" id="nav-leads" hidden>0</span></button>
+        <button class="admin__nav-btn" data-section="analytics"><span class="admin__nav-ico">📈</span> Visitas</button>
 
         <span class="admin__nav-label">CRM</span>
         <button class="admin__nav-btn" data-section="crm"><span class="admin__nav-ico">📇</span> Clientes</button>
@@ -149,6 +150,53 @@
                 <span class="chart-card__title">Cotizaciones por estado</span>
               </div>
               <div class="chart-card__canvas"><canvas id="chart-leads-status"></canvas></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISITAS (analítica first-party) -->
+        <section class="admin-sec" id="sec-analytics" hidden>
+          <div class="admin-sec__head">
+            <h2 class="admin-sec__title">Visitas</h2>
+            <div class="seg-range" id="analytics-range">
+              <button class="chip" data-days="7">7 días</button>
+              <button class="chip is-active" data-days="30">30 días</button>
+              <button class="chip" data-days="90">90 días</button>
+            </div>
+          </div>
+          <p class="admin-muted">Tráfico de las páginas públicas del sitio. Sin cookies: los visitantes únicos se cuentan con un identificador diario anónimo. No incluye bots ni el panel.</p>
+          <div class="stat-grid" id="analytics-stats"></div>
+          <div class="chart-card">
+            <div class="chart-card__head">
+              <span class="chart-card__title">Visitas por día</span>
+              <span class="chart-card__hint" id="analytics-range-hint">Últimos 30 días</span>
+            </div>
+            <div class="chart-card__canvas"><canvas id="chart-visits-day"></canvas></div>
+          </div>
+          <div class="analytics-tables">
+            <div class="chart-card">
+              <div class="chart-card__head"><span class="chart-card__title">Páginas más vistas</span></div>
+              <div class="audit-table-wrap">
+                <table class="audit-table"><tbody id="analytics-pages"></tbody></table>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card__head"><span class="chart-card__title">Fuentes de tráfico</span></div>
+              <div class="audit-table-wrap">
+                <table class="audit-table"><tbody id="analytics-referrers"></tbody></table>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card__head"><span class="chart-card__title">Países</span></div>
+              <div class="audit-table-wrap">
+                <table class="audit-table"><tbody id="analytics-countries"></tbody></table>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-card__head"><span class="chart-card__title">Dispositivos</span></div>
+              <div class="audit-table-wrap">
+                <table class="audit-table"><tbody id="analytics-devices"></tbody></table>
+              </div>
             </div>
           </div>
         </section>

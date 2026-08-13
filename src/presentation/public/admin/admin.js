@@ -154,7 +154,7 @@
     const isAdmin = role === 'admin';
     // Secciones que en el servidor exigen rol admin: se ocultan sus botones de
     // navegación a los editores. El control real es requireRole en las rutas.
-    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
+    document.querySelectorAll('.admin__nav-btn[data-section="inbox"], .admin__nav-btn[data-section="contact"], .admin__nav-btn[data-section="audit"], .admin__nav-btn[data-section="analytics"], .admin__nav-btn[data-section="users"], .admin__nav-btn[data-section="legal"]').forEach((b) => { b.hidden = !isAdmin; });
   }
   function showForce() { loginView.hidden = true; dashboardView.hidden = true; forceView.hidden = false; setTimeout(() => $('fp-current').focus(), 50); }
 
@@ -271,7 +271,7 @@
   }
 
   // ── Navegación entre secciones ────────────────────────────
-  const loaders = { home: loadOverview, inbox: loadInbox, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
+  const loaders = { home: loadOverview, analytics: loadAnalytics, inbox: loadInbox, leads: loadLeads, crm: loadCrm, templates: loadTemplates, cadences: loadCadences, blog: loadPosts, services: loadServicesSec, plans: loadPlansSec, contact: loadContact, account: loadAccount, users: loadUsers, legal: loadLegal, audit: loadAudit };
 
   function showSection(name) {
     document.querySelectorAll('.admin-sec').forEach((s) => { s.hidden = s.id !== `sec-${name}`; });
@@ -312,6 +312,7 @@
     try { localStorage.setItem(THEME_KEY, theme); } catch (_) { /* modo privado */ }
     applyThemeIcon();
     renderOverviewCharts(); // repinta con los colores del nuevo tema
+    renderAnalyticsChart();
   }
   applyThemeIcon();
   $('theme-toggle').addEventListener('click', () => setTheme(currentTheme() === 'dark' ? 'light' : 'dark'));
@@ -532,6 +533,122 @@
     }).join('');
   }
   $('audit-refresh').addEventListener('click', loadAudit);
+
+  // ── VISITAS (analítica first-party) ───────────────────────
+  let lastAnalytics = null;   // último payload, para repintar la gráfica al cambiar de tema
+  let analyticsDays = 30;
+
+  const DEVICE_LABEL = { desktop: 'Escritorio', mobile: 'Móvil', tablet: 'Tableta' };
+  // Nombres de país en español para los códigos ISO que más aparecen; el resto cae al código.
+  const COUNTRY_LABEL = { GT: 'Guatemala', US: 'Estados Unidos', MX: 'México', ES: 'España', SV: 'El Salvador', HN: 'Honduras', CR: 'Costa Rica', CO: 'Colombia', AR: 'Argentina', CL: 'Chile', PE: 'Perú', PA: 'Panamá', EC: 'Ecuador', NI: 'Nicaragua' };
+  function countryFlag(code) {
+    if (!/^[A-Za-z]{2}$/.test(code || '')) return '';
+    return String.fromCodePoint(...code.toUpperCase().split('').map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+  }
+  function dayLabel(key) {
+    const parts = String(key).split('-');
+    return `${Number(parts[2])} ${MONTHS_ES[(Number(parts[1]) - 1 + 12) % 12] || ''}`;
+  }
+
+  async function loadAnalytics() {
+    const r = await api(`/api/admin/analytics?days=${analyticsDays}`);
+    if (!guard(r) || !r.ok) return;
+    const d = r.body.data;
+    lastAnalytics = d;
+
+    const avg = d.days ? Math.round(d.totalViews / d.days) : 0;
+    const cards = [
+      { label: 'Visitas totales', value: fmtNum(d.totalViews), accent: '#6c5ffc', icon: '👁️' },
+      { label: 'Visitantes únicos', value: fmtNum(d.uniqueVisitors), accent: '#06b6d4', icon: '🧑' },
+      { label: 'Promedio diario', value: fmtNum(avg), accent: '#0ab39c', icon: '📅' },
+      { label: 'Páginas distintas', value: fmtNum(d.topPages.length), accent: '#f7b84b', icon: '📄' },
+    ];
+    $('analytics-stats').innerHTML = cards.map((c) => `
+      <div class="stat-card" style="--accent:${c.accent}">
+        <div class="stat-card__icon">${c.icon}</div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">${c.value}</div>
+          <div class="stat-card__label">${esc(c.label)}</div>
+        </div>
+      </div>`).join('');
+
+    renderMiniTable('analytics-pages', d.topPages.map((p) => ({ name: p.path, count: p.count })), { mono: true });
+    renderMiniTable('analytics-referrers', d.topReferrers.map((p) => ({ name: p.referrer, count: p.count })), { empty: 'Sin fuentes externas (tráfico directo).' });
+    renderMiniTable('analytics-countries', d.byCountry.map((p) => ({ name: `${countryFlag(p.country)} ${COUNTRY_LABEL[p.country] || p.country}`.trim(), count: p.count })));
+    renderMiniTable('analytics-devices', d.byDevice.map((p) => ({ name: DEVICE_LABEL[p.device] || p.device, count: p.count })));
+
+    renderAnalyticsChart(d);
+  }
+
+  // Tabla compacta nombre → conteo con una mini-barra proporcional al máximo.
+  function renderMiniTable(id, rows, opts = {}) {
+    const body = $(id);
+    if (!body) return;
+    if (!rows.length) { body.innerHTML = `<tr><td class="admin-muted">${esc(opts.empty || 'Sin datos.')}</td></tr>`; return; }
+    const max = Math.max(...rows.map((r) => r.count), 1);
+    body.innerHTML = rows.map((r) => {
+      const pct = Math.max(4, Math.round((r.count / max) * 100));
+      const name = opts.mono ? `<code>${esc(r.name)}</code>` : esc(r.name);
+      return `<tr>
+        <td class="bar-cell">${name}<span class="bar" style="width:${pct}%"></span></td>
+        <td class="num">${fmtNum(r.count)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Dibuja (o repinta) la gráfica de visitas por día con los colores del tema actual.
+  function renderAnalyticsChart(data) {
+    const d = data || lastAnalytics;
+    if (!d || typeof window.Chart === 'undefined') return;
+    const canvas = $('chart-visits-day');
+    if (!canvas) return;
+    if (charts.visits) charts.visits.destroy();
+
+    const primary = cssVar('--primary', '#6c5ffc');
+    const grid = cssVar('--border', 'rgba(0,0,0,0.08)');
+    const tick = cssVar('--text-muted', '#767d92');
+    const surface = cssVar('--surface', '#ffffff');
+    const series = Array.isArray(d.viewsByDay) ? d.viewsByDay : [];
+    const ctx = canvas.getContext('2d');
+    const fill = ctx.createLinearGradient(0, 0, 0, 260);
+    fill.addColorStop(0, 'rgba(108,95,252,0.28)');
+    fill.addColorStop(1, 'rgba(108,95,252,0.02)');
+    charts.visits = new window.Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: series.map((s) => dayLabel(s.day)),
+        datasets: [{
+          data: series.map((s) => s.count),
+          borderColor: primary,
+          backgroundColor: fill,
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          pointRadius: series.length > 45 ? 0 : 2.5,
+          pointBackgroundColor: surface,
+          pointBorderColor: primary,
+          pointBorderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+          y: { beginAtZero: true, grid: { color: grid }, ticks: { color: tick, precision: 0 } },
+        },
+      },
+    });
+  }
+
+  $('analytics-range').addEventListener('click', (e) => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    analyticsDays = Number(btn.getAttribute('data-days')) || 30;
+    document.querySelectorAll('#analytics-range .chip').forEach((c) => c.classList.toggle('is-active', c === btn));
+    $('analytics-range-hint').textContent = `Últimos ${analyticsDays} días`;
+    loadAnalytics();
+  });
 
   // ── COTIZACIONES / LEADS ──────────────────────────────────
   const STATUS = { pending: 'Pendiente', reviewed: 'Revisado', contacted: 'Contactado' };
