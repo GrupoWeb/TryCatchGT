@@ -18,6 +18,8 @@ export function sanitizeBlogHtml(dirty: string): string {
     allowedStyles: {
       '*': {
         color: [/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, /^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/],
+        // Alineación (del párrafo que envuelve una imagen o del texto). Email-safe.
+        'text-align': [/^(?:left|right|center|justify)$/],
       },
     },
     allowedSchemes: ['http', 'https', 'mailto'],

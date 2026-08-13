@@ -44,4 +44,12 @@ describe('sanitizeBlogHtml — imágenes', () => {
     const on = sanitizeBlogHtml('<img src="https://x/y.png" onerror="alert(1)">');
     expect(on).not.toMatch(/onerror/i);
   });
+
+  it('conserva la alineación (text-align) del párrafo que envuelve la imagen', () => {
+    for (const dir of ['left', 'center', 'right']) {
+      const out = sanitizeBlogHtml(`<p style="text-align:${dir}"><img src="https://x/y.png" alt="" width="300"></p>`);
+      expect(out, dir).toMatch(new RegExp(`text-align:\\s*${dir}`, 'i'));
+      expect(out, dir).toMatch(/<img/);
+    }
+  });
 });
