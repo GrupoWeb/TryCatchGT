@@ -17,6 +17,7 @@ import { EmailTemplateEntity } from './entities/EmailTemplateEntity.js';
 import { CrmMessageEntity } from './entities/CrmMessageEntity.js';
 import { CadenceEntity } from './entities/CadenceEntity.js';
 import { CadenceRunEntity } from './entities/CadenceRunEntity.js';
+import { PageViewEntity } from './entities/PageViewEntity.js';
 
 // Ruta a las migraciones relativa a ESTE archivo, para que funcione tanto en
 // desarrollo/CLI con tsx (resuelve a src/…/*.ts) como en producción con node
@@ -36,7 +37,7 @@ export const AppDataSource = new DataSource({
   username: env.db.user,
   password: env.db.password,
   database: env.db.name,
-  entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity, UserTokenEntity, UserSessionEntity, MediaEntity, ContactEntity, EmailTemplateEntity, CrmMessageEntity, CadenceEntity, CadenceRunEntity],
+  entities: [ServiceEntity, PlanEntity, ProjectRequestEntity, BlogPostEntity, UserEntity, SiteConfigEntity, AuditLogEntity, UserTokenEntity, UserSessionEntity, MediaEntity, ContactEntity, EmailTemplateEntity, CrmMessageEntity, CadenceEntity, CadenceRunEntity, PageViewEntity],
   migrations: [migrationsGlob],
   synchronize: false,
   migrationsRun: true,
