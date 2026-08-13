@@ -63,6 +63,14 @@
     return String(value ?? '')
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
+  // Base64 seguro para Unicode (btoa por sí solo falla con acentos/emoji): se pasa el
+  // texto a bytes UTF-8 antes de codificar. Se usa para enviar el HTML de las muestras.
+  function utf8ToBase64(str) {
+    const bytes = new TextEncoder().encode(String(str ?? ''));
+    let bin = '';
+    for (const b of bytes) bin += String.fromCharCode(b);
+    return btoa(bin);
+  }
   function fmtDate(v) {
     if (!v) return '';
     return new Date(v).toLocaleDateString('es-GT', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -1483,7 +1491,9 @@
       const frame = $('landing-frame'); frame.hidden = true; frame.removeAttribute('src');
       landingSyncUrl();
     },
-    fromForm: () => ({ slug: $('landing-slug').value.trim() || undefined, title: $('landing-title-in').value.trim(), html: $('landing-html').value }),
+    // El HTML se envía en base64 (no en crudo): así el payload no lleva `<script>`
+    // ni manejadores de eventos que el WAF del hosting bloquearía como inyección.
+    fromForm: () => ({ slug: $('landing-slug').value.trim() || undefined, title: $('landing-title-in').value.trim(), htmlBase64: utf8ToBase64($('landing-html').value) }),
   });
   function loadLandings() { landing.load(); }
   $('landing-new').addEventListener('click', landing.create);

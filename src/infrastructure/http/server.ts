@@ -39,7 +39,18 @@ if (env.security.corsOrigins.length) {
   app.use(cors({ origin: env.security.corsOrigins, credentials: true }));
 }
 
-app.use(express.json({ limit: '200kb' }));
+// Límite de body por defecto 200kb (decisión de seguridad, no subir el global).
+// Excepción acotada: las muestras de landing son páginas HTML completas (y viajan en
+// base64, +33%), así que sus rutas de escritura usan un límite mayor. Es seguro: solo
+// las alcanza un admin autenticado (requireAuth + requireAdmin + CSRF).
+const defaultJson = express.json({ limit: '200kb' });
+const landingJson = express.json({ limit: '2mb' });
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD' && req.path.startsWith('/api/admin/landings')) {
+    return landingJson(req, res, next);
+  }
+  return defaultJson(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: '200kb' }));
 
 // Límite global suave por IP (páginas + API), exento de assets y del healthcheck.
