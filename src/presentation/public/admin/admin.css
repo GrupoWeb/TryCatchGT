@@ -192,6 +192,32 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
   overflow-y: auto;
   transition: transform 0.25s ease, width 0.2s ease;
 }
+
+/* Scrollbars delgados y sutiles en las zonas con scroll del panel (evita la barra
+   nativa gruesa). Firefox: scrollbar-width/-color; WebKit: pseudo-elementos. */
+.admin__sidebar,
+.inbox-2col .inbox-list,
+.inbox-read {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-dim) 40%, transparent) transparent;
+}
+.admin__sidebar::-webkit-scrollbar,
+.inbox-2col .inbox-list::-webkit-scrollbar,
+.inbox-read::-webkit-scrollbar { width: 9px; height: 9px; }
+.admin__sidebar::-webkit-scrollbar-track,
+.inbox-2col .inbox-list::-webkit-scrollbar-track,
+.inbox-read::-webkit-scrollbar-track { background: transparent; }
+.admin__sidebar::-webkit-scrollbar-thumb,
+.inbox-2col .inbox-list::-webkit-scrollbar-thumb,
+.inbox-read::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.admin__sidebar::-webkit-scrollbar-thumb:hover,
+.inbox-2col .inbox-list::-webkit-scrollbar-thumb:hover,
+.inbox-read::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text-dim) 60%, transparent); }
 .admin__brand {
   display: flex;
   align-items: center;
