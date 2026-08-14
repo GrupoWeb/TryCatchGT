@@ -1,3 +1,4 @@
+import { IsNull } from 'typeorm';
 import { CrmMessageRepository, InboxItem } from '../../../application/ports/output/CrmMessageRepository.js';
 import { CrmMessage } from '../../../domain/entities/CrmMessage.js';
 import { AppDataSource } from './data-source.js';
@@ -71,6 +72,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       .addSelect('c.name', 'contactName')
       .addSelect('c.email', 'contactEmail')
       .where('m.direction = :dir', { dir: 'in' })
+      .andWhere('m.deletedAt IS NULL')
       .orderBy('m.createdAt', 'DESC')
       .limit(limit)
       .getRawMany<{
@@ -91,11 +93,30 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
   }
 
   public async countUnreadInbound(): Promise<number> {
-    return this.repo.count({ where: { direction: 'in', status: 'received' } });
+    return this.repo.count({ where: { direction: 'in', status: 'received', deletedAt: IsNull() } });
   }
 
   public async markInboundRead(): Promise<number> {
-    const result = await this.repo.update({ direction: 'in', status: 'received' }, { status: 'read' });
+    const result = await this.repo.update(
+      { direction: 'in', status: 'received', deletedAt: IsNull() },
+      { status: 'read' },
+    );
     return result.affected ?? 0;
+  }
+
+  public async setInboundRead(id: number, read: boolean): Promise<boolean> {
+    const result = await this.repo.update(
+      { id, direction: 'in', deletedAt: IsNull() },
+      { status: read ? 'read' : 'received' },
+    );
+    return (result.affected ?? 0) > 0;
+  }
+
+  public async softDeleteInbound(id: number): Promise<boolean> {
+    const result = await this.repo.update(
+      { id, direction: 'in', deletedAt: IsNull() },
+      { deletedAt: new Date() },
+    );
+    return (result.affected ?? 0) > 0;
   }
 }

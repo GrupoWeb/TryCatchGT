@@ -52,6 +52,11 @@ export class CrmMessageEntity {
   @Column({ name: 'received_at', type: 'datetime', nullable: true })
   receivedAt!: Date | null;
 
+  // Baja lógica (papelera de la bandeja). NULL = vigente; con fecha = eliminado.
+  @Index()
+  @Column({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 }
