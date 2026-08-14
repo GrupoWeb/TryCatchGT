@@ -28,6 +28,15 @@ export class CrmMessageEntity {
   @Column({ name: 'body_html', type: 'text', nullable: true })
   bodyHtml!: string | null;
 
+  // URL temporal del cuerpo completo (entrantes recortados por el webhook). Se
+  // limpia al completar la descarga. Ver AddCrmMessageBodyUrl.
+  @Column({ name: 'body_url', type: 'text', nullable: true })
+  bodyUrl!: string | null;
+
+  // false = cuerpo recortado, se puede reintentar la descarga desde body_url.
+  @Column({ name: 'body_complete', type: 'tinyint', width: 1, default: 1 })
+  bodyComplete!: boolean;
+
   @Column({ type: 'enum', enum: MESSAGE_STATUSES })
   status!: MessageStatusDb;
 
