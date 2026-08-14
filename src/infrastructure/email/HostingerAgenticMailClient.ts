@@ -58,4 +58,34 @@ export class HostingerAgenticMailClient implements InboundMailGateway {
       clearTimeout(timer);
     }
   }
+
+  public async fetchFullBody(bodyUrl: string): Promise<string | null> {
+    if (!bodyUrl || !/^https?:\/\//i.test(bodyUrl)) return null;
+
+    const c = await this.config.getAll();
+    const token = c.mailApiToken;
+
+    // Timeout para no colgar el webhook si la descarga no responde.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(bodyUrl, {
+        // El bodyUrl suele ser una URL firmada (no requiere auth), pero se manda el
+        // Bearer si está configurado por si el proveedor lo exige. Es inocuo si no.
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        console.warn(`✉️  Agentic Mail: no se pudo descargar el cuerpo completo (HTTP ${res.status}).`);
+        return null;
+      }
+      const text = await res.text();
+      return text.trim() ? text : null;
+    } catch (err) {
+      console.warn('✉️  Agentic Mail: error al descargar el cuerpo completo:', (err as Error).message);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 }

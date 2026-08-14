@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ReceiveInboundEmail } from '../../src/application/use-cases/ReceiveInboundEmail.js';
-import { parseInboundPayload } from '../../src/infrastructure/http/controllers/HostingerMailWebhookController.js';
+import { parseInboundPayload, HostingerMailWebhookController } from '../../src/infrastructure/http/controllers/HostingerMailWebhookController.js';
 import { Contact } from '../../src/domain/entities/Contact.js';
 import { CrmMessage } from '../../src/domain/entities/CrmMessage.js';
 import { InvalidCrmMessageError } from '../../src/domain/exceptions/DomainError.js';
@@ -29,6 +29,13 @@ function messageRepo(overrides: Partial<CrmMessageRepository> = {}): CrmMessageR
   };
 }
 const passthrough: HtmlSanitizer = { sanitize: (s) => s };
+
+function stubRes() {
+  const r: any = {};
+  r.status = vi.fn(() => r);
+  r.json = vi.fn(() => r);
+  return r;
+}
 
 describe('parseInboundPayload', () => {
   it('extrae los campos de un payload anidado con from tipo string', () => {
@@ -83,6 +90,8 @@ describe('parseInboundPayload', () => {
     expect(p!.bodyHtml).toBe('abc 123');
     expect(p!.messageId).toBe('<a@b.com>');
     expect(p!.receivedAt).toBeInstanceOf(Date);
+    // El bodyUrl (cuerpo completo) se extrae para bajarlo en el webhook.
+    expect(p!.bodyUrl).toBe('https://download-url');
   });
 
   it('prefiere plainHtml cuando trae contenido', () => {
@@ -160,6 +169,53 @@ describe('ReceiveInboundEmail', () => {
   it('lanza si no hay remitente', async () => {
     const uc = new ReceiveInboundEmail(contactRepo(), messageRepo(), passthrough);
     await expect(uc.execute({ fromEmail: '  ' })).rejects.toBeInstanceOf(InvalidCrmMessageError);
+  });
+
+  it('reemplaza el cuerpo recortado por el completo descargado del bodyUrl', async () => {
+    const saveMsg = vi.fn(async (m: CrmMessage) => m);
+    const uc = new ReceiveInboundEmail(
+      contactRepo({ findByEmail: async () => new Contact({ id: 1, name: 'A', email: 'a@x.com' }) }),
+      messageRepo({ save: saveMsg }),
+      passthrough,
+    );
+    const fetchFullBody = vi.fn(async () => '<p>Cuerpo completo, mucho más largo que el recorte de ~200 caracteres…</p>');
+    const gateway = { markProcessed: vi.fn(async () => true), fetchFullBody };
+    const config: any = { getAll: async () => ({ mailWebhookSecret: 'sek' }), setMany: async () => {} };
+    const controller = new HostingerMailWebhookController(uc, config, gateway);
+
+    const res = stubRes();
+    const req: any = {
+      headers: { 'x-webhook-secret': 'sek' },
+      query: {},
+      body: { data: { message: { from: 'a@x.com', subject: 's', plainBody: 'recorte de ~200 chars…', bodyUrl: 'https://download/full' } } },
+    };
+    await controller.receive(req, res);
+
+    expect(fetchFullBody).toHaveBeenCalledWith('https://download/full');
+    expect(res.status).toHaveBeenCalledWith(200);
+    const saved = saveMsg.mock.calls[0][0] as CrmMessage;
+    expect(saved.bodyHtml).toContain('Cuerpo completo');
+  });
+
+  it('conserva el cuerpo recortado si la descarga del bodyUrl falla', async () => {
+    const saveMsg = vi.fn(async (m: CrmMessage) => m);
+    const uc = new ReceiveInboundEmail(
+      contactRepo({ findByEmail: async () => new Contact({ id: 1, name: 'A', email: 'a@x.com' }) }),
+      messageRepo({ save: saveMsg }),
+      passthrough,
+    );
+    const gateway = { markProcessed: vi.fn(async () => true), fetchFullBody: vi.fn(async () => null) };
+    const config: any = { getAll: async () => ({ mailWebhookSecret: 'sek' }), setMany: async () => {} };
+    const controller = new HostingerMailWebhookController(uc, config, gateway);
+
+    const res = stubRes();
+    await controller.receive({
+      headers: { 'x-webhook-secret': 'sek' }, query: {},
+      body: { data: { message: { from: 'a@x.com', subject: 's', plainBody: 'solo el recorte', bodyUrl: 'https://expired' } } },
+    } as any, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect((saveMsg.mock.calls[0][0] as CrmMessage).bodyHtml).toBe('solo el recorte');
   });
 
   it('corta las cadencias activas del contacto al recibir respuesta', async () => {

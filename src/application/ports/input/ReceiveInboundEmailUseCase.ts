@@ -6,6 +6,10 @@ export interface InboundEmail {
   fromName?: string;
   subject?: string;
   bodyHtml?: string;
+  // URL de descarga del cuerpo completo (Hostinger recorta `bodyHtml` a ~200
+  // caracteres en el webhook). Es temporal (TTL). El webhook controller intenta
+  // bajarlo antes de guardar; si falla, se queda con el `bodyHtml` recortado.
+  bodyUrl?: string | null;
   messageId?: string | null;
   inReplyTo?: string | null;
   threadId?: string | null;

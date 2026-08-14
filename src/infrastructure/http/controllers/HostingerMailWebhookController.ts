@@ -69,6 +69,8 @@ export function parseInboundPayload(body: unknown): InboundEmail | null {
     // prefiere el HTML y, si viene vacío, el texto plano. Se mantienen los alias
     // genéricos por si el contrato cambia.
     bodyHtml: firstString(msg.plainHtml, msg.html, msg.body_html, msg.bodyHtml, msg.body, msg.plainBody, msg.text),
+    // URL temporal con el cuerpo completo (el de arriba viene recortado a ~200 chars).
+    bodyUrl: firstString(msg.bodyUrl, msg.body_url, msg.bodyURL) ?? null,
     messageId: firstString(msg.message_id, msg.messageId, msg.id) ?? null,
     inReplyTo: firstString(msg.in_reply_to, msg.inReplyTo) ?? null,
     threadId: threadId ?? null,
@@ -122,6 +124,13 @@ export class HostingerMailWebhookController {
     if (!inbound) {
       res.status(400).json({ success: false, error: 'Payload no reconocido (sin remitente).' });
       return;
+    }
+
+    // El webhook recorta el cuerpo a ~200 caracteres; si trae `bodyUrl`, se baja el
+    // cuerpo completo antes de guardar. Best-effort: si falla, se queda con el recorte.
+    if (inbound.bodyUrl && this.mailGateway) {
+      const full = await this.mailGateway.fetchFullBody(inbound.bodyUrl);
+      if (full) inbound.bodyHtml = full;
     }
 
     try {
