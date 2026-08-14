@@ -40,6 +40,7 @@
   --radius: 14px;
   --radius-sm: 10px;
   --sidebar-w: 250px;
+  --sidebar-w-collapsed: 72px;
   --topbar-h: 64px;
 
   color-scheme: light;
@@ -189,7 +190,7 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
   border-right: 1px solid var(--border);
   z-index: 40;
   overflow-y: auto;
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, width 0.2s ease;
 }
 .admin__brand {
   display: flex;
@@ -247,7 +248,7 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 }
 
 /* ---------- Contenido (topbar + main) ---------- */
-.admin__content { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; }
+.admin__content { flex: 1; min-width: 0; margin-left: var(--sidebar-w); display: flex; flex-direction: column; transition: margin-left 0.2s ease; }
 .admin__topbar {
   display: flex;
   align-items: center;
@@ -270,6 +271,22 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   cursor: pointer;
   padding: 6px;
 }
+/* Botón para colapsar el sidebar a modo "rail" (solo escritorio). */
+.admin__collapse-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-size: 17px;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.admin__collapse-btn:hover { color: var(--text-strong); background: var(--surface-2); border-color: var(--border-strong); }
 .admin__page-title { font-size: 18px; font-weight: 700; color: var(--text-strong); margin-right: auto; }
 .admin__logo { font-weight: 700; font-size: 16px; }
 .admin__logo span { color: var(--primary); }
@@ -717,6 +734,23 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .admin__editor-actions { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 .admin__editor-actions .btn-danger { margin-left: auto; }
 
+/* ---------- Sidebar colapsado a "rail" (solo escritorio) ---------- */
+@media (min-width: 993px) {
+  .admin.sidebar-collapsed .admin__sidebar { width: var(--sidebar-w-collapsed); }
+  .admin.sidebar-collapsed .admin__content { margin-left: var(--sidebar-w-collapsed); }
+  .admin.sidebar-collapsed .admin__nav-label { display: none; }
+  .admin.sidebar-collapsed .admin__brand { justify-content: center; padding: 0; font-size: 0; gap: 0; }
+  .admin.sidebar-collapsed .admin__brand::before { content: 'TC'; font-size: 18px; font-weight: 800; color: var(--primary); }
+  .admin.sidebar-collapsed .admin__nav-btn { position: relative; justify-content: center; gap: 0; padding: 10px 0; font-size: 0; }
+  .admin.sidebar-collapsed .admin__nav-ico { font-size: 18px; width: auto; }
+  /* El badge se reduce a un punto indicador sobre el icono. */
+  .admin.sidebar-collapsed .nav-badge {
+    position: absolute; top: 5px; right: 14px; margin: 0;
+    min-width: 0; width: 8px; height: 8px; padding: 0; font-size: 0;
+  }
+  .admin.sidebar-collapsed .admin__collapse-btn { transform: rotate(180deg); }
+}
+
 /* ---------- Responsive ---------- */
 @media (max-width: 992px) {
   .admin__sidebar { transform: translateX(-100%); box-shadow: var(--shadow-lg); }
@@ -724,6 +758,8 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   .admin.sidebar-open .admin__scrim { opacity: 1; visibility: visible; }
   .admin__content { margin-left: 0; }
   .admin__menu-btn { display: block; }
+  /* En móvil el sidebar es off-canvas: el colapso "rail" no aplica. */
+  .admin__collapse-btn { display: none; }
   .dash-charts { grid-template-columns: 1fr; }
 }
 

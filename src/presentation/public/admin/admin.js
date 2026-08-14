@@ -310,6 +310,23 @@
   $('sidebar-toggle').addEventListener('click', () => $('dashboard-view').classList.toggle('sidebar-open'));
   $('admin-scrim').addEventListener('click', closeSidebar);
 
+  // ── Colapsar sidebar a "rail" (escritorio, persistente) ───
+  const SIDEBAR_KEY = 'tc-admin-sidebar';
+  function setSidebarCollapsed(collapsed) {
+    $('dashboard-view').classList.toggle('sidebar-collapsed', collapsed);
+    const b = $('sidebar-collapse');
+    if (b) { b.setAttribute('aria-pressed', String(collapsed)); b.title = collapsed ? 'Expandir menú' : 'Colapsar menú'; }
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0'); } catch (_) { /* modo privado */ }
+  }
+  // Tooltip por botón: en modo rail se oculta el texto, así que el title lo suple.
+  document.querySelectorAll('#admin-nav .admin__nav-btn').forEach((b) => {
+    const clone = b.cloneNode(true);
+    clone.querySelectorAll('.admin__nav-ico, .nav-badge').forEach((n) => n.remove());
+    b.title = clone.textContent.trim();
+  });
+  $('sidebar-collapse').addEventListener('click', () => setSidebarCollapsed(!$('dashboard-view').classList.contains('sidebar-collapsed')));
+  try { if (localStorage.getItem(SIDEBAR_KEY) === '1') setSidebarCollapsed(true); } catch (_) { /* modo privado */ }
+
   // ── Tema claro / oscuro ───────────────────────────────────
   const THEME_KEY = 'tc-admin-theme';
   function currentTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
