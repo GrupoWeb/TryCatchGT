@@ -127,10 +127,15 @@ export class HostingerMailWebhookController {
     }
 
     // El webhook recorta el cuerpo a ~200 caracteres; si trae `bodyUrl`, se baja el
-    // cuerpo completo antes de guardar. Best-effort: si falla, se queda con el recorte.
+    // cuerpo completo antes de guardar. Best-effort: si falla, se marca incompleto y
+    // se conserva el `bodyUrl` para reintentar la descarga al abrir el correo.
     if (inbound.bodyUrl && this.mailGateway) {
       const full = await this.mailGateway.fetchFullBody(inbound.bodyUrl);
-      if (full) inbound.bodyHtml = full;
+      if (full) { inbound.bodyHtml = full; inbound.bodyComplete = true; }
+      else inbound.bodyComplete = false;
+    } else {
+      // Sin URL de descarga no hay nada que reintentar: lo recibido es lo definitivo.
+      inbound.bodyComplete = true;
     }
 
     try {

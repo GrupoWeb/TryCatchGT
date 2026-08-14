@@ -10,6 +10,9 @@ export interface InboundEmail {
   // caracteres en el webhook). Es temporal (TTL). El webhook controller intenta
   // bajarlo antes de guardar; si falla, se queda con el `bodyHtml` recortado.
   bodyUrl?: string | null;
+  // Lo fija el webhook controller: true si `bodyHtml` ya es el cuerpo definitivo;
+  // false si quedó recortado (se guarda `bodyUrl` para reintentar al abrirlo).
+  bodyComplete?: boolean;
   messageId?: string | null;
   inReplyTo?: string | null;
   threadId?: string | null;

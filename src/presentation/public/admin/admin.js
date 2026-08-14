@@ -310,6 +310,23 @@
   $('sidebar-toggle').addEventListener('click', () => $('dashboard-view').classList.toggle('sidebar-open'));
   $('admin-scrim').addEventListener('click', closeSidebar);
 
+  // ── Colapsar sidebar a "rail" (escritorio, persistente) ───
+  const SIDEBAR_KEY = 'tc-admin-sidebar';
+  function setSidebarCollapsed(collapsed) {
+    $('dashboard-view').classList.toggle('sidebar-collapsed', collapsed);
+    const b = $('sidebar-collapse');
+    if (b) { b.setAttribute('aria-pressed', String(collapsed)); b.title = collapsed ? 'Expandir menú' : 'Colapsar menú'; }
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0'); } catch (_) { /* modo privado */ }
+  }
+  // Tooltip por botón: en modo rail se oculta el texto, así que el title lo suple.
+  document.querySelectorAll('#admin-nav .admin__nav-btn').forEach((b) => {
+    const clone = b.cloneNode(true);
+    clone.querySelectorAll('.admin__nav-ico, .nav-badge').forEach((n) => n.remove());
+    b.title = clone.textContent.trim();
+  });
+  $('sidebar-collapse').addEventListener('click', () => setSidebarCollapsed(!$('dashboard-view').classList.contains('sidebar-collapsed')));
+  try { if (localStorage.getItem(SIDEBAR_KEY) === '1') setSidebarCollapsed(true); } catch (_) { /* modo privado */ }
+
   // ── Tema claro / oscuro ───────────────────────────────────
   const THEME_KEY = 'tc-admin-theme';
   function currentTheme() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
@@ -486,7 +503,24 @@
     if (isCalendar || text.length < 6) {
       return `<div class="inbox-read__notice">📅 Este correo no trae cuerpo de texto: puede ser una invitación de calendario o solo un adjunto. Ábrelo en tu bandeja de Hostinger para ver el detalle.</div>`;
     }
+    // Se guardó recortado y el enlace de descarga del cuerpo completo ya no responde.
+    if (m.bodyComplete === false && m._bodyTried) {
+      return `<div class="inbox-read__notice">⚠️ Este correo se guardó recortado y no se pudo recuperar el cuerpo completo (el enlace de descarga expiró). Ábrelo en tu bandeja de Hostinger para ver el detalle.</div>`;
+    }
     return '';
+  }
+  // Recupera el cuerpo completo si quedó recortado por el webhook (descarga diferida).
+  // Se intenta una sola vez por correo; si falla (TTL expirado) queda el aviso.
+  async function ensureFullBody(m) {
+    if (m.bodyComplete !== false || m._bodyTried) return;
+    m._bodyTried = true;
+    const r = await api(`/api/admin/inbox/${m.id}/body`, { method: 'POST' });
+    if (!r.ok) return;
+    const d = (r.body && r.body.data) || {};
+    if (typeof d.bodyHtml === 'string') m.bodyHtml = d.bodyHtml;
+    m.bodyComplete = !!d.complete;
+    if (openInboxId === m.id) renderInboxRead(m);
+    renderInboxList();
   }
   // Baja lógica de un correo (papelera): lo quita de la lista local y del panel.
   async function removeInboxMessage(id) {
@@ -549,6 +583,7 @@
     m.unread = false; // abrir cuenta como leído (el servidor los marca al cargar la bandeja)
     cont.querySelector(`.inbox-item[data-id="${id}"]`)?.classList.remove('is-unread');
     renderInboxRead(m);
+    void ensureFullBody(m); // si el cuerpo quedó recortado, lo completa en segundo plano
   }
   // Pinta solo la lista (reutilizado tras eliminar / cambiar leído).
   function renderInboxList() {
