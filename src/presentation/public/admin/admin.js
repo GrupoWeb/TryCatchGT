@@ -486,7 +486,24 @@
     if (isCalendar || text.length < 6) {
       return `<div class="inbox-read__notice">📅 Este correo no trae cuerpo de texto: puede ser una invitación de calendario o solo un adjunto. Ábrelo en tu bandeja de Hostinger para ver el detalle.</div>`;
     }
+    // Se guardó recortado y el enlace de descarga del cuerpo completo ya no responde.
+    if (m.bodyComplete === false && m._bodyTried) {
+      return `<div class="inbox-read__notice">⚠️ Este correo se guardó recortado y no se pudo recuperar el cuerpo completo (el enlace de descarga expiró). Ábrelo en tu bandeja de Hostinger para ver el detalle.</div>`;
+    }
     return '';
+  }
+  // Recupera el cuerpo completo si quedó recortado por el webhook (descarga diferida).
+  // Se intenta una sola vez por correo; si falla (TTL expirado) queda el aviso.
+  async function ensureFullBody(m) {
+    if (m.bodyComplete !== false || m._bodyTried) return;
+    m._bodyTried = true;
+    const r = await api(`/api/admin/inbox/${m.id}/body`, { method: 'POST' });
+    if (!r.ok) return;
+    const d = (r.body && r.body.data) || {};
+    if (typeof d.bodyHtml === 'string') m.bodyHtml = d.bodyHtml;
+    m.bodyComplete = !!d.complete;
+    if (openInboxId === m.id) renderInboxRead(m);
+    renderInboxList();
   }
   // Baja lógica de un correo (papelera): lo quita de la lista local y del panel.
   async function removeInboxMessage(id) {
@@ -549,6 +566,7 @@
     m.unread = false; // abrir cuenta como leído (el servidor los marca al cargar la bandeja)
     cont.querySelector(`.inbox-item[data-id="${id}"]`)?.classList.remove('is-unread');
     renderInboxRead(m);
+    void ensureFullBody(m); // si el cuerpo quedó recortado, lo completa en segundo plano
   }
   // Pinta solo la lista (reutilizado tras eliminar / cambiar leído).
   function renderInboxList() {
