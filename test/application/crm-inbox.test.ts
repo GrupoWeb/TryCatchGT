@@ -74,6 +74,44 @@ describe('CrmInboxController', () => {
     });
   });
 
+  describe('refreshBody', () => {
+    it('devuelve el cuerpo recuperado (updated -> complete true)', async () => {
+      const refresh: any = { execute: vi.fn(async () => ({ outcome: 'updated', bodyHtml: '<p>completo</p>' })) };
+      const controller = new CrmInboxController({} as any, refresh);
+      const res = stubRes();
+      await controller.refreshBody({ params: { id: '3' } } as any, res);
+      expect(refresh.execute).toHaveBeenCalledWith(3);
+      expect(res.status).toHaveBeenCalledWith(200);
+      const data = res.json.mock.calls[0][0].data;
+      expect(data).toEqual({ id: 3, outcome: 'updated', bodyHtml: '<p>completo</p>', complete: true });
+    });
+
+    it('marca complete=false cuando la descarga falla', async () => {
+      const refresh: any = { execute: vi.fn(async () => ({ outcome: 'failed', bodyHtml: 'recorte' })) };
+      const controller = new CrmInboxController({} as any, refresh);
+      const res = stubRes();
+      await controller.refreshBody({ params: { id: '3' } } as any, res);
+      expect(res.json.mock.calls[0][0].data.complete).toBe(false);
+    });
+
+    it('responde 404 si el correo no existe', async () => {
+      const refresh: any = { execute: vi.fn(async () => ({ outcome: 'not_found', bodyHtml: null })) };
+      const controller = new CrmInboxController({} as any, refresh);
+      const res = stubRes();
+      await controller.refreshBody({ params: { id: '9' } } as any, res);
+      expect(res.status).toHaveBeenCalledWith(404);
+    });
+
+    it('responde 400 con id no válido', async () => {
+      const refresh: any = { execute: vi.fn() };
+      const controller = new CrmInboxController({} as any, refresh);
+      const res = stubRes();
+      await controller.refreshBody({ params: { id: 'x' } } as any, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(refresh.execute).not.toHaveBeenCalled();
+    });
+  });
+
   describe('remove', () => {
     it('envía el correo a la papelera (baja lógica)', async () => {
       const messages: any = { softDeleteInbound: vi.fn(async () => true) };

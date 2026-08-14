@@ -18,6 +18,12 @@ export interface CrmMessageProps {
   direction: MessageDirection;
   subject: string;
   bodyHtml: string;
+  // URL temporal para descargar el cuerpo completo (entrantes con cuerpo recortado
+  // por el webhook). Se conserva solo mientras `bodyComplete` sea false.
+  bodyUrl?: string | null;
+  // false = el cuerpo guardado está recortado y se puede reintentar la descarga
+  // desde `bodyUrl`. true (por defecto) = el cuerpo es el definitivo.
+  bodyComplete?: boolean;
   status: MessageStatus;
   messageId?: string | null;
   inReplyTo?: string | null;
@@ -39,6 +45,8 @@ export class CrmMessage {
   public readonly direction: MessageDirection;
   public readonly subject: string;
   public readonly bodyHtml: string;
+  public readonly bodyUrl: string | null;
+  public readonly bodyComplete: boolean;
   public readonly status: MessageStatus;
   public readonly messageId: string | null;
   public readonly inReplyTo: string | null;
@@ -67,6 +75,8 @@ export class CrmMessage {
     this.direction = props.direction;
     this.subject = props.subject.trim();
     this.bodyHtml = props.bodyHtml ?? '';
+    this.bodyUrl = props.bodyUrl?.trim() || null;
+    this.bodyComplete = props.bodyComplete ?? true;
     this.status = props.status;
     this.messageId = props.messageId?.trim() || null;
     this.inReplyTo = props.inReplyTo?.trim() || null;

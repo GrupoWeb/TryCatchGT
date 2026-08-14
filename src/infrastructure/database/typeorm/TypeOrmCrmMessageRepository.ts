@@ -12,6 +12,8 @@ function toDomain(e: CrmMessageEntity): CrmMessage {
     direction: e.direction,
     subject: e.subject,
     bodyHtml: e.bodyHtml ?? '',
+    bodyUrl: e.bodyUrl,
+    bodyComplete: !!e.bodyComplete,
     status: e.status,
     messageId: e.messageId,
     inReplyTo: e.inReplyTo,
@@ -34,6 +36,8 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       direction: message.direction,
       subject: message.subject,
       bodyHtml: message.bodyHtml || null,
+      bodyUrl: message.bodyUrl,
+      bodyComplete: message.bodyComplete,
       status: message.status,
       messageId: message.messageId,
       inReplyTo: message.inReplyTo,
@@ -66,6 +70,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       .addSelect('m.contactId', 'contactId')
       .addSelect('m.subject', 'subject')
       .addSelect('m.bodyHtml', 'bodyHtml')
+      .addSelect('m.bodyComplete', 'bodyComplete')
       .addSelect('m.status', 'status')
       .addSelect('m.receivedAt', 'receivedAt')
       .addSelect('m.createdAt', 'createdAt')
@@ -76,7 +81,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       .orderBy('m.createdAt', 'DESC')
       .limit(limit)
       .getRawMany<{
-        id: number; contactId: number; subject: string; bodyHtml: string | null; status: string;
+        id: number; contactId: number; subject: string; bodyHtml: string | null; bodyComplete: number; status: string;
         receivedAt: Date | null; createdAt: Date; contactName: string; contactEmail: string;
       }>();
     return rows.map((r) => ({
@@ -86,6 +91,7 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
       contactEmail: r.contactEmail,
       subject: r.subject,
       bodyHtml: r.bodyHtml ?? '',
+      bodyComplete: !!r.bodyComplete,
       receivedAt: r.receivedAt ? new Date(r.receivedAt) : null,
       createdAt: new Date(r.createdAt),
       unread: r.status === 'received',
@@ -116,6 +122,19 @@ export class TypeOrmCrmMessageRepository implements CrmMessageRepository {
     const result = await this.repo.update(
       { id, direction: 'in', deletedAt: IsNull() },
       { deletedAt: new Date() },
+    );
+    return (result.affected ?? 0) > 0;
+  }
+
+  public async findInboxMessageById(id: number): Promise<CrmMessage | null> {
+    const row = await this.repo.findOne({ where: { id, direction: 'in', deletedAt: IsNull() } });
+    return row ? toDomain(row) : null;
+  }
+
+  public async updateInboundBody(id: number, bodyHtml: string): Promise<boolean> {
+    const result = await this.repo.update(
+      { id, direction: 'in', deletedAt: IsNull() },
+      { bodyHtml, bodyComplete: true, bodyUrl: null },
     );
     return (result.affected ?? 0) > 0;
   }

@@ -58,12 +58,17 @@ export class ReceiveInboundEmail implements ReceiveInboundEmailUseCase {
       contactCreated = true;
     }
 
+    // Si el cuerpo quedó recortado (bodyComplete === false), se conserva la URL de
+    // descarga para reintentar al abrir el correo en la bandeja; si no, se descarta.
+    const bodyComplete = email.bodyComplete !== false;
     const message = await this.messages.save(
       new CrmMessage({
         contactId: contact.id!,
         direction: 'in',
         subject: email.subject?.trim() || '(sin asunto)',
         bodyHtml: this.sanitizer.sanitize(email.bodyHtml || ''),
+        bodyUrl: bodyComplete ? null : (email.bodyUrl ?? null),
+        bodyComplete,
         status: 'received',
         messageId: email.messageId ?? null,
         inReplyTo: email.inReplyTo ?? null,

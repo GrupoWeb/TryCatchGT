@@ -50,6 +50,7 @@ import { DeleteEmailTemplate } from '../../../application/use-cases/DeleteEmailT
 import { SendContactEmail } from '../../../application/use-cases/SendContactEmail.js';
 import { GetContactMessages } from '../../../application/use-cases/GetContactMessages.js';
 import { ReceiveInboundEmail } from '../../../application/use-cases/ReceiveInboundEmail.js';
+import { RefreshInboundBody } from '../../../application/use-cases/RefreshInboundBody.js';
 import { SaveCadence } from '../../../application/use-cases/SaveCadence.js';
 import { GetCadences } from '../../../application/use-cases/GetCadences.js';
 import { DeleteCadence } from '../../../application/use-cases/DeleteCadence.js';
@@ -194,7 +195,10 @@ const serviceAdminController = new ServiceAdminController(serviceRepository);
 const planAdminController = new PlanAdminController(planRepository);
 const accountAdminController = new AccountAdminController(userRepository, passwordHasher, tokenService, emailService, userSessionRepository);
 const overviewController = new OverviewController(blogRepository, projectRequestRepository, crmMessageRepository);
-const crmInboxController = new CrmInboxController(crmMessageRepository);
+const crmInboxController = new CrmInboxController(
+  crmMessageRepository,
+  new RefreshInboundBody(crmMessageRepository, inboundMailGateway, htmlSanitizer),
+);
 const auditController = new AuditController(auditRepository, userRepository);
 const analyticsController = new AnalyticsController(pageViewRepository);
 const legalController = new LegalController(siteConfigRepository, htmlSanitizer);
@@ -268,6 +272,7 @@ apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/inbox', requireAuth, requireAdmin, crmInboxController.list);
 apiRouter.post('/admin/inbox/seen', requireAuth, requireAdmin, crmInboxController.markSeen);
 apiRouter.post('/admin/inbox/:id/read', requireAuth, requireAdmin, crmInboxController.setRead);
+apiRouter.post('/admin/inbox/:id/body', requireAuth, requireAdmin, crmInboxController.refreshBody);
 apiRouter.delete('/admin/inbox/:id', requireAuth, requireAdmin, crmInboxController.remove);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 apiRouter.get('/admin/analytics', requireAuth, requireAdmin, analyticsController.summary);

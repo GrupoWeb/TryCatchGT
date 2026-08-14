@@ -8,6 +8,8 @@ export interface InboxItem {
   contactEmail: string;
   subject: string;
   bodyHtml: string;
+  // false = el cuerpo está recortado; la bandeja intenta completarlo al abrirlo.
+  bodyComplete: boolean;
   receivedAt: Date | null;
   createdAt: Date;
   unread: boolean;
@@ -30,4 +32,8 @@ export interface CrmMessageRepository {
   setInboundRead(id: number, read: boolean): Promise<boolean>;
   // Papelera: baja lógica de un entrante (deleted_at = ahora). true si se eliminó.
   softDeleteInbound(id: number): Promise<boolean>;
+  // Un entrante vigente por id (para recuperar su cuerpo completo). null si no existe.
+  findInboxMessageById(id: number): Promise<CrmMessage | null>;
+  // Guarda el cuerpo completo ya descargado y lo marca como completo (limpia body_url).
+  updateInboundBody(id: number, bodyHtml: string): Promise<boolean>;
 }
