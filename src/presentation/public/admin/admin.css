@@ -355,6 +355,16 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .inbox-item.is-active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-weak); }
 .inbox-item__snippet { font-size: 12.5px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inbox-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
+/* Papelera por fila: aparece al pasar el cursor (estilo Hostinger/Gmail). */
+.inbox-item__del {
+  flex-shrink: 0; align-self: center; border: none; background: transparent; cursor: pointer;
+  font-size: 15px; line-height: 1; padding: 6px; border-radius: 8px; opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease; color: var(--text-dim);
+}
+.inbox-item:hover .inbox-item__del, .inbox-item:focus-within .inbox-item__del { opacity: 0.75; }
+.inbox-item__del:hover { opacity: 1; background: color-mix(in srgb, var(--danger) 15%, transparent); }
+/* En pantallas táctiles no hay hover: la papelera queda siempre visible. */
+@media (hover: none) { .inbox-item__del { opacity: 0.6; } }
 
 /* Bandeja a dos columnas (estilo Gmail escritorio): lista + panel de lectura. */
 .inbox-2col { display: grid; grid-template-columns: 340px 1fr; gap: 16px; height: calc(100vh - 190px); min-height: 440px; }
@@ -370,7 +380,14 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .inbox-read__subject { margin: 16px 0 0; font-size: 1.15rem; font-weight: 700; color: var(--text-strong); }
 .inbox-read__body { padding: 22px 24px; font-size: 15px; line-height: 1.7; color: var(--text); overflow-wrap: anywhere; }
 .inbox-read__body a { color: var(--primary); }
-.inbox-read__actions { padding: 0 24px 24px; }
+/* Aviso de correo sin cuerpo útil (invitaciones de calendario / solo adjunto). */
+.inbox-read__notice {
+  margin: 16px 24px 0; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; line-height: 1.5;
+  color: var(--text-muted); background: var(--surface-2);
+  border: 1px solid var(--border); border-left: 3px solid var(--primary);
+}
+.inbox-read__actions { padding: 16px 24px 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.inbox-read__actions .btn-danger { margin-left: auto; }
 
 /* Botones de color en la barra de formato del compositor. */
 .rt__color { width: 22px; min-width: 22px; height: 22px; padding: 0; border-radius: 6px; background: var(--sw); border: 1px solid rgba(0, 0, 0, 0.2); }
