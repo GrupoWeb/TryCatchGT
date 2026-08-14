@@ -65,4 +65,47 @@ describe('HostingerAgenticMailClient', () => {
     expect(await client.markProcessed('')).toBe(false);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  describe('fetchFullBody', () => {
+    it('descarga el cuerpo completo desde el bodyUrl', async () => {
+      const fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => '<p>cuerpo completo</p>' }));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));
+      const body = await client.fetchFullBody('https://download/body');
+      expect(body).toBe('<p>cuerpo completo</p>');
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer tok');
+    });
+
+    it('funciona sin token (bodyUrl firmado): no manda Authorization', async () => {
+      const fetchMock = vi.fn(async () => ({ ok: true, status: 200, text: async () => 'texto' }));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = new HostingerAgenticMailClient(config({}));
+      expect(await client.fetchFullBody('https://download/body')).toBe('texto');
+      expect(fetchMock.mock.calls[0][1].headers).toBeUndefined();
+    });
+
+    it('devuelve null con una URL vacía o no http (no llama a fetch)', async () => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const client = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));
+      expect(await client.fetchFullBody('')).toBeNull();
+      expect(await client.fetchFullBody('ftp://x/y')).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('devuelve null si la descarga falla o viene vacía, sin lanzar', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 410, text: async () => '' })));
+      const errClient = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));
+      await expect(errClient.fetchFullBody('https://expired/body')).resolves.toBeNull();
+
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, status: 200, text: async () => '   ' })));
+      const emptyClient = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));
+      await expect(emptyClient.fetchFullBody('https://empty/body')).resolves.toBeNull();
+
+      vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network down'); }));
+      const downClient = new HostingerAgenticMailClient(config({ mailApiToken: 'tok' }));
+      await expect(downClient.fetchFullBody('https://down/body')).resolves.toBeNull();
+    });
+  });
 });

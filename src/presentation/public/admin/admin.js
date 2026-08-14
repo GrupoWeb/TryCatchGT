@@ -458,7 +458,7 @@
   }
   function inboxRow(m) {
     const initials = esc(leadInitials(m.contactName || m.contactEmail || '?'));
-    return `<button class="inbox-item${m.unread ? ' is-unread' : ''}" data-id="${m.id}">
+    return `<div class="inbox-item${m.unread ? ' is-unread' : ''}" data-id="${m.id}" role="button" tabindex="0">
       <span class="inbox-item__avatar" style="--c:${leadColor(m.contactName || m.contactEmail || '?')}">${initials}</span>
       <span class="inbox-item__body">
         <span class="inbox-item__top">
@@ -468,7 +468,45 @@
         <span class="inbox-item__subject">${m.unread ? '<span class="inbox-dot" aria-label="No leído"></span>' : ''}${esc(m.subject || '(sin asunto)')}</span>
         <span class="inbox-item__snippet">${esc(inboxSnippet(m.bodyHtml))}</span>
       </span>
-    </button>`;
+      <button class="inbox-item__del" type="button" title="Eliminar" aria-label="Eliminar" data-del="${m.id}">🗑</button>
+    </div>`;
+  }
+  // Texto plano del cuerpo (para detectar correos sin contenido / invitaciones).
+  function inboxBodyText(html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+    return (tmp.textContent || '').trim();
+  }
+  // Aviso cuando el correo no trae cuerpo útil: típico de invitaciones de calendario
+  // (.ics) o correos que son solo un adjunto. Honesto: dirige a la bandeja de Hostinger.
+  function inboxNotice(m) {
+    const raw = m.bodyHtml || '';
+    const text = inboxBodyText(raw);
+    const isCalendar = /BEGIN:VCALENDAR|VEVENT/i.test(raw);
+    if (isCalendar || text.length < 6) {
+      return `<div class="inbox-read__notice">📅 Este correo no trae cuerpo de texto: puede ser una invitación de calendario o solo un adjunto. Ábrelo en tu bandeja de Hostinger para ver el detalle.</div>`;
+    }
+    return '';
+  }
+  // Baja lógica de un correo (papelera): lo quita de la lista local y del panel.
+  async function removeInboxMessage(id) {
+    const ok = await confirmDialog({ title: 'Eliminar correo', message: 'Se enviará a la papelera y saldrá de la bandeja. Se conserva en el historial del contacto.', confirmText: 'Eliminar', danger: true });
+    if (!ok) return;
+    const r = await api(`/api/admin/inbox/${id}`, { method: 'DELETE' });
+    if (!r.ok) { toast((r.body && r.body.error) || 'No se pudo eliminar', 'error'); return; }
+    inboxItems = inboxItems.filter((x) => String(x.id) !== String(id));
+    if (openInboxId === id) { openInboxId = null; renderInboxRead(null); }
+    renderInboxList();
+    toast('Correo eliminado');
+  }
+  // Alterna leído/no leído de un correo (panel de lectura).
+  async function toggleInboxRead(m) {
+    const read = m.unread; // si está sin leer -> marcar leído; si está leído -> marcar no leído
+    const r = await api(`/api/admin/inbox/${m.id}/read`, { method: 'POST', body: JSON.stringify({ read }) });
+    if (!r.ok) { toast((r.body && r.body.error) || 'No se pudo actualizar', 'error'); return; }
+    m.unread = !read;
+    renderInboxList();
+    renderInboxRead(m);
   }
   // Panel de lectura (columna derecha). El cuerpo ya viene sanitizado del servidor.
   function renderInboxRead(m) {
@@ -486,38 +524,67 @@
         </div>
         <h3 class="inbox-read__subject">${esc(m.subject || '(sin asunto)')}</h3>
       </div>
+      ${inboxNotice(m)}
       <div class="inbox-read__body">${m.bodyHtml || '<em class="admin-muted">(sin contenido)</em>'}</div>
       <div class="inbox-read__actions">
         <button class="btn-primary" id="inbox-reply">↩ Responder</button>
+        <button class="btn-ghost" id="inbox-toggle-read">${m.unread ? '✓ Marcar leído' : '● Marcar no leído'}</button>
+        <button class="btn-danger" id="inbox-del">🗑 Eliminar</button>
       </div>`;
     read.querySelector('#inbox-reply').addEventListener('click', async () => {
       const cr = await api(`/api/admin/contacts/${m.contactId}`);
       if (cr.ok && cr.body.data) openMailComposer(cr.body.data);
     });
+    read.querySelector('#inbox-toggle-read').addEventListener('click', () => toggleInboxRead(m));
+    read.querySelector('#inbox-del').addEventListener('click', () => removeInboxMessage(m.id));
+  }
+  // Id del correo abierto en el panel (para cerrarlo si se elimina).
+  let openInboxId = null;
+  function openInboxItem(id) {
+    const m = inboxItems.find((x) => String(x.id) === String(id));
+    if (!m) return;
+    openInboxId = m.id;
+    const cont = $('inbox-list');
+    cont.querySelectorAll('.inbox-item').forEach((x) => x.classList.toggle('is-active', x.getAttribute('data-id') === String(id)));
+    m.unread = false; // abrir cuenta como leído (el servidor los marca al cargar la bandeja)
+    cont.querySelector(`.inbox-item[data-id="${id}"]`)?.classList.remove('is-unread');
+    renderInboxRead(m);
+  }
+  // Pinta solo la lista (reutilizado tras eliminar / cambiar leído).
+  function renderInboxList() {
+    const cont = $('inbox-list');
+    if (!inboxItems.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay correos entrantes.</p>'; return; }
+    cont.innerHTML = inboxItems.map(inboxRow).join('');
+    if (openInboxId != null) {
+      cont.querySelector(`.inbox-item[data-id="${openInboxId}"]`)?.classList.add('is-active');
+    }
   }
   async function loadInbox() {
     const cont = $('inbox-list');
     const r = await api('/api/admin/inbox');
     if (!guard(r) || !r.ok) { cont.innerHTML = '<p class="admin-muted">No se pudo cargar la bandeja.</p>'; return; }
     inboxItems = (r.body.data && r.body.data.items) || [];
+    openInboxId = null;
     renderInboxRead(null);
-    if (!inboxItems.length) { cont.innerHTML = '<p class="admin-muted">Aún no hay correos entrantes.</p>'; }
-    else {
-      cont.innerHTML = inboxItems.map(inboxRow).join('');
-      cont.querySelectorAll('.inbox-item').forEach((el) => el.addEventListener('click', () => {
-        const m = inboxItems.find((x) => String(x.id) === el.getAttribute('data-id'));
-        cont.querySelectorAll('.inbox-item').forEach((x) => x.classList.remove('is-active'));
-        el.classList.add('is-active');
-        el.classList.remove('is-unread');
-        renderInboxRead(m);
-      }));
-    }
+    renderInboxList();
     // Al abrir la bandeja se marcan como leídos y el badge se limpia.
     if ((r.body.data && r.body.data.unread) > 0) {
       await api('/api/admin/inbox/seen', { method: 'POST' });
     }
     setInboxBadge(0);
   }
+  // Delegación: abrir al hacer clic/Enter en la fila; eliminar con el botón papelera.
+  $('inbox-list').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) { e.stopPropagation(); removeInboxMessage(Number(del.getAttribute('data-del'))); return; }
+    const row = e.target.closest('.inbox-item');
+    if (row) openInboxItem(row.getAttribute('data-id'));
+  });
+  $('inbox-list').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const row = e.target.closest('.inbox-item');
+    if (row && !e.target.closest('[data-del]')) { e.preventDefault(); openInboxItem(row.getAttribute('data-id')); }
+  });
   $('inbox-refresh').addEventListener('click', loadInbox);
 
   // ── AUDITORÍA ─────────────────────────────────────────────

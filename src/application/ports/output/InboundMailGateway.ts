@@ -8,4 +8,12 @@
  */
 export interface InboundMailGateway {
   markProcessed(providerMessageId: string): Promise<boolean>;
+
+  /**
+   * Descarga el cuerpo completo de un correo desde la URL temporal (`bodyUrl`) que
+   * trae el webhook (el `bodyHtml` del payload viene recortado a ~200 caracteres).
+   * Best-effort: NUNCA lanza; devuelve el HTML/texto completo, o `null` si no hay
+   * URL, la descarga falla o el TTL expiró (el llamador cae al cuerpo recortado).
+   */
+  fetchFullBody(bodyUrl: string): Promise<string | null>;
 }

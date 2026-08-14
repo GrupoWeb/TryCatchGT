@@ -267,6 +267,8 @@ apiRouter.post('/auth/reset-password', authLimiter, authController.resetPassword
 apiRouter.get('/admin/overview', requireAuth, overviewController.stats);
 apiRouter.get('/admin/inbox', requireAuth, requireAdmin, crmInboxController.list);
 apiRouter.post('/admin/inbox/seen', requireAuth, requireAdmin, crmInboxController.markSeen);
+apiRouter.post('/admin/inbox/:id/read', requireAuth, requireAdmin, crmInboxController.setRead);
+apiRouter.delete('/admin/inbox/:id', requireAuth, requireAdmin, crmInboxController.remove);
 apiRouter.get('/admin/audit', requireAuth, requireAdmin, auditController.list);
 apiRouter.get('/admin/analytics', requireAuth, requireAdmin, analyticsController.summary);
 

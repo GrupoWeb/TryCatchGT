@@ -22,4 +22,35 @@ export class CrmInboxController {
     const marked = await this.messages.markInboundRead();
     res.status(200).json({ success: true, data: { marked } });
   };
+
+  /** Marca un correo concreto como leído/no leído (body: { read: boolean }). */
+  public setRead = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ success: false, error: 'Id no válido.' });
+      return;
+    }
+    const read = req.body?.read !== false; // por defecto marca como leído
+    const ok = await this.messages.setInboundRead(id, read);
+    if (!ok) {
+      res.status(404).json({ success: false, error: 'Correo no encontrado.' });
+      return;
+    }
+    res.status(200).json({ success: true, data: { id, read } });
+  };
+
+  /** Envía un correo a la papelera (baja lógica; se conserva en la BD). */
+  public remove = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ success: false, error: 'Id no válido.' });
+      return;
+    }
+    const ok = await this.messages.softDeleteInbound(id);
+    if (!ok) {
+      res.status(404).json({ success: false, error: 'Correo no encontrado.' });
+      return;
+    }
+    res.status(200).json({ success: true, data: { id } });
+  };
 }
