@@ -807,7 +807,13 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 }
 
 @media (max-width: 560px) {
-  .admin__topbar { padding: 0 16px; }
+  .admin__topbar { padding: 0 14px; gap: 8px; }
+  /* El título de la sección ya se muestra en el contenido; en móvil se oculta para
+     dejar espacio y que las acciones queden en una sola fila, alineadas a la derecha. */
+  .admin__page-title { display: none; }
+  .admin__actions { margin-left: auto; gap: 8px; flex-wrap: nowrap; align-items: center; }
+  .admin__actions .btn-ghost { padding: 7px 11px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+  .admin__actions .theme-toggle { width: 36px; height: 36px; flex-shrink: 0; }
   .admin__main { padding: 20px 16px 72px; }
   .admin__editor, .admin__empty { padding: 20px; }
   .admin-login__card { padding: 30px 22px; }
