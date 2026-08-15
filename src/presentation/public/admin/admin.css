@@ -496,6 +496,7 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 /* Gráficas del dashboard */
 .dash-charts { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
 .chart-card {
+  min-width: 0; /* permite que la tarjeta se encoja (el canvas tiene ancho intrínseco) */
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -505,7 +506,9 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .chart-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .chart-card__title { font-size: 15px; font-weight: 700; color: var(--text-strong); }
 .chart-card__hint { font-size: 12.5px; color: var(--text-dim); }
-.chart-card__canvas { position: relative; height: 280px; }
+.chart-card__canvas { position: relative; height: 280px; min-width: 0; }
+/* El canvas de Chart.js no debe desbordar su tarjeta (evita scroll horizontal en móvil). */
+.chart-card__canvas canvas { max-width: 100% !important; }
 
 /* ---------- Visitas (analítica) ---------- */
 .seg-range { display: inline-flex; gap: 8px; }
