@@ -811,8 +811,11 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 
 /* ---------- Ajustes de secciones en móvil (listas, perfil, tablas) ---------- */
 @media (max-width: 640px) {
-  /* Cotizaciones y Clientes: una sola columna (la tarjeta ocupa todo el ancho). */
-  #crm-list, #leads-list { grid-template-columns: 1fr; }
+  /* Cotizaciones y Clientes: una sola columna (la tarjeta ocupa todo el ancho).
+     Se usa el id de sección como prefijo para ganar especificidad a la regla base
+     de 2 columnas (que aparece más abajo en el archivo). */
+  #sec-leads #leads-list,
+  #sec-crm #crm-list { grid-template-columns: 1fr; }
 
   /* Perfil: apila la cabecera y evita desbordes del QR / clave del 2FA. */
   .profile-head { flex-wrap: wrap; gap: 14px; }
