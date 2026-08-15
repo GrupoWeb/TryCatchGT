@@ -634,11 +634,11 @@
       const when = e.createdAt ? new Date(e.createdAt).toLocaleString('es-GT') : '—';
       const who = e.actorLabel || e.actor || (e.actorId ? `#${e.actorId}` : '—');
       return `<tr>
-        <td>${esc(when)}</td>
-        <td><code>${esc(e.action)}</code></td>
-        <td>${esc(who)}</td>
-        <td><span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(e.status ?? '—')}</span></td>
-        <td>${esc(e.ip || '—')}</td>
+        <td data-label="Fecha">${esc(when)}</td>
+        <td data-label="Acción"><code>${esc(e.action)}</code></td>
+        <td data-label="Usuario">${esc(who)}</td>
+        <td data-label="Estado"><span class="badge-status ${okStatus ? 'published' : 'draft'}">${esc(e.status ?? '—')}</span></td>
+        <td data-label="IP">${esc(e.ip || '—')}</td>
       </tr>`;
     }).join('');
   }
@@ -2096,11 +2096,11 @@
       const st = userStatusMeta(u);
       const you = u.id === currentUserId ? ' <span class="admin-hint">(tú)</span>' : '';
       return `<tr data-id="${u.id}"${u.deleted ? ' class="is-deleted"' : ''}>
-        <td><div class="u-cell"><span>${esc(u.displayName || u.username)}${you}</span><small>@${esc(u.username)}</small></div></td>
-        <td>${u.email ? esc(u.email) : '<span class="admin-hint">—</span>'}</td>
-        <td><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></td>
-        <td><span class="badge-status ${st.cls}">${st.label}</span></td>
-        <td>${u.mfaEnabled ? '🔒 Sí' : '<span class="admin-hint">No</span>'}</td>
+        <td data-label="Usuario"><div class="u-cell"><span>${esc(u.displayName || u.username)}${you}</span><small>@${esc(u.username)}</small></div></td>
+        <td data-label="Correo">${u.email ? esc(u.email) : '<span class="admin-hint">—</span>'}</td>
+        <td data-label="Rol"><span class="badge-status ${u.role === 'admin' ? 'published' : 'draft'}">${esc(u.role)}</span></td>
+        <td data-label="Estado"><span class="badge-status ${st.cls}">${st.label}</span></td>
+        <td data-label="2FA">${u.mfaEnabled ? '🔒 Sí' : '<span class="admin-hint">No</span>'}</td>
       </tr>`;
     }).join('');
     tb.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => {

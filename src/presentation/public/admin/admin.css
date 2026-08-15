@@ -110,7 +110,7 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
 .btn-sm { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
 
 /* ---------- Campos ---------- */
-.admin-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.admin-field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; min-width: 0; }
 .admin-field label { font-size: 13px; font-weight: 600; color: var(--text-strong); }
 .admin-hint { font-weight: 400; color: var(--text-dim); }
 .admin-inline { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -140,7 +140,7 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-weak);
 }
-.admin-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.admin-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .admin-error { color: var(--danger); font-size: 14px; min-height: 18px; margin: 4px 0; }
 .admin-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); margin-bottom: 16px; cursor: pointer; }
 .admin-check input { width: auto; }
@@ -192,6 +192,44 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
   overflow-y: auto;
   transition: transform 0.25s ease, width 0.2s ease;
 }
+
+/* Scrollbars delgados y discretos en las zonas con scroll del panel: el thumb queda
+   oculto (transparente) y solo aparece, con fundido, al pasar el cursor o al enfocar.
+   Firefox: scrollbar-width/-color; WebKit: pseudo-elementos. */
+.admin__sidebar,
+.inbox-2col .inbox-list,
+.inbox-read {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent; /* oculto por defecto */
+}
+.admin__sidebar:hover, .admin__sidebar:focus-within,
+.inbox-2col .inbox-list:hover, .inbox-2col .inbox-list:focus-within,
+.inbox-read:hover, .inbox-read:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--text-dim) 40%, transparent) transparent;
+}
+.admin__sidebar::-webkit-scrollbar,
+.inbox-2col .inbox-list::-webkit-scrollbar,
+.inbox-read::-webkit-scrollbar { width: 9px; height: 9px; }
+.admin__sidebar::-webkit-scrollbar-track,
+.inbox-2col .inbox-list::-webkit-scrollbar-track,
+.inbox-read::-webkit-scrollbar-track { background: transparent; }
+.admin__sidebar::-webkit-scrollbar-thumb,
+.inbox-2col .inbox-list::-webkit-scrollbar-thumb,
+.inbox-read::-webkit-scrollbar-thumb {
+  background: transparent; /* invisible hasta pasar el cursor */
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+.admin__sidebar:hover::-webkit-scrollbar-thumb, .admin__sidebar:focus-within::-webkit-scrollbar-thumb,
+.inbox-2col .inbox-list:hover::-webkit-scrollbar-thumb, .inbox-2col .inbox-list:focus-within::-webkit-scrollbar-thumb,
+.inbox-read:hover::-webkit-scrollbar-thumb, .inbox-read:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
+}
+.admin__sidebar::-webkit-scrollbar-thumb:hover,
+.inbox-2col .inbox-list::-webkit-scrollbar-thumb:hover,
+.inbox-read::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text-dim) 60%, transparent); }
 .admin__brand {
   display: flex;
   align-items: center;
@@ -329,11 +367,11 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 
 /* Paneles de ajustes en dos columnas (Contacto, Perfil, Usuarios). */
 .panel-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; margin-top: 20px; }
-.panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); padding: 22px; }
+.panel { min-width: 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); padding: 22px; }
 .panel__title { font-size: 15px; font-weight: 700; color: var(--text-strong); margin-bottom: 6px; }
 .panel > .admin-muted { margin-bottom: 16px; }
 .panel .admin__editor-actions { margin-top: 4px; }
-@media (max-width: 760px) { .panel-grid { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .panel-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* Tabla de datos (usuarios) con filas clicables. */
 .table-wrap { overflow-x: auto; margin-top: 18px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow-sm); }
@@ -458,6 +496,7 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 /* Gráficas del dashboard */
 .dash-charts { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
 .chart-card {
+  min-width: 0; /* permite que la tarjeta se encoja (el canvas tiene ancho intrínseco) */
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -467,7 +506,9 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
 .chart-card__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
 .chart-card__title { font-size: 15px; font-weight: 700; color: var(--text-strong); }
 .chart-card__hint { font-size: 12.5px; color: var(--text-dim); }
-.chart-card__canvas { position: relative; height: 280px; }
+.chart-card__canvas { position: relative; height: 280px; min-width: 0; }
+/* El canvas de Chart.js no debe desbordar su tarjeta (evita scroll horizontal en móvil). */
+.chart-card__canvas canvas { max-width: 100% !important; }
 
 /* ---------- Visitas (analítica) ---------- */
 .seg-range { display: inline-flex; gap: 8px; }
@@ -665,6 +706,9 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   color: var(--primary);
   background: var(--primary-weak);
   border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 .mfa-backup-list {
   list-style: none;
@@ -768,8 +812,56 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   .admin-grid-2 { grid-template-columns: 1fr; }
 }
 
+/* ---------- Ajustes de secciones en móvil (listas, perfil, tablas) ---------- */
+@media (max-width: 640px) {
+  /* Cotizaciones y Clientes: una sola columna (la tarjeta ocupa todo el ancho).
+     Se usa el id de sección como prefijo para ganar especificidad a la regla base
+     de 2 columnas (que aparece más abajo en el archivo). */
+  #sec-leads #leads-list,
+  #sec-crm #crm-list { grid-template-columns: 1fr; }
+
+  /* Perfil: apila la cabecera y evita desbordes del QR / clave del 2FA. */
+  .profile-head { flex-wrap: wrap; gap: 14px; }
+  .panel { padding: 18px; }
+  .mfa-qr { max-width: 100%; }
+  .mfa-qr img { max-width: 100%; height: auto; }
+  .mfa-secret { max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
+
+  /* Usuarios y Auditoría: las tablas pasan a tarjetas apiladas (sin scroll lateral). */
+  #sec-users .table-wrap,
+  #sec-audit .audit-table-wrap { overflow-x: visible; border: none; box-shadow: none; background: transparent; }
+  #sec-users .data-table thead,
+  #sec-audit .audit-table thead { display: none; }
+  #sec-users .data-table tr,
+  #sec-audit .audit-table tr {
+    display: block; margin-bottom: 12px; padding: 4px 2px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); box-shadow: var(--shadow-sm);
+  }
+  #sec-users .data-table td,
+  #sec-audit .audit-table td {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 9px 14px; text-align: right; border-bottom: 1px solid var(--border);
+  }
+  #sec-users .data-table tr td:last-child,
+  #sec-audit .audit-table tr td:last-child { border-bottom: none; }
+  #sec-users .data-table td::before,
+  #sec-audit .audit-table td::before {
+    content: attr(data-label); flex: 0 0 auto; text-align: left;
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim);
+  }
+  /* La celda de usuario (nombre + @usuario) se alinea a la derecha, junto a su etiqueta. */
+  #sec-users .data-table td .u-cell { align-items: flex-end; text-align: right; }
+}
+
 @media (max-width: 560px) {
-  .admin__topbar { padding: 0 16px; }
+  .admin__topbar { padding: 0 14px; gap: 8px; }
+  /* El título de la sección ya se muestra en el contenido; en móvil se oculta para
+     dejar espacio y que las acciones queden en una sola fila, alineadas a la derecha. */
+  .admin__page-title { display: none; }
+  .admin__actions { margin-left: auto; gap: 8px; flex-wrap: nowrap; align-items: center; }
+  .admin__actions .btn-ghost { padding: 7px 11px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+  .admin__actions .theme-toggle { width: 36px; height: 36px; flex-shrink: 0; }
   .admin__main { padding: 20px 16px 72px; }
   .admin__editor, .admin__empty { padding: 20px; }
   .admin-login__card { padding: 30px 22px; }
