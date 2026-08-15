@@ -809,6 +809,45 @@ html[data-theme="dark"] .admin__nav-btn.is-active { color: var(--text-strong); }
   .admin-grid-2 { grid-template-columns: 1fr; }
 }
 
+/* ---------- Ajustes de secciones en móvil (listas, perfil, tablas) ---------- */
+@media (max-width: 640px) {
+  /* Cotizaciones y Clientes: una sola columna (la tarjeta ocupa todo el ancho). */
+  #crm-list, #leads-list { grid-template-columns: 1fr; }
+
+  /* Perfil: apila la cabecera y evita desbordes del QR / clave del 2FA. */
+  .profile-head { flex-wrap: wrap; gap: 14px; }
+  .panel { padding: 18px; }
+  .mfa-qr { max-width: 100%; }
+  .mfa-qr img { max-width: 100%; height: auto; }
+  .mfa-secret { max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
+
+  /* Usuarios y Auditoría: las tablas pasan a tarjetas apiladas (sin scroll lateral). */
+  #sec-users .table-wrap,
+  #sec-audit .audit-table-wrap { overflow-x: visible; border: none; box-shadow: none; background: transparent; }
+  #sec-users .data-table thead,
+  #sec-audit .audit-table thead { display: none; }
+  #sec-users .data-table tr,
+  #sec-audit .audit-table tr {
+    display: block; margin-bottom: 12px; padding: 4px 2px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); box-shadow: var(--shadow-sm);
+  }
+  #sec-users .data-table td,
+  #sec-audit .audit-table td {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 9px 14px; text-align: right; border-bottom: 1px solid var(--border);
+  }
+  #sec-users .data-table tr td:last-child,
+  #sec-audit .audit-table tr td:last-child { border-bottom: none; }
+  #sec-users .data-table td::before,
+  #sec-audit .audit-table td::before {
+    content: attr(data-label); flex: 0 0 auto; text-align: left;
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-dim);
+  }
+  /* La celda de usuario (nombre + @usuario) se alinea a la derecha, junto a su etiqueta. */
+  #sec-users .data-table td .u-cell { align-items: flex-end; text-align: right; }
+}
+
 @media (max-width: 560px) {
   .admin__topbar { padding: 0 14px; gap: 8px; }
   /* El título de la sección ya se muestra en el contenido; en móvil se oculta para
