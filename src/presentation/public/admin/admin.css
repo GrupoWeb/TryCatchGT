@@ -193,12 +193,18 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
   transition: transform 0.25s ease, width 0.2s ease;
 }
 
-/* Scrollbars delgados y sutiles en las zonas con scroll del panel (evita la barra
-   nativa gruesa). Firefox: scrollbar-width/-color; WebKit: pseudo-elementos. */
+/* Scrollbars delgados y discretos en las zonas con scroll del panel: el thumb queda
+   oculto (transparente) y solo aparece, con fundido, al pasar el cursor o al enfocar.
+   Firefox: scrollbar-width/-color; WebKit: pseudo-elementos. */
 .admin__sidebar,
 .inbox-2col .inbox-list,
 .inbox-read {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent; /* oculto por defecto */
+}
+.admin__sidebar:hover, .admin__sidebar:focus-within,
+.inbox-2col .inbox-list:hover, .inbox-2col .inbox-list:focus-within,
+.inbox-read:hover, .inbox-read:focus-within {
   scrollbar-color: color-mix(in srgb, var(--text-dim) 40%, transparent) transparent;
 }
 .admin__sidebar::-webkit-scrollbar,
@@ -210,10 +216,16 @@ body { min-height: 100vh; background: var(--bg); color: var(--text); transition:
 .admin__sidebar::-webkit-scrollbar-thumb,
 .inbox-2col .inbox-list::-webkit-scrollbar-thumb,
 .inbox-read::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
+  background: transparent; /* invisible hasta pasar el cursor */
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
+  transition: background 0.2s ease;
+}
+.admin__sidebar:hover::-webkit-scrollbar-thumb, .admin__sidebar:focus-within::-webkit-scrollbar-thumb,
+.inbox-2col .inbox-list:hover::-webkit-scrollbar-thumb, .inbox-2col .inbox-list:focus-within::-webkit-scrollbar-thumb,
+.inbox-read:hover::-webkit-scrollbar-thumb, .inbox-read:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-dim) 35%, transparent);
 }
 .admin__sidebar::-webkit-scrollbar-thumb:hover,
 .inbox-2col .inbox-list::-webkit-scrollbar-thumb:hover,
