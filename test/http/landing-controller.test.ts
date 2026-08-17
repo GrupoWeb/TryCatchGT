@@ -10,13 +10,14 @@ function mockRes() {
 }
 
 // Repo en memoria: captura lo guardado y no encuentra choques de slug.
-function memRepo() {
+// `seed` alimenta findById (para probar update/setActive).
+function memRepo(seed: LandingSample | null = null) {
   const state: { saved: LandingSample | null } = { saved: null };
   const repo = {
     findAll: async () => [],
-    findById: async () => null,
+    findById: async (id: number) => (seed && seed.id === id ? seed : null),
     findBySlug: async () => null,
-    save: async (s: LandingSample) => { state.saved = s; return new LandingSample({ ...s, id: 1 }); },
+    save: async (s: LandingSample) => { state.saved = s; return new LandingSample({ ...s, id: s.id ?? 1 }); },
     delete: async () => true,
   };
   return { repo, state };
@@ -62,5 +63,56 @@ describe('LandingSampleController.create — el HTML llega en base64', () => {
     );
     expect(res.statusCode).toBe(201);
     expect(state.saved?.html).toBe('<p>hola</p>');
+  });
+
+  it('al crear sin isActive queda publicada (default del dominio)', async () => {
+    const { repo, state } = memRepo();
+    const ctrl = new LandingSampleController(repo);
+    const res = mockRes();
+    await ctrl.create({ body: { title: 'Pub', slug: 'pub', html: '<p>x</p>' }, userId: 1 } as any, res as any);
+    expect(state.saved?.isActive).toBe(true);
+  });
+
+  it('al crear con isActive=false queda en borrador', async () => {
+    const { repo, state } = memRepo();
+    const ctrl = new LandingSampleController(repo);
+    const res = mockRes();
+    await ctrl.create({ body: { title: 'Draft', slug: 'draft', html: '<p>x</p>', isActive: false }, userId: 1 } as any, res as any);
+    expect(state.saved?.isActive).toBe(false);
+  });
+});
+
+describe('LandingSampleController.setActive — toggle sin reenviar el HTML', () => {
+  it('despublica conservando el resto de campos', async () => {
+    const seed = new LandingSample({ id: 5, slug: 'dm-cafe', title: 'DM Café', html: '<h1>hola</h1>', isActive: true, createdBy: 9 });
+    const { repo, state } = memRepo(seed);
+    const ctrl = new LandingSampleController(repo);
+    const res = mockRes();
+    await ctrl.setActive({ params: { id: '5' }, body: { isActive: false } } as any, res as any);
+    expect(res.statusCode).toBe(200);
+    expect(state.saved?.isActive).toBe(false);
+    expect(state.saved?.html).toBe('<h1>hola</h1>'); // el HTML se preserva
+    expect(state.saved?.slug).toBe('dm-cafe');
+    expect(res.jsonBody.data.isActive).toBe(false);
+  });
+
+  it('404 si la muestra no existe', async () => {
+    const { repo } = memRepo(null);
+    const ctrl = new LandingSampleController(repo);
+    const res = mockRes();
+    await ctrl.setActive({ params: { id: '99' }, body: { isActive: true } } as any, res as any);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('update sin isActive conserva el estado previo (no republica un borrador)', async () => {
+    const seed = new LandingSample({ id: 8, slug: 'sitio', title: 'Sitio', html: '<p>v</p>', isActive: false });
+    const { repo, state } = memRepo(seed);
+    const ctrl = new LandingSampleController(repo);
+    const res = mockRes();
+    await ctrl.update(
+      { params: { id: '8' }, body: { title: 'Sitio', slug: 'sitio', html: '<p>nuevo</p>' }, userId: 1 } as any,
+      res as any,
+    );
+    expect(state.saved?.isActive).toBe(false);
   });
 });

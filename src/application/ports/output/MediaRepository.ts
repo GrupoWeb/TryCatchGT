@@ -9,4 +9,6 @@ export interface MediaRepository {
   save(input: { mime: string; data: Buffer; size: number; createdBy: number | null }): Promise<number>;
   // Devuelve el contenido para servirlo, o null si no existe.
   findById(id: number): Promise<StoredMedia | null>;
+  // Elimina la imagen; devuelve false si no existía.
+  delete(id: number): Promise<boolean>;
 }

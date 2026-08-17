@@ -31,8 +31,9 @@ describe('createLandingHandler — sirve muestras aisladas con CSP sandbox', () 
     await handler({ params: { slug: 'demo-ferreteria' } } as any, res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('<h1>Hola</h1>');
-    expect(res.headers['Content-Security-Policy']).toBe('sandbox allow-scripts allow-popups allow-forms');
+    expect(res.headers['Content-Security-Policy']).toBe("sandbox allow-scripts allow-popups allow-forms; frame-ancestors 'none'");
     expect(res.headers['Content-Security-Policy']).not.toContain('allow-same-origin');
+    expect(res.headers['Content-Security-Policy']).toContain("frame-ancestors 'none'"); // anti-clickjacking
     expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow');
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
     expect(res.headers['Cache-Control']).toBe('no-store');
@@ -52,5 +53,14 @@ describe('createLandingHandler — sirve muestras aisladas con CSP sandbox', () 
     await handler({ params: { slug: 'no-existe' } } as any, res);
     expect(res.statusCode).toBe(404);
     expect(res.type_).toBe('text/plain');
+  });
+
+  it('404 si la muestra existe pero está en borrador (isActive=false)', async () => {
+    const draft = new LandingSample({ id: 2, slug: 'borrador', title: 'Borrador', html: '<h1>Oculto</h1>', isActive: false });
+    const handler = createLandingHandler(repoWith(draft));
+    const res = mockRes();
+    await handler({ params: { slug: 'borrador' } } as any, res);
+    expect(res.statusCode).toBe(404);
+    expect(res.body).not.toBe('<h1>Oculto</h1>'); // no filtra el contenido ni la existencia
   });
 });

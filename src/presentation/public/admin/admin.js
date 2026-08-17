@@ -1213,6 +1213,9 @@
         ? items.map(cfg.renderItem).join('')
         : '<p class="admin-muted">Aún no hay elementos.</p>';
       $(cfg.listEl).querySelectorAll('.admin-item').forEach((it) => it.addEventListener('click', () => edit(Number(it.getAttribute('data-id')))));
+      // Enganche opcional para controles por item (p. ej. el toggle de estado de las
+      // muestras) que necesitan detener la propagación del clic que abre la edición.
+      if (cfg.afterRender) cfg.afterRender($(cfg.listEl));
     }
     async function edit(id) {
       const r = await api(`${cfg.path}/${id}`);
@@ -1570,6 +1573,40 @@
   $('plan-delete').addEventListener('click', plans.remove);
 
   // ── MUESTRAS (LANDINGS) ───────────────────────────────────
+  // Editor de código (CodeMirror 5, vendorizado por CSP self) montado sobre el
+  // textarea `landing-html`. Se crea de forma perezosa la primera vez que se abre el
+  // drawer; mientras la librería no esté disponible, el textarea plano sirve de
+  // respaldo. `landingGetHtml`/`landingSetHtml` abstraen de qué motor está activo.
+  let landingCM = null;
+  let landingLiveOn = false;
+  let landingLiveTimer = null;
+  function ensureLandingCM() {
+    if (landingCM || !window.CodeMirror) return landingCM;
+    landingCM = window.CodeMirror.fromTextArea($('landing-html'), {
+      mode: 'htmlmixed', lineNumbers: true, lineWrapping: false, tabSize: 2, indentUnit: 2,
+      autoCloseTags: true, autoCloseBrackets: true, matchBrackets: true, spellcheck: false,
+    });
+    landingCM.setSize('100%', 380);
+    landingCM.on('change', scheduleLandingLive); // refresca la vista en vivo (si está activa)
+    return landingCM;
+  }
+  function landingGetHtml() { return landingCM ? landingCM.getValue() : $('landing-html').value; }
+  function landingSetHtml(v) { if (landingCM) landingCM.setValue(v || ''); else $('landing-html').value = v || ''; }
+  // Vista en vivo: vuelca el HTML actual al iframe con `srcdoc` (sandbox aislado, sin
+  // allow-same-origin). Ojo: el srcdoc hereda la CSP estricta del panel, así que sirve
+  // para revisar maquetación/estilos, no el JS ni las fuentes de CDN del landing. Para
+  // el render exacto está "Previsualizar (URL real)".
+  function renderLandingLive() {
+    const frame = $('landing-frame');
+    frame.removeAttribute('src');
+    frame.srcdoc = landingGetHtml();
+    frame.hidden = false;
+  }
+  function scheduleLandingLive() {
+    if (!landingLiveOn) return;
+    clearTimeout(landingLiveTimer);
+    landingLiveTimer = setTimeout(renderLandingLive, 400);
+  }
   // Refleja la URL pública y el iframe según el slug actual del formulario.
   function landingSyncUrl() {
     const slug = ($('landing-slug').value.trim() || '').toLowerCase();
@@ -1582,21 +1619,44 @@
   const landing = makeCrud({
     path: '/api/admin/landings', listEl: 'landing-list', overlayEl: $('landing-overlay'), titleEl: $('landing-title'), firstField: 'landing-title-in',
     deleteBtn: $('landing-delete'), errorEl: $('landing-error'), entityName: 'Muestra',
-    blank: {},
-    renderItem: (m) => `<div class="admin-item" data-id="${m.id}"><div class="admin-item__title">🎨 ${esc(m.title)}</div><div class="admin-item__meta"><span>/muestras/${esc(m.slug)}</span></div></div>`,
+    blank: { isActive: true },
+    renderItem: (m) => {
+      const draft = m.isActive === false;
+      const badge = draft ? ' <span class="chip">Borrador</span>' : '';
+      const toggle = `<button type="button" class="btn-ghost landing-toggle" data-id="${m.id}" data-active="${draft ? '0' : '1'}">${draft ? 'Publicar' : 'Despublicar'}</button>`;
+      return `<div class="admin-item" data-id="${m.id}"><div class="admin-item__title">🎨 ${esc(m.title)}${badge}</div><div class="admin-item__meta"><span>/muestras/${esc(m.slug)}</span></div>${toggle}</div>`;
+    },
+    // Publicar/despublicar sin abrir el drawer. `stopPropagation` evita el clic del item
+    // que abriría la edición.
+    afterRender: (listEl) => {
+      listEl.querySelectorAll('.landing-toggle').forEach((b) => b.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = b.getAttribute('data-id');
+        const next = b.getAttribute('data-active') !== '1';
+        const r = await api(`/api/admin/landings/${id}/active`, { method: 'PATCH', body: JSON.stringify({ isActive: next }) });
+        if (r.ok) { toast(next ? 'Muestra publicada' : 'Muestra despublicada'); landing.load(); }
+        else toast((r.body && r.body.error) || 'No se pudo cambiar el estado', 'error');
+      }));
+    },
     toForm: (m) => {
       $('landing-id').value = m.id || '';
       $('landing-title-in').value = m.title || '';
       $('landing-slug').value = m.slug || '';
-      $('landing-html').value = m.html || '';
-      // Reinicia la previsualización; se recarga bajo demanda con "Previsualizar".
-      const frame = $('landing-frame'); frame.hidden = true; frame.removeAttribute('src');
+      $('landing-active').checked = m.isActive !== false; // nueva/undefined ⇒ publicada
+      ensureLandingCM();
+      landingSetHtml(m.html || '');
+      // Reinicia la previsualización; se recarga bajo demanda ("Vista en vivo"/"Previsualizar").
+      landingLiveOn = false; $('landing-live-btn').classList.remove('is-active');
+      const frame = $('landing-frame'); frame.hidden = true; frame.removeAttribute('src'); frame.removeAttribute('srcdoc');
       $('landing-assets').innerHTML = ''; // lista de imágenes subidas (por sesión de edición)
       landingSyncUrl();
+      // El drawer se abre justo después; CodeMirror mide mal si se crea oculto, así que
+      // se refresca cuando ya es visible.
+      if (landingCM) setTimeout(() => landingCM.refresh(), 80);
     },
     // El HTML se envía en base64 (no en crudo): así el payload no lleva `<script>`
     // ni manejadores de eventos que el WAF del hosting bloquearía como inyección.
-    fromForm: () => ({ slug: $('landing-slug').value.trim() || undefined, title: $('landing-title-in').value.trim(), htmlBase64: utf8ToBase64($('landing-html').value) }),
+    fromForm: () => ({ slug: $('landing-slug').value.trim() || undefined, title: $('landing-title-in').value.trim(), isActive: $('landing-active').checked, htmlBase64: utf8ToBase64(landingGetHtml()) }),
   });
   function loadLandings() { landing.load(); }
   $('landing-new').addEventListener('click', landing.create);
@@ -1610,25 +1670,44 @@
     catch { $('landing-url').select(); toast('Selecciona y copia (Ctrl+C)', 'error'); }
   });
   $('landing-open').addEventListener('click', () => { const u = $('landing-url').value; if (u) window.open(u, '_blank', 'noopener'); });
-  // Subir un archivo .html a la textarea (lectura local, no toca el servidor).
+  // Subir un archivo .html al editor (lectura local, no toca el servidor).
   $('landing-upload').addEventListener('click', () => $('landing-file').click());
   $('landing-file').addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => { $('landing-html').value = String(reader.result || ''); toast('HTML cargado del archivo'); };
+    reader.onload = () => { landingSetHtml(String(reader.result || '')); scheduleLandingLive(); toast('HTML cargado del archivo'); };
     reader.onerror = () => toast('No se pudo leer el archivo', 'error');
     reader.readAsText(file);
     e.target.value = ''; // permite volver a subir el mismo archivo
   });
+  // Reindenta línea a línea según el modo (htmlmixed): solo toca el espaciado inicial,
+  // nunca el contenido, así que no corrompe <script>/<style>/<pre>.
+  $('landing-format').addEventListener('click', () => {
+    if (!landingCM) { toast('Editor no disponible', 'error'); return; }
+    const n = landingCM.lineCount();
+    landingCM.operation(() => { for (let i = 0; i < n; i++) landingCM.indentLine(i, 'smart'); });
+    scheduleLandingLive();
+    toast('HTML formateado');
+  });
+  // Vista en vivo: activa/desactiva el volcado del editor al iframe con srcdoc.
+  $('landing-live-btn').addEventListener('click', () => {
+    landingLiveOn = !landingLiveOn;
+    $('landing-live-btn').classList.toggle('is-active', landingLiveOn);
+    if (landingLiveOn) { renderLandingLive(); }
+    else { const f = $('landing-frame'); f.hidden = true; f.removeAttribute('srcdoc'); }
+  });
   // Previsualiza apuntando el iframe a la URL pública real (/muestras/<slug>): así se
-  // ve exactamente lo que sirve producción (con su CSP sandbox). Requiere haber
-  // guardado antes; la CSP del panel (frame-src 'self') no permitiría un srcdoc.
+  // ve exactamente lo que sirve producción (con su CSP sandbox permisiva). Requiere
+  // haber guardado antes. Es la fuente de verdad frente a la "Vista en vivo" (srcdoc).
   $('landing-preview-btn').addEventListener('click', () => {
     if (!$('landing-id').value) { toast('Guarda la muestra para previsualizarla', 'error'); return; }
     const slug = ($('landing-slug').value.trim() || '').toLowerCase();
     if (!slug) return;
+    // Apaga la vista en vivo para no mezclar srcdoc con la URL real en el mismo iframe.
+    landingLiveOn = false; $('landing-live-btn').classList.remove('is-active');
     const frame = $('landing-frame');
+    frame.removeAttribute('srcdoc');
     frame.src = `${location.origin}/muestras/${slug}`;
     frame.hidden = false;
   });
@@ -1637,10 +1716,21 @@
   function addLandingAsset(url) {
     const row = document.createElement('div');
     row.className = 'landing-asset';
-    row.innerHTML = `<img src="${esc(url)}" alt="" /><input type="text" readonly value="${esc(url)}" /><button type="button" class="btn-ghost">Copiar</button>`;
-    row.querySelector('button').addEventListener('click', async () => {
+    row.innerHTML = `<img src="${esc(url)}" alt="" /><input type="text" readonly value="${esc(url)}" /><button type="button" class="btn-ghost" data-a="copy">Copiar</button><button type="button" class="btn-danger" data-a="del">Eliminar</button>`;
+    row.querySelector('[data-a="copy"]').addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(url); toast('URL copiada'); }
       catch { row.querySelector('input').select(); toast('Selecciona y copia (Ctrl+C)', 'error'); }
+    });
+    // Elimina la imagen de la BD. Se extrae el id de la URL /api/media/<id>. Si ya la
+    // pegaste en el HTML, quedará rota: por eso se confirma antes.
+    row.querySelector('[data-a="del"]').addEventListener('click', async () => {
+      const m = url.match(/\/api\/media\/(\d+)/);
+      if (!m) { row.remove(); return; }
+      const okc = await confirmDialog({ title: 'Eliminar imagen', message: 'Se borrará del servidor. Si ya la usaste en el HTML, ese enlace quedará roto.', confirmText: 'Eliminar', danger: true });
+      if (!okc) return;
+      const r = await api(`/api/admin/media/${m[1]}`, { method: 'DELETE' });
+      if (r.ok) { row.remove(); toast('Imagen eliminada'); }
+      else toast((r.body && r.body.error) || 'No se pudo eliminar la imagen', 'error');
     });
     $('landing-assets').prepend(row);
   }
