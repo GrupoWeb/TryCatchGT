@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/framer-theme.css" />
+  <link rel="stylesheet" href="{{ADMIN_BASE}}/vendor/codemirror.min.css" />
   <link rel="stylesheet" href="{{ADMIN_BASE}}/admin.css" />
 </head>
 <body>
@@ -553,6 +554,11 @@
                 <input type="hidden" id="landing-id" />
                 <div class="admin-field"><label for="landing-title-in">Título *</label><input type="text" id="landing-title-in" placeholder="Demo Ferretería El Tornillo" /></div>
                 <div class="admin-field"><label for="landing-slug">Slug (opcional)</label><input type="text" id="landing-slug" placeholder="ferreteria-el-tornillo" /></div>
+                <div class="admin-field">
+                  <label class="admin-check"><input type="checkbox" id="landing-active" checked /> Muestra publicada
+                    <span class="admin-hint">(si la desactivas, <code>/muestras/&lt;slug&gt;</code> responde 404)</span>
+                  </label>
+                </div>
                 <div class="admin-field" id="landing-url-row" hidden>
                   <label>URL pública</label>
                   <div class="admin-inline">
@@ -578,7 +584,9 @@
                   <div class="admin-inline">
                     <input type="file" id="landing-file" accept=".html,.htm,text/html" hidden />
                     <button type="button" class="btn-ghost" id="landing-upload">Subir .html</button>
-                    <button type="button" class="btn-ghost" id="landing-preview-btn">Previsualizar</button>
+                    <button type="button" class="btn-ghost" id="landing-format">Formatear</button>
+                    <button type="button" class="btn-ghost" id="landing-live-btn">Vista en vivo</button>
+                    <button type="button" class="btn-ghost" id="landing-preview-btn">Previsualizar (URL real)</button>
                   </div>
                   <textarea id="landing-html" rows="16" spellcheck="false" style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.5;white-space:pre;overflow-wrap:normal;"></textarea>
                 </div>
@@ -896,6 +904,7 @@
   </div>
 
   <script src="{{ADMIN_BASE}}/vendor/chart.umd.min.js"></script>
+  <script src="{{ADMIN_BASE}}/vendor/codemirror.bundle.min.js"></script>
   <script src="{{ADMIN_BASE}}/admin.js"></script>
 </body>
 </html>
