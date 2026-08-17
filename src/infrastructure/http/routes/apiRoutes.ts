@@ -302,6 +302,17 @@ apiRouter.post('/admin/uploads', requireAuth, uploadLimiter, (req: AuthedRequest
 // Servido público de las imágenes guardadas en la BD (portadas del blog, avatar).
 apiRouter.get('/media/:id', createMediaHandler(mediaRepository));
 
+// Borra una imagen subida. Solo admin: es destructivo y el id podría estar en uso por
+// otra pieza (p. ej. una portada del blog). En el panel solo se ofrece sobre imágenes
+// recién subidas en la sesión de edición de una muestra.
+apiRouter.delete('/admin/media/:id', requireAuth, requireAdmin, async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) { res.status(404).json({ success: false, error: 'Imagen no encontrada.' }); return; }
+  const ok = await mediaRepository.delete(id);
+  if (!ok) { res.status(404).json({ success: false, error: 'Imagen no encontrada.' }); return; }
+  res.status(200).json({ success: true });
+});
+
 // Blog
 apiRouter.get('/admin/posts', requireAuth, adminBlogController.list);
 apiRouter.get('/admin/posts/:id', requireAuth, adminBlogController.getById);

@@ -1716,10 +1716,21 @@
   function addLandingAsset(url) {
     const row = document.createElement('div');
     row.className = 'landing-asset';
-    row.innerHTML = `<img src="${esc(url)}" alt="" /><input type="text" readonly value="${esc(url)}" /><button type="button" class="btn-ghost">Copiar</button>`;
-    row.querySelector('button').addEventListener('click', async () => {
+    row.innerHTML = `<img src="${esc(url)}" alt="" /><input type="text" readonly value="${esc(url)}" /><button type="button" class="btn-ghost" data-a="copy">Copiar</button><button type="button" class="btn-danger" data-a="del">Eliminar</button>`;
+    row.querySelector('[data-a="copy"]').addEventListener('click', async () => {
       try { await navigator.clipboard.writeText(url); toast('URL copiada'); }
       catch { row.querySelector('input').select(); toast('Selecciona y copia (Ctrl+C)', 'error'); }
+    });
+    // Elimina la imagen de la BD. Se extrae el id de la URL /api/media/<id>. Si ya la
+    // pegaste en el HTML, quedará rota: por eso se confirma antes.
+    row.querySelector('[data-a="del"]').addEventListener('click', async () => {
+      const m = url.match(/\/api\/media\/(\d+)/);
+      if (!m) { row.remove(); return; }
+      const okc = await confirmDialog({ title: 'Eliminar imagen', message: 'Se borrará del servidor. Si ya la usaste en el HTML, ese enlace quedará roto.', confirmText: 'Eliminar', danger: true });
+      if (!okc) return;
+      const r = await api(`/api/admin/media/${m[1]}`, { method: 'DELETE' });
+      if (r.ok) { row.remove(); toast('Imagen eliminada'); }
+      else toast((r.body && r.body.error) || 'No se pudo eliminar la imagen', 'error');
     });
     $('landing-assets').prepend(row);
   }
