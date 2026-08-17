@@ -9,6 +9,8 @@ function toDomain(e: LandingSampleEntity): LandingSample {
     slug: e.slug,
     title: e.title,
     html: e.html,
+    // MySQL devuelve tinyint como número; normaliza a booleano.
+    isActive: !!e.isActive,
     createdBy: e.createdBy ?? null,
     createdAt: e.createdAt,
     updatedAt: e.updatedAt,
@@ -41,6 +43,7 @@ export class TypeOrmLandingSampleRepository implements LandingSampleRepository {
       slug: sample.slug,
       title: sample.title,
       html: sample.html,
+      isActive: sample.isActive,
       createdBy: sample.createdBy ?? null,
     });
     const saved = await this.repo.save(entity);

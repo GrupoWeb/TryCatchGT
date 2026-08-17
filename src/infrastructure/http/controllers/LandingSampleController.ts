@@ -10,6 +10,7 @@ function toListView(s: LandingSample) {
     id: s.id,
     slug: s.slug,
     title: s.title,
+    isActive: s.isActive,
     updatedAt: s.updatedAt,
     url: `/muestras/${s.slug}`,
   };
@@ -22,6 +23,7 @@ function toDetailView(s: LandingSample) {
     slug: s.slug,
     title: s.title,
     html: s.html,
+    isActive: s.isActive,
     updatedAt: s.updatedAt,
     url: `/muestras/${s.slug}`,
   };
@@ -55,6 +57,26 @@ export class LandingSampleController {
     res.status(200).json({ success: true });
   };
 
+  /**
+   * Publica/despublica una muestra sin reenviar el HTML (toggle rápido desde la lista).
+   * Reconstruye la muestra con el nuevo estado y la reguarda; el resto de campos se
+   * conservan tal cual estaban.
+   */
+  public setActive = async (req: AuthedRequest, res: Response): Promise<void> => {
+    const current = await this.repo.findById(Number(req.params.id));
+    if (!current) { res.status(404).json({ success: false, error: 'Muestra no encontrada.' }); return; }
+    const isActive = req.body?.isActive === true;
+    const saved = await this.repo.save(new LandingSample({
+      id: current.id,
+      slug: current.slug,
+      title: current.title,
+      html: current.html,
+      isActive,
+      createdBy: current.createdBy,
+    }));
+    res.status(200).json({ success: true, data: toListView(saved) });
+  };
+
   private async upsert(req: AuthedRequest, res: Response, id?: number): Promise<void> {
     try {
       const b = req.body ?? {};
@@ -85,11 +107,20 @@ export class LandingSampleController {
         res.status(409).json({ success: false, error: 'Ese slug ya está en uso por otra muestra.' });
         return;
       }
+      // Estado publicado/borrador. Si el cliente no lo envía: al crear queda activa
+      // (default del dominio); al actualizar se conserva el estado que ya tenía, para
+      // que un update sin el campo no republique un borrador por accidente.
+      let isActive: boolean | undefined = typeof b.isActive === 'boolean' ? b.isActive : undefined;
+      if (isActive === undefined && id) {
+        const current = await this.repo.findById(id);
+        isActive = current?.isActive;
+      }
       const sample = new LandingSample({
         id,
         slug,
         title: String(b.title).trim(),
         html,
+        isActive,
         createdBy: req.userId ?? null,
       });
       const saved = await this.repo.save(sample);

@@ -16,4 +16,9 @@ export class TypeOrmMediaRepository implements MediaRepository {
     const row = await this.repo.findOne({ where: { id }, select: ['mime', 'data'] });
     return row ? { mime: row.mime, data: row.data } : null;
   }
+
+  public async delete(id: number): Promise<boolean> {
+    const result = await this.repo.delete({ id });
+    return (result.affected ?? 0) > 0;
+  }
 }
