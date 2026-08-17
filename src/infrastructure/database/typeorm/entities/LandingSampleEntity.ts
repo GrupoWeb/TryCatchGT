@@ -16,6 +16,10 @@ export class LandingSampleEntity {
   @Column({ type: 'longtext' })
   html!: string;
 
+  // Publicada (1) o borrador (0). Si es 0, /muestras/<slug> responde 404.
+  @Column({ name: 'is_active', type: 'tinyint', width: 1, default: 1 })
+  isActive!: boolean;
+
   @Column({ name: 'created_by', type: 'int', nullable: true })
   createdBy!: number | null;
 

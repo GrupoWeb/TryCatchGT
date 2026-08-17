@@ -363,6 +363,7 @@ apiRouter.get('/admin/landings', requireAuth, requireAdmin, landingSampleControl
 apiRouter.get('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.getById);
 apiRouter.post('/admin/landings', requireAuth, requireAdmin, landingSampleController.create);
 apiRouter.put('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.update);
+apiRouter.patch('/admin/landings/:id/active', requireAuth, requireAdmin, landingSampleController.setActive);
 apiRouter.delete('/admin/landings/:id', requireAuth, requireAdmin, landingSampleController.remove);
 
 // Configuración del sitio (incluye credenciales SMTP/Turnstile → solo admin)

@@ -53,4 +53,13 @@ describe('createLandingHandler — sirve muestras aisladas con CSP sandbox', () 
     expect(res.statusCode).toBe(404);
     expect(res.type_).toBe('text/plain');
   });
+
+  it('404 si la muestra existe pero está en borrador (isActive=false)', async () => {
+    const draft = new LandingSample({ id: 2, slug: 'borrador', title: 'Borrador', html: '<h1>Oculto</h1>', isActive: false });
+    const handler = createLandingHandler(repoWith(draft));
+    const res = mockRes();
+    await handler({ params: { slug: 'borrador' } } as any, res);
+    expect(res.statusCode).toBe(404);
+    expect(res.body).not.toBe('<h1>Oculto</h1>'); // no filtra el contenido ni la existencia
+  });
 });
