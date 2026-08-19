@@ -31,9 +31,12 @@ describe('createLandingHandler — sirve muestras aisladas con CSP sandbox', () 
     await handler({ params: { slug: 'demo-ferreteria' } } as any, res);
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe('<h1>Hola</h1>');
-    expect(res.headers['Content-Security-Policy']).toBe("sandbox allow-scripts allow-popups allow-forms; frame-ancestors 'none'");
+    expect(res.headers['Content-Security-Policy']).toContain('sandbox allow-scripts allow-popups allow-forms');
     expect(res.headers['Content-Security-Policy']).not.toContain('allow-same-origin');
-    expect(res.headers['Content-Security-Policy']).toContain("frame-ancestors 'none'"); // anti-clickjacking
+    expect(res.headers['Content-Security-Policy']).toContain("frame-ancestors 'self'"); // anti-clickjacking + preview admin
+    expect(res.headers['Content-Security-Policy']).toContain("base-uri 'none'");
+    expect(res.headers['Content-Security-Policy']).toContain("object-src 'none'");
+    expect(res.headers['Content-Security-Policy']).toContain("form-action 'self' https: mailto:");
     expect(res.headers['X-Robots-Tag']).toBe('noindex, nofollow');
     expect(res.headers['Content-Type']).toBe('text/html; charset=utf-8');
     expect(res.headers['Cache-Control']).toBe('no-store');

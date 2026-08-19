@@ -4,6 +4,8 @@ import { LandingSample } from '../../../domain/entities/LandingSample.js';
 import { slugify } from '../../../domain/entities/BlogPost.js';
 import { AuthedRequest } from '../middleware/requireAuth.js';
 
+const MAX_LANDING_HTML_BYTES = 200 * 1024;
+
 // Vista de lista: sin el HTML (puede ser enorme) — solo lo necesario para el panel.
 function toListView(s: LandingSample) {
   return {
@@ -94,6 +96,10 @@ export class LandingSampleController {
         : String(b.html ?? '');
       if (!html.trim()) {
         res.status(400).json({ success: false, error: 'El HTML de la muestra no puede estar vacío.' });
+        return;
+      }
+      if (Buffer.byteLength(html, 'utf8') > MAX_LANDING_HTML_BYTES) {
+        res.status(400).json({ success: false, error: 'El HTML de la muestra no puede superar 200 KB.' });
         return;
       }
       const slug = ((b.slug && String(b.slug).trim()) || slugify(String(b.title))).toLowerCase();
