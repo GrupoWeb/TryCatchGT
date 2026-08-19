@@ -35,6 +35,7 @@ import { issueCsrfToken, createCsrfGuard } from '../csrf.js';
 import { createHealthCheck } from '../health.js';
 import { createMediaHandler } from '../media.js';
 import { createLandingHandler } from '../landing.js';
+import { createDatabaseReadyGuard } from '../middleware/databaseReady.js';
 import { AppDataSource } from '../../database/typeorm/data-source.js';
 
 // Use cases
@@ -244,6 +245,10 @@ apiRouter.use(auditLog);
 // del contenedor detecte una BD caída en vez de dar por sano al server. El
 // sondeo va cacheado y con rate limit para no amplificar carga contra la BD.
 apiRouter.get('/health', healthLimiter, createHealthCheck(AppDataSource));
+
+// Si TypeORM no inicializó (credenciales/host/BD caída en producción), las demás
+// rutas API devuelven 503 controlado en vez de tocar repositorios desconectados.
+apiRouter.use(createDatabaseReadyGuard(AppDataSource));
 
 // Público
 apiRouter.get('/config', siteConfigController.publicConfig);
