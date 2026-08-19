@@ -44,7 +44,7 @@ if (env.security.corsOrigins.length) {
 // base64, +33%), así que sus rutas de escritura usan un límite mayor. Es seguro: solo
 // las alcanza un admin autenticado (requireAuth + requireAdmin + CSRF).
 const defaultJson = express.json({ limit: '200kb' });
-const landingJson = express.json({ limit: '2mb' });
+const landingJson = express.json({ limit: '300kb' });
 app.use((req, res, next) => {
   if (req.method !== 'GET' && req.method !== 'HEAD' && req.path.startsWith('/api/admin/landings')) {
     return landingJson(req, res, next);

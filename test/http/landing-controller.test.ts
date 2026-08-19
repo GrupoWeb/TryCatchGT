@@ -53,6 +53,19 @@ describe('LandingSampleController.create — el HTML llega en base64', () => {
     expect(res.jsonBody.success).toBe(false);
   });
 
+  it('rechaza (400) si el HTML decodificado supera 200 KB', async () => {
+    const { repo } = memRepo();
+    const ctrl = new LandingSampleController(repo);
+    const html = `<p>${'x'.repeat((200 * 1024) + 1)}</p>`;
+    const res = mockRes();
+    await ctrl.create(
+      { body: { title: 'Grande', slug: 'grande', htmlBase64: utf8ToBase64(html) }, userId: 1 } as any,
+      res as any,
+    );
+    expect(res.statusCode).toBe(400);
+    expect(res.jsonBody.error).toContain('200 KB');
+  });
+
   it('acepta el campo `html` en crudo como respaldo (compatibilidad)', async () => {
     const { repo, state } = memRepo();
     const ctrl = new LandingSampleController(repo);
